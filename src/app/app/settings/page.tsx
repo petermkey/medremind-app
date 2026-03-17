@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
+import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -21,8 +22,11 @@ export default function SettingsPage() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  function saveProfile() {
-    updateProfile({ name: name.trim(), timezone, ageRange: ageRange as '18-30'|'31-50'|'51-70'|'70+' });
+  async function handleSaveProfile() {
+    const patch = { name: name.trim(), timezone, ageRange: ageRange as '18-30'|'31-50'|'51-70'|'70+' };
+    updateProfile(patch);
+    const p = useStore.getState().profile;
+    if (p) await saveProfile({ ...p, ...patch });
     show('✓ Profile saved');
   }
 
@@ -42,12 +46,14 @@ export default function SettingsPage() {
     }
   }
 
-  function handleSignOut() {
+  async function handleSignOut() {
+    await supabaseSignOut();
     signOut();
     router.push('/login');
   }
 
-  function handleDeleteAccount() {
+  async function handleDeleteAccount() {
+    await supabaseSignOut();
     signOut();
     if (typeof window !== 'undefined') localStorage.clear();
     router.push('/register');
@@ -70,7 +76,7 @@ export default function SettingsPage() {
             <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Timezone</label>
             <p className="text-sm text-[#F0F6FC] bg-[#1C2333] px-4 py-3 rounded-xl border border-[rgba(255,255,255,0.08)]">{timezone}</p>
           </div>
-          <Button size="sm" onClick={saveProfile}>Save Profile</Button>
+          <Button size="sm" onClick={handleSaveProfile}>Save Profile</Button>
         </Section>
 
         {/* Notifications */}
