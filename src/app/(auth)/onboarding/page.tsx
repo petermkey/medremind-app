@@ -57,16 +57,15 @@ export default function OnboardingPage() {
     const patch = { name: name.trim(), timezone, ageRange };
     completeOnboarding(patch);
 
-    // Persist to Supabase
-    const profile = useStore.getState().profile;
-    if (profile) {
-      await saveProfile({ ...profile, ...patch, onboarded: true });
-    }
-
     if (selectedProtocolId) {
       const today = new Date().toISOString().slice(0, 10);
       activateProtocol(selectedProtocolId, today);
     }
+
+    // Persist to Supabase — non-blocking, don't block navigation on failure
+    const p = useStore.getState().profile;
+    if (p) saveProfile({ ...p, ...patch, onboarded: true }).catch(() => {});
+
     router.push('/app');
   }
 
