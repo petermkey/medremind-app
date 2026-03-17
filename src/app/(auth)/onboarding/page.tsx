@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
+import { saveProfile } from '@/lib/supabase/auth';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import type { AgeRange, ProtocolCategory } from '@/types';
@@ -52,8 +53,16 @@ export default function OnboardingPage() {
     setStep(3);
   }
 
-  function handleFinish() {
-    completeOnboarding({ name: name.trim(), timezone, ageRange });
+  async function handleFinish() {
+    const patch = { name: name.trim(), timezone, ageRange };
+    completeOnboarding(patch);
+
+    // Persist to Supabase
+    const profile = useStore.getState().profile;
+    if (profile) {
+      await saveProfile({ ...profile, ...patch, onboarded: true });
+    }
+
     if (selectedProtocolId) {
       const today = new Date().toISOString().slice(0, 10);
       activateProtocol(selectedProtocolId, today);
