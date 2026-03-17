@@ -126,9 +126,12 @@ export function AddDoseSheet({ open, onClose }: Props) {
       color: ['blue', 'green', 'purple', 'yellow', 'red', 'pink'][Math.floor(Math.random() * 6)],
     });
 
-    // Regenerate doses for the active protocol
-    const activeInstance = activeProtocols.find(ap => ap.protocolId === protocolId && ap.status === 'active');
-    if (activeInstance) regenerateDoses(activeInstance.id);
+    // Read activeProtocols from store directly (not stale closure) — activateProtocol
+    // may have just run and the React closure hasn't updated yet.
+    const freshInstance = useStore.getState().activeProtocols.find(
+      ap => ap.protocolId === protocolId && ap.status === 'active'
+    );
+    if (freshInstance) regenerateDoses(freshInstance.id);
 
     show(`✓ ${name.trim()} added`);
     reset();
