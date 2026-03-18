@@ -1,17 +1,85 @@
 'use client';
-import { use, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { use, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
-import type { ProtocolItem } from '@/types';
+import type { DoseForm, FrequencyType, ProtocolCategory, ProtocolItem, RouteOfAdmin } from '@/types';
 
 const ROUTE_LABELS: Record<string, string> = {
   oral: 'Oral', subcutaneous: 'Subcut.', intramuscular: 'IM',
   topical: 'Topical', sublingual: 'Sublingual', inhalation: 'Inhaler', nasal: 'Nasal', iv: 'IV', other: 'Other',
 };
+
+const CATEGORY_OPTIONS: { value: ProtocolCategory; label: string }[] = [
+  { value: 'general', label: 'General Health' },
+  { value: 'cardiovascular', label: 'Cardiovascular' },
+  { value: 'metabolic', label: 'Metabolic' },
+  { value: 'hormonal', label: 'Hormonal' },
+  { value: 'neurological', label: 'Neurological' },
+  { value: 'immune', label: 'Immune' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const COLORS = ['blue', 'green', 'purple', 'yellow', 'red', 'pink'];
+const COLOR_VALS: Record<string, string> = {
+  blue: '#3B82F6', green: '#10B981', purple: '#8B5CF6',
+  yellow: '#FBBF24', red: '#EF4444', pink: '#EC4899',
+};
+
+type ItemDraft = {
+  itemType: ProtocolItem['itemType'];
+  name: string;
+  doseAmount: string;
+  doseUnit: string;
+  doseForm: DoseForm;
+  route: RouteOfAdmin;
+  frequencyType: FrequencyType;
+  frequencyValue: string;
+  time: string;
+  withFood: 'yes' | 'no' | 'any';
+  instructions: string;
+  icon: string;
+  color: string;
+};
+
+function emptyDraft(): ItemDraft {
+  return {
+    itemType: 'medication',
+    name: '',
+    doseAmount: '',
+    doseUnit: 'mg',
+    doseForm: 'tablet',
+    route: 'oral',
+    frequencyType: 'daily',
+    frequencyValue: '2',
+    time: '08:00',
+    withFood: 'any',
+    instructions: '',
+    icon: '💊',
+    color: 'blue',
+  };
+}
+
+function draftFromItem(item: ProtocolItem): ItemDraft {
+  return {
+    itemType: item.itemType,
+    name: item.name,
+    doseAmount: item.doseAmount !== undefined ? String(item.doseAmount) : '',
+    doseUnit: item.doseUnit ?? 'mg',
+    doseForm: item.doseForm ?? 'tablet',
+    route: item.route ?? 'oral',
+    frequencyType: item.frequencyType,
+    frequencyValue: String(item.frequencyValue ?? 2),
+    time: item.times[0] ?? '08:00',
+    withFood: item.withFood ?? 'any',
+    instructions: item.instructions ?? '',
+    icon: item.icon ?? (item.itemType === 'analysis' ? '🧪' : item.itemType === 'therapy' ? '🩺' : '💊'),
+    color: item.color ?? 'blue',
+  };
+}
 
 function frequencyLabel(item: ProtocolItem) {
   if (item.frequencyType === 'every_n_days') {
@@ -23,6 +91,7 @@ function frequencyLabel(item: ProtocolItem) {
 export default function ProtocolDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     protocols,
     activeProtocols,
@@ -31,62 +100,124 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     resumeProtocol,
     completeProtocol,
     updateProtocol,
+    addProtocolItem,
     removeProtocolItem,
     regenerateDoses,
   } = useStore();
   const { show } = useToast();
-  const [editingItem, setEditingItem] = useState<ProtocolItem | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDoseAmount, setEditDoseAmount] = useState('');
-  const [editDoseUnit, setEditDoseUnit] = useState('mg');
-  const [editTime, setEditTime] = useState('08:00');
-  const [editFrequencyType, setEditFrequencyType] = useState<ProtocolItem['frequencyType']>('daily');
-  const [editFrequencyValue, setEditFrequencyValue] = useState('2');
 
   const protocol = protocols.find(p => p.id === id);
   const instance = activeProtocols.find(ap => ap.protocolId === id);
   const protocolId = protocol?.id;
 
-  if (!protocol) return (
-    <div className="flex flex-col items-center justify-center h-full gap-3">
-      <div className="text-4xl">🤷</div>
-      <div className="text-sm text-[#8B949E]">Protocol not found</div>
-      <Button onClick={() => router.back()}>Go back</Button>
-    </div>
-  );
+  const [metaName, setMetaName] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
+  const [metaCategory, setMetaCategory] = useState<ProtocolCategory>('custom');
+
+  const [editingItem, setEditingItem] = useState<ProtocolItem | null>(null);
+  const [itemDraft, setItemDraft] = useState<ItemDraft>(emptyDraft());
+
+  useEffect(() => {
+    if (!protocol) return;
+    setMetaName(protocol.name);
+    setMetaDescription(protocol.description ?? '');
+    setMetaCategory(protocol.category);
+  }, [protocol?.id, protocol?.name, protocol?.description, protocol?.category]);
+
+  useEffect(() => {
+    if (searchParams.get('edit') === '1') {
+      const section = document.getElementById('protocol-edit-section');
+      section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [searchParams]);
+
+  if (!protocol) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3">
+        <div className="text-4xl">🤷</div>
+        <div className="text-sm text-[#8B949E]">Protocol not found</div>
+        <Button onClick={() => router.back()}>Go back</Button>
+      </div>
+    );
+  }
+
+  function saveProtocolMeta() {
+    if (!protocol) return;
+    if (!metaName.trim()) {
+      show('Protocol name is required', 'warning');
+      return;
+    }
+    updateProtocol(protocol.id, {
+      name: metaName.trim(),
+      description: metaDescription.trim() || undefined,
+      category: metaCategory,
+    });
+    show('✓ Protocol details updated');
+  }
 
   function openEditItem(item: ProtocolItem) {
     setEditingItem(item);
-    setEditName(item.name);
-    setEditDoseAmount(item.doseAmount ? String(item.doseAmount) : '');
-    setEditDoseUnit(item.doseUnit ?? 'mg');
-    setEditTime(item.times[0] ?? '08:00');
-    setEditFrequencyType(item.frequencyType);
-    setEditFrequencyValue(String(item.frequencyValue ?? 2));
+    setItemDraft(draftFromItem(item));
   }
 
-  function saveEditItem() {
-    if (!editingItem || !protocol) return;
-    if (!editName.trim()) {
+  function resetItemEditor() {
+    setEditingItem(null);
+    setItemDraft(emptyDraft());
+  }
+
+  function buildItemPayload(sortOrder: number): Omit<ProtocolItem, 'id' | 'protocolId'> {
+    const normalizedFrequencyValue = itemDraft.frequencyType === 'every_n_days'
+      ? Math.max(1, parseInt(itemDraft.frequencyValue || '1', 10))
+      : undefined;
+
+    return {
+      itemType: itemDraft.itemType,
+      name: itemDraft.name.trim(),
+      doseAmount: itemDraft.doseAmount ? parseFloat(itemDraft.doseAmount) : undefined,
+      doseUnit: itemDraft.doseUnit || undefined,
+      doseForm: itemDraft.itemType === 'medication' ? itemDraft.doseForm : undefined,
+      route: itemDraft.itemType === 'medication' ? itemDraft.route : undefined,
+      frequencyType: itemDraft.frequencyType,
+      frequencyValue: normalizedFrequencyValue,
+      times: [itemDraft.time],
+      withFood: itemDraft.itemType === 'medication' ? itemDraft.withFood : undefined,
+      instructions: itemDraft.instructions.trim() || undefined,
+      startDay: 1,
+      endDay: undefined,
+      sortOrder,
+      icon: itemDraft.icon,
+      color: itemDraft.color,
+      drugId: undefined,
+    };
+  }
+
+  function saveItem() {
+    if (!protocol) return;
+    if (!itemDraft.name.trim()) {
       show('Item name is required', 'warning');
       return;
     }
-    const updatedItems = protocol.items.map(item => {
+
+    if (!editingItem) {
+      addProtocolItem(protocol.id, buildItemPayload(protocol.items.length));
+      if (instance && instance.status === 'active') regenerateDoses(instance.id);
+      show('✓ Item added');
+      resetItemEditor();
+      return;
+    }
+
+    const updatedItems = protocol.items.map((item, idx) => {
       if (item.id !== editingItem.id) return item;
       return {
         ...item,
-        name: editName.trim(),
-        doseAmount: editDoseAmount ? parseFloat(editDoseAmount) : undefined,
-        doseUnit: editDoseUnit,
-        frequencyType: editFrequencyType,
-        frequencyValue: editFrequencyType === 'every_n_days' ? Math.max(1, parseInt(editFrequencyValue || '1', 10)) : undefined,
-        times: [editTime],
+        ...buildItemPayload(idx),
       };
     });
+
     updateProtocol(protocol.id, { items: updatedItems });
     if (instance && instance.status === 'active') regenerateDoses(instance.id);
     show('✓ Item updated');
-    setEditingItem(null);
+    resetItemEditor();
   }
 
   function handleDeleteItem(item: ProtocolItem) {
@@ -122,7 +253,6 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 mt-4">
           {!instance && (
             <Button size="sm" onClick={handleActivate}>▶ Activate</Button>
@@ -140,7 +270,29 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {/* Meta */}
+        <div id="protocol-edit-section" className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5 flex flex-col gap-3">
+          <div className="text-xs font-bold text-[#3B82F6] uppercase tracking-wide">Edit protocol</div>
+          <Input label="Name" value={metaName} onChange={e => setMetaName(e.target.value)} />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Description</label>
+            <textarea
+              value={metaDescription}
+              onChange={e => setMetaDescription(e.target.value)}
+              rows={3}
+              className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
+            />
+          </div>
+          <Select
+            label="Category"
+            value={metaCategory}
+            onChange={e => setMetaCategory(e.target.value as ProtocolCategory)}
+            options={CATEGORY_OPTIONS}
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={saveProtocolMeta}>Save protocol details</Button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 gap-2 mb-5">
           {[
             { label: 'Items', value: protocol.items.length },
@@ -154,10 +306,159 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           ))}
         </div>
 
-        {/* Items */}
+        <div className="bg-[#161B22] border border-[rgba(59,130,246,0.25)] rounded-2xl p-4 flex flex-col gap-3 mb-5">
+          <div className="text-xs font-bold text-[#3B82F6] uppercase tracking-wide">
+            {editingItem ? 'Edit item' : 'Add item'}
+          </div>
+
+          <Select
+            label="Type"
+            value={itemDraft.itemType}
+            onChange={e => {
+              const value = e.target.value as ProtocolItem['itemType'];
+              setItemDraft(d => ({
+                ...d,
+                itemType: value,
+                icon: value === 'analysis' ? '🧪' : value === 'therapy' ? '🩺' : '💊',
+              }));
+            }}
+            options={[
+              { value: 'medication', label: '💊 Medication' },
+              { value: 'analysis', label: '🧪 Lab Analysis' },
+              { value: 'therapy', label: '🩺 Therapy' },
+            ]}
+          />
+
+          <Input label="Name" value={itemDraft.name} onChange={e => setItemDraft(d => ({ ...d, name: e.target.value }))} />
+
+          {itemDraft.itemType === 'medication' && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Amount"
+                  type="number"
+                  value={itemDraft.doseAmount}
+                  onChange={e => setItemDraft(d => ({ ...d, doseAmount: e.target.value }))}
+                />
+                <Select
+                  label="Unit"
+                  value={itemDraft.doseUnit}
+                  onChange={e => setItemDraft(d => ({ ...d, doseUnit: e.target.value }))}
+                  options={['mg', 'mcg', 'IU', 'ml', 'units', 'g'].map(v => ({ value: v, label: v }))}
+                />
+              </div>
+              <Select
+                label="Form"
+                value={itemDraft.doseForm}
+                onChange={e => setItemDraft(d => ({ ...d, doseForm: e.target.value as DoseForm }))}
+                options={[
+                  { value: 'tablet', label: 'Tablet' },
+                  { value: 'capsule', label: 'Capsule' },
+                  { value: 'injection', label: 'Injection' },
+                  { value: 'drops', label: 'Drops/Liquid' },
+                  { value: 'cream', label: 'Cream/Gel' },
+                  { value: 'powder', label: 'Powder' },
+                  { value: 'patch', label: 'Patch' },
+                  { value: 'inhaler', label: 'Inhaler' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
+              <Select
+                label="Route"
+                value={itemDraft.route}
+                onChange={e => setItemDraft(d => ({ ...d, route: e.target.value as RouteOfAdmin }))}
+                options={[
+                  { value: 'oral', label: 'Oral' },
+                  { value: 'subcutaneous', label: 'Subcutaneous' },
+                  { value: 'intramuscular', label: 'Intramuscular' },
+                  { value: 'topical', label: 'Topical' },
+                  { value: 'sublingual', label: 'Sublingual' },
+                  { value: 'inhalation', label: 'Inhalation' },
+                  { value: 'nasal', label: 'Nasal' },
+                  { value: 'iv', label: 'IV' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
+              <Select
+                label="With food"
+                value={itemDraft.withFood}
+                onChange={e => setItemDraft(d => ({ ...d, withFood: e.target.value as 'yes' | 'no' | 'any' }))}
+                options={[
+                  { value: 'any', label: 'No preference' },
+                  { value: 'yes', label: 'With food' },
+                  { value: 'no', label: 'Empty stomach' },
+                ]}
+              />
+            </>
+          )}
+
+          <Select
+            label="Frequency"
+            value={itemDraft.frequencyType}
+            onChange={e => setItemDraft(d => ({ ...d, frequencyType: e.target.value as FrequencyType }))}
+            options={[
+              { value: 'daily', label: 'Once daily' },
+              { value: 'twice_daily', label: 'Twice daily' },
+              { value: 'three_times_daily', label: 'Three times daily' },
+              { value: 'every_n_days', label: 'Every N days' },
+              { value: 'weekly', label: 'Weekly' },
+            ]}
+          />
+
+          {itemDraft.frequencyType === 'every_n_days' && (
+            <Input
+              label="Every N days"
+              type="number"
+              value={itemDraft.frequencyValue}
+              onChange={e => setItemDraft(d => ({ ...d, frequencyValue: String(Math.max(1, parseInt(e.target.value || '1', 10))) }))}
+            />
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Time</label>
+            <input
+              type="time"
+              value={itemDraft.time}
+              onChange={e => setItemDraft(d => ({ ...d, time: e.target.value }))}
+              className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6]"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Instructions</label>
+            <textarea
+              value={itemDraft.instructions}
+              onChange={e => setItemDraft(d => ({ ...d, instructions: e.target.value }))}
+              rows={2}
+              className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide mb-2 block">Colour</label>
+            <div className="flex gap-2">
+              {COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setItemDraft(d => ({ ...d, color: c }))}
+                  className={`w-7 h-7 rounded-full transition-all ${itemDraft.color === c ? 'scale-125 ring-2 ring-white/40' : ''}`}
+                  style={{ background: COLOR_VALS[c] }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            {editingItem && (
+              <Button size="sm" variant="secondary" onClick={resetItemEditor}>Cancel</Button>
+            )}
+            <Button size="sm" onClick={saveItem}>{editingItem ? 'Save item' : '+ Add item'}</Button>
+          </div>
+        </div>
+
         <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Items</div>
         {protocol.items.length === 0 && (
-          <div className="text-center py-8 text-sm text-[#8B949E]">No items yet. Edit this protocol to add medications.</div>
+          <div className="text-center py-8 text-sm text-[#8B949E]">No items yet. Use the editor above to add medications.</div>
         )}
         {protocol.items.map(item => (
           <ItemRow
@@ -196,57 +497,10 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           </ItemRow>
         ))}
 
-        {/* Disclaimer */}
         <div className="mt-6 text-[11px] text-[#8B949E] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 leading-relaxed">
           ⚠️ This protocol is for personal tracking purposes only. MedRemind does not provide medical advice. Always consult your healthcare provider before starting, modifying, or stopping any medication or supplement protocol.
         </div>
       </div>
-
-      {editingItem && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center sm:justify-center p-4">
-          <div className="w-full sm:max-w-md bg-[#161B22] border border-[rgba(255,255,255,0.12)] rounded-2xl p-4 flex flex-col gap-3">
-            <div className="text-sm font-bold text-[#F0F6FC]">Edit item</div>
-            <Input label="Name" value={editName} onChange={e => setEditName(e.target.value)} />
-            <div className="grid grid-cols-2 gap-2">
-              <Input label="Amount" type="number" value={editDoseAmount} onChange={e => setEditDoseAmount(e.target.value)} />
-              <Input label="Unit" value={editDoseUnit} onChange={e => setEditDoseUnit(e.target.value)} />
-            </div>
-            <Select
-              label="Frequency"
-              value={editFrequencyType}
-              onChange={e => setEditFrequencyType(e.target.value as ProtocolItem['frequencyType'])}
-              options={[
-                { value: 'daily', label: 'Once daily' },
-                { value: 'twice_daily', label: 'Twice daily' },
-                { value: 'three_times_daily', label: 'Three times daily' },
-                { value: 'every_n_days', label: 'Every N days' },
-                { value: 'weekly', label: 'Weekly' },
-              ]}
-            />
-            {editFrequencyType === 'every_n_days' && (
-              <Input
-                label="Every N days"
-                type="number"
-                value={editFrequencyValue}
-                onChange={e => setEditFrequencyValue(String(Math.max(1, parseInt(e.target.value || '1', 10))))}
-              />
-            )}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Time</label>
-              <input
-                type="time"
-                value={editTime}
-                onChange={e => setEditTime(e.target.value)}
-                className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6]"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="secondary" size="sm" onClick={() => setEditingItem(null)}>Cancel</Button>
-              <Button size="sm" onClick={saveEditItem}>Save</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

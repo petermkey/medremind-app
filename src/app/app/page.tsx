@@ -1,12 +1,13 @@
 'use client';
 import { useMemo, useState, useEffect } from 'react';
-import { format, parseISO } from 'date-fns';
+import { addDays, addMinutes, format, parseISO } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { WeekStrip } from '@/components/app/WeekStrip';
 import { MedCard } from '@/components/app/MedCard';
 import { AddDoseSheet } from '@/components/app/AddDoseSheet';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
+import type { ScheduledDose } from '@/types';
 
 function fmtTime(t: string) {
   const [h, m] = t.split(':').map(Number);
@@ -21,13 +22,23 @@ function greeting() {
 }
 
 export default function SchedulePage() {
-  const { profile, getDaySchedule, takeDose, skipDose, snoozeDose, scheduledDoses } = useStore();
+  const {
+    profile,
+    activeProtocols,
+    getDaySchedule,
+    getVisibleDoseDates,
+    takeDose,
+    skipDose,
+    snoozeDose,
+    scheduledDoses,
+  } = useStore();
   const { show } = useToast();
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [clock, setClock] = useState('');
+  const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
 
   useEffect(() => {
     const update = () => setClock(format(new Date(), 'HH:mm'));
@@ -37,19 +48,21 @@ export default function SchedulePage() {
   }, []);
 
   const doses = useMemo(() => getDaySchedule(selectedDate), [selectedDate, scheduledDoses]);
+  const visibleDoses = useMemo(
+    () => doses.filter(d => d.status !== 'skipped'),
+    [doses],
+  );
 
   // Dates that have at least one dose (for week strip dots)
   const doseDateSet = useMemo(() => {
-    const s = new Set<string>();
-    scheduledDoses.forEach(d => s.add(d.scheduledDate));
-    return s;
-  }, [scheduledDoses]);
+    return new Set<string>(getVisibleDoseDates());
+  }, [scheduledDoses, activeProtocols, getVisibleDoseDates]);
 
   // Group by time block
   const grouped = useMemo(() => {
-    const blocks: { label: string; doses: typeof doses }[] = [];
+    const blocks: { label: string; doses: typeof visibleDoses }[] = [];
     const seen: Record<string, number> = {};
-    for (const dose of doses) {
+    for (const dose of visibleDoses) {
       const [h] = dose.scheduledTime.split(':').map(Number);
       const label = h < 12 ? `Morning · ${fmtTime(dose.scheduledTime)}` :
                     h < 17 ? `Afternoon · ${fmtTime(dose.scheduledTime)}` :
@@ -58,15 +71,49 @@ export default function SchedulePage() {
       blocks[seen[label]].doses.push(dose);
     }
     return blocks;
-  }, [doses]);
+  }, [visibleDoses]);
 
   const taken = doses.filter(d => d.status === 'taken').length;
   const total = doses.length;
   const pct = total ? Math.round((taken / total) * 100) : 0;
 
   const nextDose = doses
-    .filter(d => d.status === 'pending' || (d.status as string) === 'upcoming')
+    .filter(d => d.status === 'pending' || d.status === 'snoozed' || (d.status as string) === 'upcoming')
     .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
+
+  function getSnoozeUntil(dose: ScheduledDose, option: '15m' | '1h' | 'evening' | 'tomorrow') {
+    const now = new Date();
+    if (option === '15m') return addMinutes(now, 15);
+    if (option === '1h') return addMinutes(now, 60);
+    if (option === 'evening') {
+      const evening = new Date(now);
+      evening.setHours(19, 0, 0, 0);
+      if (evening.getTime() <= now.getTime()) {
+        evening.setHours(21, 0, 0, 0);
+      }
+      return evening.getTime() > now.getTime() ? evening : addMinutes(now, 15);
+    }
+    const [hours, minutes] = dose.scheduledTime.split(':').map(Number);
+    const tomorrow = addDays(now, 1);
+    tomorrow.setHours(hours, minutes, 0, 0);
+    return tomorrow;
+  }
+
+  function applySnooze(option: '15m' | '1h' | 'evening' | 'tomorrow') {
+    if (!snoozeTargetDose) return;
+    const until = getSnoozeUntil(snoozeTargetDose, option);
+    snoozeDose(snoozeTargetDose.id, { until: until.toISOString() });
+    const label =
+      option === '15m'
+        ? '15 minutes'
+        : option === '1h'
+          ? '1 hour'
+          : option === 'evening'
+            ? `this evening (${fmtTime(format(until, 'HH:mm'))})`
+            : `tomorrow (${fmtTime(format(until, 'HH:mm'))})`;
+    show(`⏰ Snoozed to ${label}`, 'warning');
+    setSnoozeTargetDose(null);
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -154,7 +201,7 @@ export default function SchedulePage() {
                 dose={dose}
                 onTake={() => { takeDose(dose.id); show(`✓ ${dose.protocolItem.name} taken`); }}
                 onSkip={() => { skipDose(dose.id); show(`Skipped ${dose.protocolItem.name}`, 'warning'); }}
-                onSnooze={() => { snoozeDose(dose.id, 15); show(`⏰ Snoozed 15 min`, 'warning'); }}
+                onSnooze={() => { setSnoozeTargetDose(dose); }}
               />
             ))}
           </div>
@@ -170,6 +217,23 @@ export default function SchedulePage() {
       </button>
 
       <AddDoseSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
+      {snoozeTargetDose && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-end">
+          <div className="w-full rounded-t-2xl bg-[#0F172A] border-t border-[rgba(255,255,255,0.08)] p-4 pb-6">
+            <div className="text-sm font-bold text-[#F0F6FC] mb-1">Snooze dose</div>
+            <div className="text-xs text-[#8B949E] mb-3">
+              {snoozeTargetDose.protocolItem.name}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => applySnooze('15m')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">15 minutes</button>
+              <button onClick={() => applySnooze('1h')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">1 hour</button>
+              <button onClick={() => applySnooze('evening')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">This evening</button>
+              <button onClick={() => applySnooze('tomorrow')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Tomorrow</button>
+            </div>
+            <button onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#8B949E]">Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -161,9 +161,10 @@ interface AppState {
 
   // Actions — Schedule
   getDaySchedule: (date: string) => ScheduledDose[];
+  getVisibleDoseDates: () => string[];
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
-  snoozeDose: (doseId: string, minutes: number) => void;
+  snoozeDose: (doseId: string, option: number | { until: string }) => void;
   regenerateDoses: (activeProtocolId: string) => void;
 
   // Actions — Settings
@@ -494,8 +495,38 @@ export const useStore = create<AppState>()(
       // ── Schedule ──────────────────────────────────────────────────────
 
       getDaySchedule: (date) => {
-        const doses = get().scheduledDoses.filter(d => d.scheduledDate === date);
+        const todayDate = today();
+        const isPastDate = date < todayDate;
+        if (isPastDate) {
+          const pastDoses = get().scheduledDoses.filter(d => d.scheduledDate === date);
+          return pastDoses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+        }
+
+        const activeIds = new Set(
+          get().activeProtocols
+            .filter(ap => ap.status === 'active')
+            .map(ap => ap.id),
+        );
+        const doses = get().scheduledDoses.filter(
+          d => d.scheduledDate === date && activeIds.has(d.activeProtocolId),
+        );
         return doses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+      },
+
+      getVisibleDoseDates: () => {
+        const todayDate = today();
+        const activeIds = new Set(
+          get().activeProtocols
+            .filter(ap => ap.status === 'active')
+            .map(ap => ap.id),
+        );
+        const dates = new Set<string>();
+        get().scheduledDoses.forEach(d => {
+          if (d.scheduledDate < todayDate || activeIds.has(d.activeProtocolId)) {
+            dates.add(d.scheduledDate);
+          }
+        });
+        return [...dates];
       },
 
       takeDose: (doseId, note) => {
@@ -550,11 +581,17 @@ export const useStore = create<AppState>()(
         }
       },
 
-      snoozeDose: (doseId, minutes) => {
+      snoozeDose: (doseId, option) => {
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
-        const snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString();
+        const targetDate = typeof option === 'number'
+          ? new Date(Date.now() + option * 60000)
+          : new Date(option.until);
+        if (Number.isNaN(targetDate.getTime())) return;
+        const snoozedUntil = targetDate.toISOString();
+        const scheduledDate = format(targetDate, 'yyyy-MM-dd');
+        const scheduledTime = format(targetDate, 'HH:mm');
         const record: DoseRecord = {
           id: uuid(),
           userId: state.profile?.id ?? '',
@@ -564,16 +601,34 @@ export const useStore = create<AppState>()(
         };
         set(s => ({
           scheduledDoses: s.scheduledDoses.map(d =>
-            d.id === doseId ? { ...d, status: 'snoozed' as DoseStatus, snoozedUntil } : d
+            d.id === doseId
+              ? {
+                ...d,
+                status: 'snoozed' as DoseStatus,
+                snoozedUntil,
+                scheduledDate,
+                scheduledTime,
+              }
+              : d
           ),
           doseRecords: [...s.doseRecords, record],
         }));
         if (state.profile?.id) {
           syncFireAndForget(
-            syncDoseAction(state.profile.id, dose, { status: 'snoozed', snoozedUntil }, record),
+            syncDoseAction(
+              state.profile.id,
+              dose,
+              { status: 'snoozed', snoozedUntil, scheduledDate, scheduledTime },
+              record,
+            ),
             {
               kind: 'doseAction',
-              payload: { userId: state.profile.id, dose, patch: { status: 'snoozed', snoozedUntil }, record },
+              payload: {
+                userId: state.profile.id,
+                dose,
+                patch: { status: 'snoozed', snoozedUntil, scheduledDate, scheduledTime },
+                record,
+              },
             },
           );
         }

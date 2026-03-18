@@ -34,7 +34,12 @@ type SyncPayloadMap = {
   doseAction: {
     userId: string;
     dose: ScheduledDose;
-    patch: { status: ScheduledDose['status']; snoozedUntil?: string };
+    patch: {
+      status: ScheduledDose['status'];
+      snoozedUntil?: string;
+      scheduledDate?: string;
+      scheduledTime?: string;
+    };
     record?: DoseRecord;
   };
 };

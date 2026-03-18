@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import type { Protocol, ProtocolCategory } from '@/types';
 
@@ -20,16 +19,6 @@ const FILTERS = [
   { value: 'custom', label: 'My Protocols' },
 ];
 
-const CATEGORY_OPTIONS: { value: ProtocolCategory; label: string }[] = [
-  { value: 'general', label: 'General Health' },
-  { value: 'cardiovascular', label: 'Cardiovascular' },
-  { value: 'metabolic', label: 'Metabolic' },
-  { value: 'hormonal', label: 'Hormonal' },
-  { value: 'neurological', label: 'Neurological' },
-  { value: 'immune', label: 'Immune' },
-  { value: 'custom', label: 'Custom' },
-];
-
 export default function ProtocolsPage() {
   const router = useRouter();
   const {
@@ -38,16 +27,11 @@ export default function ProtocolsPage() {
     activateProtocol,
     pauseProtocol,
     resumeProtocol,
-    updateProtocol,
     deleteProtocol,
   } = useStore();
   const { show } = useToast();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState<Protocol | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editCategory, setEditCategory] = useState<ProtocolCategory>('custom');
 
   const filtered = protocols.filter(p => {
     if (p.isArchived) return false;
@@ -81,28 +65,6 @@ export default function ProtocolsPage() {
       return;
     }
     handleActivate(protocolId);
-  }
-
-  function openEdit(protocol: Protocol) {
-    setEditing(protocol);
-    setEditName(protocol.name);
-    setEditDescription(protocol.description ?? '');
-    setEditCategory(protocol.category);
-  }
-
-  function saveEdit() {
-    if (!editing) return;
-    if (!editName.trim()) {
-      show('Protocol name is required', 'warning');
-      return;
-    }
-    updateProtocol(editing.id, {
-      name: editName.trim(),
-      description: editDescription.trim() || undefined,
-      category: editCategory,
-    });
-    show('✓ Protocol updated');
-    setEditing(null);
   }
 
   function handleDelete(protocol: Protocol) {
@@ -175,7 +137,7 @@ export default function ProtocolsPage() {
             <ProtocolRow
               key={p.id}
               onOpen={() => router.push(`/app/protocols/${p.id}`)}
-              onEdit={() => openEdit(p)}
+              onEdit={() => router.push(`/app/protocols/${p.id}?edit=1`)}
               onDelete={() => handleDelete(p)}
             >
               <div className="flex items-start gap-3">
@@ -232,34 +194,6 @@ export default function ProtocolsPage() {
           );
         })}
       </div>
-
-      {editing && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center sm:justify-center p-4">
-          <div className="w-full sm:max-w-md bg-[#161B22] border border-[rgba(255,255,255,0.12)] rounded-2xl p-4 flex flex-col gap-3">
-            <div className="text-sm font-bold text-[#F0F6FC]">Edit protocol</div>
-            <Input label="Name" value={editName} onChange={e => setEditName(e.target.value)} />
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Description</label>
-              <textarea
-                value={editDescription}
-                onChange={e => setEditDescription(e.target.value)}
-                rows={3}
-                className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
-              />
-            </div>
-            <Select
-              label="Category"
-              value={editCategory}
-              onChange={e => setEditCategory(e.target.value as ProtocolCategory)}
-              options={CATEGORY_OPTIONS}
-            />
-            <div className="flex gap-2 justify-end">
-              <Button variant="secondary" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
-              <Button size="sm" onClick={saveEdit}>Save</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

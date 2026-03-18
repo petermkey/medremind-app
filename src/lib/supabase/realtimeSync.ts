@@ -328,7 +328,12 @@ export async function syncRegeneratedDoses(
 export async function syncDoseAction(
   userId: string,
   dose: ScheduledDose,
-  patch: { status: ScheduledDose['status']; snoozedUntil?: string },
+  patch: {
+    status: ScheduledDose['status'];
+    snoozedUntil?: string;
+    scheduledDate?: string;
+    scheduledTime?: string;
+  },
   record?: DoseRecord,
 ) {
   const supabase = getSupabaseClient();
@@ -339,6 +344,8 @@ export async function syncDoseAction(
     .update({
       status: patch.status,
       snoozed_until: patch.snoozedUntil ?? null,
+      scheduled_date: patch.scheduledDate ?? dose.scheduledDate,
+      scheduled_time: patch.scheduledTime ?? dose.scheduledTime,
     })
     .eq('id', cDoseId)
     .eq('user_id', userId);
