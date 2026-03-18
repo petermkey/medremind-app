@@ -251,7 +251,7 @@ export const useStore = create<AppState>()(
       signUp: (email, password, name) => {
         _passwords[email] = password;
         const profile: UserProfile = {
-          id: uuid(),
+          id: generateId('profile'),
           email,
           name,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
