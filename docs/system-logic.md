@@ -65,9 +65,11 @@ Global sync status UI:
 
 Settings sign-out flow:
 
-1. If outbox has pending ops, app attempts forced flush.
-2. If pending remains after timeout, user gets confirmation dialog.
-3. On sign-out completion, outbox is cleared and local user data is reset.
+1. App first waits for in-flight realtime sync operations (`waitForRealtimeSyncIdle`).
+2. If in-flight sync is still pending after timeout, user gets explicit confirmation dialog.
+3. App then attempts forced outbox flush when pending queued ops exist.
+4. If outbox still has pending ops after timeout, user gets explicit confirmation dialog.
+5. On sign-out completion, outbox is cleared and local user data is reset.
 
 ## 6. Recovery flows
 
@@ -128,10 +130,10 @@ If protocol instance is active, item composition changes trigger dose regenerati
 
 UI offers options:
 
-- 15 minutes
 - 1 hour
 - this evening
 - tomorrow
+- next week
 
 Snooze updates:
 
