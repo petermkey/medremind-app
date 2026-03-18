@@ -1,5 +1,6 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ScheduledDose } from '@/types';
 
 const COLOR_MAP: Record<string, { bg: string; text: string }> = {
@@ -46,7 +47,59 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const statusColor = STATUS_COLOR[dose.status] ?? '#8B949E';
   const [swiped, setSwiped] = useState(false);
-  const touchStartX = useRef<number | null>(null);
+  const gesture = useRef<{
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+  }>({
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+  });
+
+  const resetGesture = () => {
+    gesture.current.pointerId = null;
+    gesture.current.startX = 0;
+    gesture.current.startY = 0;
+  };
+
+  useEffect(() => {
+    // Ensure stale row-local swipe state is not reused if card identity changes.
+    setSwiped(false);
+  }, [dose.id]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ doseId?: string }>).detail;
+      if (detail?.doseId && detail.doseId !== dose.id) {
+        setSwiped(false);
+      }
+    };
+    window.addEventListener('med-card-open', handler as EventListener);
+    return () => window.removeEventListener('med-card-open', handler as EventListener);
+  }, [dose.id]);
+
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    gesture.current.pointerId = e.pointerId;
+    gesture.current.startX = e.clientX;
+    gesture.current.startY = e.clientY;
+  };
+
+  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (gesture.current.pointerId !== e.pointerId) return;
+    const dx = gesture.current.startX - e.clientX;
+    const dy = Math.abs(gesture.current.startY - e.clientY);
+    resetGesture();
+
+    // Let vertical scroll gestures pass through without opening swipe actions.
+    if (dy > 24 && dy > Math.abs(dx)) return;
+    if (dx > 50) {
+      setSwiped(true);
+      window.dispatchEvent(new CustomEvent('med-card-open', { detail: { doseId: dose.id } }));
+    }
+    if (dx < -30) setSwiped(false);
+  };
 
   const tags: string[] = [];
   if (item.withFood === 'yes') tags.push('With food');
@@ -58,14 +111,11 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
   return (
     <div
       className="relative overflow-hidden rounded-[18px] mb-2.5"
-      onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
-      onTouchEnd={e => {
-        if (touchStartX.current === null) return;
-        const dx = touchStartX.current - e.changedTouches[0].clientX;
-        if (dx > 50) setSwiped(true);
-        if (dx < -30) setSwiped(false);
-        touchStartX.current = null;
-      }}
+      data-dose-id={dose.id}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={resetGesture}
+      style={{ touchAction: 'pan-y' }}
     >
       {/* Card */}
       <div
