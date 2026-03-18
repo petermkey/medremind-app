@@ -1,0 +1,359 @@
+'use client';
+
+import type {
+  ActiveProtocol,
+  DoseRecord,
+  Protocol,
+  ScheduledDose,
+} from '@/types';
+import { getSupabaseClient } from './client';
+
+function isUuid(value: string | undefined | null): value is string {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function hash32(input: string, seed: number): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function stableUuid(namespace: string, source: string): string {
+  const input = `${namespace}:${source}`;
+  const p1 = hash32(input, 0x811c9dc5).toString(16).padStart(8, '0');
+  const p2 = hash32(input, 0x9e3779b9).toString(16).padStart(8, '0');
+  const p3 = hash32(input, 0x85ebca6b).toString(16).padStart(8, '0');
+  const p4 = hash32(input, 0xc2b2ae35).toString(16).padStart(8, '0');
+  const hex = `${p1}${p2}${p3}${p4}`;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function cloudProtocolId(userId: string, protocolId: string): string {
+  return isUuid(protocolId) ? protocolId : stableUuid(`protocol:${userId}`, protocolId);
+}
+
+function cloudProtocolItemId(userId: string, protocolId: string, itemId: string): string {
+  if (isUuid(itemId)) return itemId;
+  return stableUuid(`protocol-item:${cloudProtocolId(userId, protocolId)}`, itemId);
+}
+
+function cloudActiveId(userId: string, activeId: string): string {
+  return isUuid(activeId) ? activeId : stableUuid(`active:${userId}`, activeId);
+}
+
+function cloudDoseId(userId: string, doseId: string): string {
+  return isUuid(doseId) ? doseId : stableUuid(`dose:${userId}`, doseId);
+}
+
+function cloudRecordId(userId: string, recordId: string): string {
+  return isUuid(recordId) ? recordId : stableUuid(`record:${userId}`, recordId);
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+async function upsertProtocolWithItems(userId: string, protocol: Protocol) {
+  const supabase = getSupabaseClient();
+  const cProtocolId = cloudProtocolId(userId, protocol.id);
+  const protocolRow = {
+    id: cProtocolId,
+    owner_id: userId,
+    name: protocol.name,
+    description: protocol.description ?? null,
+    category: protocol.category ?? 'custom',
+    duration_days: protocol.durationDays ?? null,
+    is_template: false,
+    is_archived: Boolean(protocol.isArchived),
+    created_at: protocol.createdAt ?? new Date().toISOString(),
+  };
+
+  const { error: pErr } = await supabase.from('protocols').upsert(protocolRow, { onConflict: 'id' });
+  if (pErr) throw new Error(`Protocol sync failed: ${pErr.message}`);
+
+  const itemRows = protocol.items.map(item => ({
+    id: cloudProtocolItemId(userId, protocol.id, item.id),
+    protocol_id: cProtocolId,
+    item_type: item.itemType,
+    name: item.name,
+    drug_id: item.drugId && isUuid(item.drugId) ? item.drugId : null,
+    analysis_id: null,
+    dose_amount: item.doseAmount ?? null,
+    dose_unit: item.doseUnit ?? null,
+    dose_form: item.doseForm ?? null,
+    route: item.route ?? null,
+    frequency_type: item.frequencyType,
+    frequency_value: item.frequencyValue ?? null,
+    times: item.times ?? [],
+    with_food: item.withFood ?? null,
+    instructions: item.instructions ?? null,
+    start_day: item.startDay ?? 1,
+    end_day: item.endDay ?? null,
+    sort_order: item.sortOrder ?? 0,
+    icon: item.icon ?? null,
+    color: item.color ?? null,
+  }));
+
+  for (const part of chunk(itemRows, 250)) {
+    const { error } = await supabase.from('protocol_items').upsert(part, { onConflict: 'id' });
+    if (error) throw new Error(`Protocol items sync failed: ${error.message}`);
+  }
+}
+
+export async function syncProtocolUpsert(userId: string, protocol: Protocol) {
+  await upsertProtocolWithItems(userId, protocol);
+}
+
+export async function syncProtocolItemDelete(userId: string, protocolId: string, itemId: string) {
+  const supabase = getSupabaseClient();
+  const id = cloudProtocolItemId(userId, protocolId, itemId);
+  const { error } = await supabase.from('protocol_items').delete().eq('id', id);
+  if (error) throw new Error(`Delete protocol item failed: ${error.message}`);
+}
+
+export async function syncProtocolDelete(userId: string, protocolId: string) {
+  const supabase = getSupabaseClient();
+  const cProtocolId = cloudProtocolId(userId, protocolId);
+
+  const { data: activeRows, error: activeErr } = await supabase
+    .from('active_protocols')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('protocol_id', cProtocolId);
+  if (activeErr) throw new Error(`Load active protocols for delete failed: ${activeErr.message}`);
+
+  const activeIds = ((activeRows ?? []) as Array<{ id: string }>).map(row => row.id);
+  if (activeIds.length) {
+    const doseIds: string[] = [];
+    for (const ids of chunk(activeIds, 250)) {
+      const { data: dRows, error: dErr } = await supabase
+        .from('scheduled_doses')
+        .select('id')
+        .eq('user_id', userId)
+        .in('active_protocol_id', ids);
+      if (dErr) throw new Error(`Load scheduled doses for delete failed: ${dErr.message}`);
+      doseIds.push(...(((dRows ?? []) as Array<{ id: string }>).map(row => row.id)));
+    }
+
+    for (const ids of chunk(doseIds, 250)) {
+      const { error: rErr } = await supabase
+        .from('dose_records')
+        .delete()
+        .eq('user_id', userId)
+        .in('scheduled_dose_id', ids);
+      if (rErr) throw new Error(`Delete dose records for protocol failed: ${rErr.message}`);
+    }
+
+    for (const ids of chunk(activeIds, 250)) {
+      const { error: sErr } = await supabase
+        .from('scheduled_doses')
+        .delete()
+        .eq('user_id', userId)
+        .in('active_protocol_id', ids);
+      if (sErr) throw new Error(`Delete scheduled doses for protocol failed: ${sErr.message}`);
+    }
+
+    for (const ids of chunk(activeIds, 250)) {
+      const { error: aErr } = await supabase
+        .from('active_protocols')
+        .delete()
+        .eq('user_id', userId)
+        .in('id', ids);
+      if (aErr) throw new Error(`Delete active protocols failed: ${aErr.message}`);
+    }
+  }
+
+  const { error: pErr } = await supabase
+    .from('protocols')
+    .delete()
+    .eq('owner_id', userId)
+    .eq('id', cProtocolId);
+  if (pErr) throw new Error(`Delete protocol failed: ${pErr.message}`);
+}
+
+export async function syncActivation(
+  userId: string,
+  active: ActiveProtocol,
+  doses: ScheduledDose[],
+) {
+  const supabase = getSupabaseClient();
+  await upsertProtocolWithItems(userId, active.protocol);
+
+  const cActiveId = cloudActiveId(userId, active.id);
+  const cProtocolId = cloudProtocolId(userId, active.protocolId);
+
+  const activeRow = {
+    id: cActiveId,
+    user_id: userId,
+    protocol_id: cProtocolId,
+    status: active.status,
+    start_date: active.startDate,
+    end_date: active.endDate ?? null,
+    paused_at: active.pausedAt ?? null,
+    completed_at: active.completedAt ?? null,
+    notes: active.notes ?? null,
+    created_at: active.createdAt ?? new Date().toISOString(),
+  };
+
+  const { error: aErr } = await supabase.from('active_protocols').upsert(activeRow, { onConflict: 'id' });
+  if (aErr) throw new Error(`Activate protocol sync failed: ${aErr.message}`);
+
+  const doseRows = doses.map(d => ({
+    id: cloudDoseId(userId, d.id),
+    user_id: userId,
+    active_protocol_id: cActiveId,
+    protocol_item_id: cloudProtocolItemId(userId, active.protocolId, d.protocolItemId),
+    scheduled_date: d.scheduledDate,
+    scheduled_time: d.scheduledTime,
+    status: d.status,
+    snoozed_until: d.snoozedUntil ?? null,
+  }));
+
+  for (const part of chunk(doseRows, 250)) {
+    const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
+    if (error) throw new Error(`Scheduled doses sync failed: ${error.message}`);
+  }
+}
+
+export async function syncActiveStatus(
+  userId: string,
+  activeId: string,
+  patch: { status: ActiveProtocol['status']; pausedAt?: string; completedAt?: string },
+) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from('active_protocols')
+    .update({
+      status: patch.status,
+      paused_at: patch.pausedAt ?? null,
+      completed_at: patch.completedAt ?? null,
+    })
+    .eq('id', cloudActiveId(userId, activeId))
+    .eq('user_id', userId);
+  if (error) throw new Error(`Active status sync failed: ${error.message}`);
+}
+
+export async function syncRegeneratedDoses(
+  userId: string,
+  active: ActiveProtocol,
+  fromDate: string,
+  newDoses: ScheduledDose[],
+) {
+  const supabase = getSupabaseClient();
+  const cActiveId = cloudActiveId(userId, active.id);
+
+  const { data: existingRows, error: existingErr } = await supabase
+    .from('scheduled_doses')
+    .select('id, protocol_item_id, scheduled_date, scheduled_time, status')
+    .eq('user_id', userId)
+    .eq('active_protocol_id', cActiveId)
+    .gte('scheduled_date', fromDate);
+  if (existingErr) throw new Error(`Load existing regenerated doses failed: ${existingErr.message}`);
+
+  const existing = (existingRows ?? []) as Array<{
+    id: string;
+    protocol_item_id: string;
+    scheduled_date: string;
+    scheduled_time: string;
+    status: ScheduledDose['status'];
+  }>;
+
+  const existingDoseIds = existing.map(row => row.id);
+  const protectedByRecord = new Set<string>();
+  if (existingDoseIds.length) {
+    for (const ids of chunk(existingDoseIds, 250)) {
+      const { data: recordRows, error: rErr } = await supabase
+        .from('dose_records')
+        .select('scheduled_dose_id')
+        .eq('user_id', userId)
+        .in('scheduled_dose_id', ids);
+      if (rErr) throw new Error(`Load dose records for regeneration failed: ${rErr.message}`);
+      for (const row of (recordRows ?? []) as Array<{ scheduled_dose_id: string }>) {
+        protectedByRecord.add(row.scheduled_dose_id);
+      }
+    }
+  }
+
+  const protectedStatuses = new Set<ScheduledDose['status']>(['taken', 'skipped', 'snoozed']);
+  const protectedSlots = new Set<string>();
+  const deletableIds: string[] = [];
+
+  for (const row of existing) {
+    const hasRecord = protectedByRecord.has(row.id);
+    const isProtected = hasRecord || protectedStatuses.has(row.status);
+    const slot = `${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
+    if (isProtected) {
+      protectedSlots.add(slot);
+      continue;
+    }
+    deletableIds.push(row.id);
+  }
+
+  for (const ids of chunk(deletableIds, 250)) {
+    const { error: delErr } = await supabase
+      .from('scheduled_doses')
+      .delete()
+      .eq('user_id', userId)
+      .in('id', ids);
+    if (delErr) throw new Error(`Delete regenerated doses failed: ${delErr.message}`);
+  }
+
+  const rows = newDoses
+    .map(d => ({
+      id: cloudDoseId(userId, d.id),
+      user_id: userId,
+      active_protocol_id: cActiveId,
+      protocol_item_id: cloudProtocolItemId(userId, active.protocolId, d.protocolItemId),
+      scheduled_date: d.scheduledDate,
+      scheduled_time: d.scheduledTime,
+      status: d.status,
+      snoozed_until: d.snoozedUntil ?? null,
+    }))
+    .filter(row => {
+      const slot = `${row.protocol_item_id}|${row.scheduled_date}|${row.scheduled_time}`;
+      return !protectedSlots.has(slot);
+    });
+  for (const part of chunk(rows, 250)) {
+    const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
+    if (error) throw new Error(`Insert regenerated doses failed: ${error.message}`);
+  }
+}
+
+export async function syncDoseAction(
+  userId: string,
+  dose: ScheduledDose,
+  patch: { status: ScheduledDose['status']; snoozedUntil?: string },
+  record?: DoseRecord,
+) {
+  const supabase = getSupabaseClient();
+  const cDoseId = cloudDoseId(userId, dose.id);
+
+  const { error: dErr } = await supabase
+    .from('scheduled_doses')
+    .update({
+      status: patch.status,
+      snoozed_until: patch.snoozedUntil ?? null,
+    })
+    .eq('id', cDoseId)
+    .eq('user_id', userId);
+  if (dErr) throw new Error(`Dose status sync failed: ${dErr.message}`);
+
+  if (record) {
+    const row = {
+      id: cloudRecordId(userId, record.id),
+      user_id: userId,
+      scheduled_dose_id: cDoseId,
+      action: record.action,
+      recorded_at: record.recordedAt,
+      note: record.note ?? null,
+    };
+    const { error: rErr } = await supabase.from('dose_records').upsert(row, { onConflict: 'id' });
+    if (rErr) throw new Error(`Dose record sync failed: ${rErr.message}`);
+  }
+}

@@ -60,6 +60,7 @@ export function AddDoseSheet({ open, onClose }: Props) {
   const [withFood, setWithFood] = useState<'yes'|'no'|'any'>('any');
   const [instructions, setInstructions] = useState('');
   const [frequency, setFrequency] = useState<FrequencyType>('daily');
+  const [frequencyValue, setFrequencyValue] = useState('2');
   const [targetProtocolId, setTargetProtocolId] = useState<string>('');
 
   const activeCustomProtocols = activeProtocols.filter(ap => ap.status === 'active');
@@ -73,7 +74,7 @@ export function AddDoseSheet({ open, onClose }: Props) {
   function reset() {
     setName(''); setDoseAmount(''); setDoseUnit('mg');
     setDoseForm('tablet'); setRoute('oral'); setTime('08:00');
-    setWithFood('any'); setInstructions(''); setFrequency('daily');
+    setWithFood('any'); setInstructions(''); setFrequency('daily'); setFrequencyValue('2');
   }
 
   function handleAdd() {
@@ -115,6 +116,7 @@ export function AddDoseSheet({ open, onClose }: Props) {
       doseForm,
       route,
       frequencyType: frequency,
+      frequencyValue: frequency === 'every_n_days' ? Math.max(1, parseInt(frequencyValue || '1', 10)) : undefined,
       times,
       withFood,
       instructions: instructions.trim() || undefined,
@@ -175,6 +177,16 @@ export function AddDoseSheet({ open, onClose }: Props) {
                 { value: 'weekly',            label: 'Weekly' },
               ]}
             />
+
+            {frequency === 'every_n_days' && (
+              <Input
+                label="Every N days"
+                type="number"
+                value={frequencyValue}
+                onChange={e => setFrequencyValue(String(Math.max(1, parseInt(e.target.value || '1', 10))))}
+                placeholder="e.g. 3"
+              />
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">First dose time</label>

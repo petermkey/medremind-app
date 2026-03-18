@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { saveProfile } from '@/lib/supabase/auth';
@@ -24,11 +24,7 @@ export default function OnboardingPage() {
 
   // Step 1 state
   const [name, setName] = useState(profile?.name ?? '');
-  const [timezone, setTimezone] = useState(
-    typeof window !== 'undefined'
-      ? Intl.DateTimeFormat().resolvedOptions().timeZone
-      : 'UTC'
-  );
+  const [timezone, setTimezone] = useState('UTC');
   const [ageRange, setAgeRange] = useState<AgeRange>('31-50');
 
   // Step 2 state
@@ -40,6 +36,10 @@ export default function OnboardingPage() {
   const [eveningTime, setEveningTime] = useState('21:00');
 
   const templates = protocols.filter(p => p.isTemplate);
+
+  useEffect(() => {
+    setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
 
   function handleStep1() {
     if (!name.trim()) return;

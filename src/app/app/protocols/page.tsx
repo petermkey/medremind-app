@@ -1,11 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
+import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
-import type { ProtocolCategory } from '@/types';
+import type { Protocol, ProtocolCategory } from '@/types';
 
 const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
   general: '🌿', cardiovascular: '❤️', metabolic: '⚙️',
@@ -13,18 +14,40 @@ const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
 };
 
 const FILTERS = [
-  { value: 'all',       label: 'All' },
-  { value: 'active',    label: 'Active' },
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
   { value: 'templates', label: 'Templates' },
-  { value: 'custom',    label: 'My Protocols' },
+  { value: 'custom', label: 'My Protocols' },
+];
+
+const CATEGORY_OPTIONS: { value: ProtocolCategory; label: string }[] = [
+  { value: 'general', label: 'General Health' },
+  { value: 'cardiovascular', label: 'Cardiovascular' },
+  { value: 'metabolic', label: 'Metabolic' },
+  { value: 'hormonal', label: 'Hormonal' },
+  { value: 'neurological', label: 'Neurological' },
+  { value: 'immune', label: 'Immune' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 export default function ProtocolsPage() {
   const router = useRouter();
-  const { protocols, activeProtocols, activateProtocol, pauseProtocol, resumeProtocol, completeProtocol } = useStore();
+  const {
+    protocols,
+    activeProtocols,
+    activateProtocol,
+    pauseProtocol,
+    resumeProtocol,
+    updateProtocol,
+    deleteProtocol,
+  } = useStore();
   const { show } = useToast();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState<Protocol | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState<ProtocolCategory>('custom');
 
   const filtered = protocols.filter(p => {
     if (p.isArchived) return false;
@@ -47,15 +70,53 @@ export default function ProtocolsPage() {
   }
 
   function handleAction(protocolId: string, status: string, activeId: string) {
-    if (status === 'active') { pauseProtocol(activeId); show('Protocol paused', 'warning'); }
-    else if (status === 'paused') { resumeProtocol(activeId); show('Protocol resumed'); }
-    else if (status === 'completed') { show('Protocol already completed', 'info'); }
-    else handleActivate(protocolId);
+    if (status === 'active') {
+      pauseProtocol(activeId);
+      show('Protocol paused', 'warning');
+      return;
+    }
+    if (status === 'paused') {
+      resumeProtocol(activeId);
+      show('Protocol resumed');
+      return;
+    }
+    handleActivate(protocolId);
+  }
+
+  function openEdit(protocol: Protocol) {
+    setEditing(protocol);
+    setEditName(protocol.name);
+    setEditDescription(protocol.description ?? '');
+    setEditCategory(protocol.category);
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    if (!editName.trim()) {
+      show('Protocol name is required', 'warning');
+      return;
+    }
+    updateProtocol(editing.id, {
+      name: editName.trim(),
+      description: editDescription.trim() || undefined,
+      category: editCategory,
+    });
+    show('✓ Protocol updated');
+    setEditing(null);
+  }
+
+  function handleDelete(protocol: Protocol) {
+    if (protocol.isTemplate) {
+      show('Template protocols cannot be deleted', 'warning');
+      return;
+    }
+    if (!confirm(`Delete protocol "${protocol.name}"?`)) return;
+    deleteProtocol(protocol.id);
+    show('Protocol deleted', 'warning');
   }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-extrabold text-[#F0F6FC]">Protocols</h1>
@@ -67,7 +128,6 @@ export default function ProtocolsPage() {
           </button>
         </div>
 
-        {/* Search */}
         <input
           type="text"
           placeholder="Search protocols…"
@@ -76,7 +136,6 @@ export default function ProtocolsPage() {
           className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#F0F6FC] placeholder:text-[#8B949E] outline-none focus:border-[#3B82F6] mb-3"
         />
 
-        {/* Filter tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {FILTERS.map(f => (
             <button
@@ -93,7 +152,6 @@ export default function ProtocolsPage() {
         </div>
       </div>
 
-      {/* List */}
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {filtered.length === 0 && (
           <div className="text-center py-16">
@@ -105,15 +163,20 @@ export default function ProtocolsPage() {
 
         {filtered.map(p => {
           const instance = getActiveInstance(p.id);
-          const statusColor = !instance ? 'transparent' :
-            instance.status === 'active' ? '#10B981' :
-            instance.status === 'paused' ? '#FBBF24' : '#8B949E';
+          const statusColor = !instance
+            ? 'transparent'
+            : instance.status === 'active'
+            ? '#10B981'
+            : instance.status === 'paused'
+            ? '#FBBF24'
+            : '#8B949E';
 
           return (
-            <div
+            <ProtocolRow
               key={p.id}
-              className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-3 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200"
-              onClick={() => router.push(`/app/protocols/${p.id}`)}
+              onOpen={() => router.push(`/app/protocols/${p.id}`)}
+              onEdit={() => openEdit(p)}
+              onDelete={() => handleDelete(p)}
             >
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[rgba(59,130,246,0.12)] flex items-center justify-center text-xl flex-shrink-0">
@@ -123,7 +186,10 @@ export default function ProtocolsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-[#F0F6FC] truncate">{p.name}</span>
                     {instance && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: `${statusColor}20`, color: statusColor }}>
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                        style={{ background: `${statusColor}20`, color: statusColor }}
+                      >
                         {instance.status}
                       </span>
                     )}
@@ -144,7 +210,6 @@ export default function ProtocolsPage() {
                   </div>
                 </div>
 
-                {/* Action button */}
                 <button
                   onClick={e => {
                     e.stopPropagation();
@@ -160,13 +225,122 @@ export default function ProtocolsPage() {
                       : 'bg-[rgba(59,130,246,0.15)] text-[#3B82F6] hover:bg-[rgba(59,130,246,0.25)]',
                   ].join(' ')}
                 >
-                  {instance?.status === 'active' ? 'Pause' :
-                   instance?.status === 'paused' ? 'Resume' : 'Activate'}
+                  {instance?.status === 'active' ? 'Pause' : instance?.status === 'paused' ? 'Resume' : 'Activate'}
                 </button>
               </div>
-            </div>
+            </ProtocolRow>
           );
         })}
+      </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center sm:justify-center p-4">
+          <div className="w-full sm:max-w-md bg-[#161B22] border border-[rgba(255,255,255,0.12)] rounded-2xl p-4 flex flex-col gap-3">
+            <div className="text-sm font-bold text-[#F0F6FC]">Edit protocol</div>
+            <Input label="Name" value={editName} onChange={e => setEditName(e.target.value)} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Description</label>
+              <textarea
+                value={editDescription}
+                onChange={e => setEditDescription(e.target.value)}
+                rows={3}
+                className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
+              />
+            </div>
+            <Select
+              label="Category"
+              value={editCategory}
+              onChange={e => setEditCategory(e.target.value as ProtocolCategory)}
+              options={CATEGORY_OPTIONS}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button size="sm" onClick={saveEdit}>Save</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProtocolRow({
+  children,
+  onOpen,
+  onEdit,
+  onDelete,
+}: {
+  children: React.ReactNode;
+  onOpen: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [swiped, setSwiped] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const mouseStartX = useRef<number | null>(null);
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl mb-3"
+      onTouchStart={e => {
+        touchStartX.current = e.touches[0].clientX;
+      }}
+      onTouchEnd={e => {
+        if (touchStartX.current === null) return;
+        const dx = touchStartX.current - e.changedTouches[0].clientX;
+        if (dx > 50) setSwiped(true);
+        if (dx < -30) setSwiped(false);
+        touchStartX.current = null;
+      }}
+      onMouseDown={e => {
+        mouseStartX.current = e.clientX;
+      }}
+      onMouseUp={e => {
+        if (mouseStartX.current === null) return;
+        const dx = mouseStartX.current - e.clientX;
+        if (dx > 60) setSwiped(true);
+        if (dx < -40) setSwiped(false);
+        mouseStartX.current = null;
+      }}
+    >
+      <div
+        className={[
+          'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200',
+          swiped ? '-translate-x-[132px]' : '',
+        ].join(' ')}
+        onClick={() => {
+          if (!swiped) onOpen();
+        }}
+      >
+        {children}
+      </div>
+
+      <div
+        className={[
+          'absolute right-0 top-0 bottom-0 flex items-stretch transition-transform duration-200',
+          swiped ? 'translate-x-0' : 'translate-x-full',
+        ].join(' ')}
+      >
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onEdit();
+            setSwiped(false);
+          }}
+          className="px-5 bg-[#3B82F6] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+        >
+          ✏️<br />Edit
+        </button>
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onDelete();
+            setSwiped(false);
+          }}
+          className="px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl"
+        >
+          ✕<br />Delete
+        </button>
       </div>
     </div>
   );

@@ -1,11 +1,23 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
+import {
+  backupCurrentStoreToSupabase,
+  downloadCurrentStoreSnapshot,
+  pullStoreFromSupabase,
+} from '@/lib/supabase/cloudStore';
+import { importStoreSnapshotToSupabase } from '@/lib/supabase/importStore';
+import { getSyncStatusSnapshot, subscribeSyncStatus, type SyncStatus } from '@/lib/supabase/syncOutbox';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+
+type BuildInfo = {
+  sha: string;
+  environment: string;
+};
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -19,8 +31,32 @@ export default function SettingsPage() {
   const [emailEnabled, setEmailEnabled] = useState(notificationSettings.emailEnabled);
   const [leadTime, setLeadTime] = useState(String(notificationSettings.leadTimeMin));
   const [digestTime, setDigestTime] = useState(notificationSettings.digestTime);
+  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
+  const [importPayload, setImportPayload] = useState('');
+  const [importStatus, setImportStatus] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [outbox, setOutbox] = useState<SyncStatus>(getSyncStatusSnapshot());
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/version')
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: BuildInfo | null) => {
+        if (!cancelled && data) setBuildInfo(data);
+      })
+      .catch(() => {
+        // Non-critical info; keep UI working even if endpoint is unavailable.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    return subscribeSyncStatus(setOutbox);
+  }, []);
 
   async function handleSaveProfile() {
     const patch = { name: name.trim(), timezone, ageRange: ageRange as '18-30'|'31-50'|'51-70'|'70+' };
@@ -57,6 +93,80 @@ export default function SettingsPage() {
     signOut();
     if (typeof window !== 'undefined') localStorage.clear();
     router.push('/register');
+  }
+
+  function loadSnapshotFromCurrentBrowser() {
+    if (typeof window === 'undefined') return;
+    const raw = localStorage.getItem('medremind-store');
+    if (!raw) {
+      setImportStatus('No local medremind-store key found in this browser/origin.');
+      return;
+    }
+    setImportPayload(raw);
+    setImportStatus('Loaded medremind-store from current browser.');
+  }
+
+  async function handleCloudImport() {
+    if (!importPayload.trim()) {
+      setImportStatus('Paste medremind-store JSON first.');
+      return;
+    }
+    setImporting(true);
+    setImportStatus('Import in progress...');
+    try {
+      const summary = await importStoreSnapshotToSupabase(importPayload.trim());
+      setImportStatus(
+        `Imported: protocols ${summary.protocols}, items ${summary.protocolItems}, active ${summary.activeProtocols}, doses ${summary.scheduledDoses}, records ${summary.doseRecords}, custom drugs ${summary.customDrugs}.`
+      );
+      show('✓ Cloud import completed');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Import failed';
+      setImportStatus(message);
+      show(message, 'warning');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleExportSnapshot() {
+    downloadCurrentStoreSnapshot();
+    setSyncStatus('Snapshot exported to file.');
+  }
+
+  async function handleBackupCurrentState() {
+    setSyncing(true);
+    setSyncStatus('Backing up current state to cloud...');
+    try {
+      const summary = await backupCurrentStoreToSupabase();
+      setSyncStatus(
+        `Backup done: protocols ${summary.protocols}, items ${summary.protocolItems}, active ${summary.activeProtocols}, doses ${summary.scheduledDoses}, records ${summary.doseRecords}.`
+      );
+      show('✓ Cloud backup completed');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Cloud backup failed';
+      setSyncStatus(message);
+      show(message, 'warning');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleRestoreFromCloud() {
+    setSyncing(true);
+    setSyncStatus('Loading cloud data...');
+    try {
+      const summary = await pullStoreFromSupabase();
+      setSyncStatus(
+        `Loaded from cloud: protocols ${summary.protocols}, items ${summary.protocolItems}, active ${summary.activeProtocols}, doses ${summary.scheduledDoses}, records ${summary.doseRecords}.`
+      );
+      show('✓ Cloud restore completed');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Cloud restore failed';
+      setSyncStatus(message);
+      show(message, 'warning');
+    } finally {
+      setSyncing(false);
+    }
   }
 
   return (
@@ -108,6 +218,14 @@ export default function SettingsPage() {
           <div className="text-sm text-[#8B949E] leading-relaxed bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.15)] rounded-xl p-4">
             <strong className="text-[#F0F6FC]">MedRemind v0.1.0</strong><br /><br />
             This app is a protocol management and adherence tracking tool. It is <strong>not</strong> a medical device and does not provide medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting, modifying, or discontinuing any medication or supplement regimen.
+            {buildInfo && (
+              <>
+                <br /><br />
+                <span className="text-xs">
+                  Build: <code>{buildInfo.sha.slice(0, 7)}</code> · Env: <code>{buildInfo.environment}</code>
+                </span>
+              </>
+            )}
           </div>
           <div className="flex gap-2 text-xs">
             <a href="#" className="text-[#3B82F6] hover:underline">Privacy Policy</a>
@@ -131,6 +249,53 @@ export default function SettingsPage() {
                 <Button variant="danger" size="sm" onClick={handleDeleteAccount}>Delete Everything</Button>
               </div>
             </div>
+          )}
+        </Section>
+
+        <Section title="☁️ Data Recovery">
+          <p className="text-xs text-[#8B949E] leading-relaxed">
+            Cloud sync: {outbox.pending > 0 ? `${outbox.pending} pending change(s)` : 'all changes synced'}.
+            {outbox.lastSuccessAt ? ` Last success: ${new Date(outbox.lastSuccessAt).toLocaleTimeString()}.` : ''}
+            {outbox.lastError ? ` Last error: ${outbox.lastError}.` : ''}
+          </p>
+          <p className="text-xs text-[#8B949E] leading-relaxed">
+            Import old `medremind-store` snapshot into Supabase for the current signed-in account.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExportSnapshot}>
+              Export snapshot
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleBackupCurrentState} loading={syncing}>
+              Backup current to cloud
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleRestoreFromCloud} loading={syncing}>
+              Restore from cloud
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={loadSnapshotFromCurrentBrowser}>
+              Load from local storage
+            </Button>
+            <Button size="sm" onClick={handleCloudImport} loading={importing}>
+              Import to cloud
+            </Button>
+          </div>
+          {syncStatus && (
+            <p className="text-xs text-[#8B949E] bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)] rounded-xl px-3 py-2">
+              {syncStatus}
+            </p>
+          )}
+          <textarea
+            value={importPayload}
+            onChange={e => setImportPayload(e.target.value)}
+            placeholder="Paste medremind-store JSON here"
+            rows={7}
+            className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-xs font-mono outline-none focus:border-[#3B82F6]"
+          />
+          {importStatus && (
+            <p className="text-xs text-[#8B949E] bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.15)] rounded-xl px-3 py-2">
+              {importStatus}
+            </p>
           )}
         </Section>
 

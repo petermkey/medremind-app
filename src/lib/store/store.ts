@@ -10,11 +10,39 @@ import type {
 } from '@/types';
 import { SEED_PROTOCOLS, SEED_DRUGS } from '@/lib/data/seed';
 import type { Drug } from '@/types';
+import {
+  syncActivation,
+  syncActiveStatus,
+  syncDoseAction,
+  syncProtocolDelete,
+  syncProtocolItemDelete,
+  syncProtocolUpsert,
+  syncRegeneratedDoses,
+} from '@/lib/supabase/realtimeSync';
+import {
+  enqueueSyncOperation,
+  markSyncFailure,
+  markSyncSuccess,
+  type SyncOperation,
+} from '@/lib/supabase/syncOutbox';
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
 const today = () => format(new Date(), 'yyyy-MM-dd');
 const nowTime = () => format(new Date(), 'HH:mm');
+
+function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
+  void task
+    .then(() => {
+      markSyncSuccess();
+    })
+    .catch((err: unknown) => {
+      markSyncFailure(err);
+      if (fallbackOp) enqueueSyncOperation(fallbackOp);
+    // Keep UX responsive; failed writes are queued for retry and logged for diagnostics.
+    console.error('[realtime-sync]', err);
+  });
+}
 
 /** Expand a protocol item into scheduled_doses for a date range */
 function expandItemToDoses(
@@ -112,6 +140,7 @@ interface AppState {
   drugs: Drug[];
 
   // Actions — Auth
+  setProfile: (profile: UserProfile | null) => void;
   signUp: (email: string, password: string, name: string) => UserProfile;
   signIn: (email: string, password: string) => UserProfile | null;
   signOut: () => void;
@@ -125,6 +154,7 @@ interface AppState {
   completeProtocol: (activeId: string) => void;
   createCustomProtocol: (p: Omit<Protocol, 'id' | 'createdAt' | 'ownerId' | 'isTemplate'>) => Protocol;
   updateProtocol: (id: string, patch: Partial<Protocol>) => void;
+  deleteProtocol: (id: string) => void;
   addProtocolItem: (protocolId: string, item: Omit<ProtocolItem, 'id' | 'protocolId'>) => void;
   removeProtocolItem: (protocolId: string, itemId: string) => void;
 
@@ -166,6 +196,8 @@ export const useStore = create<AppState>()(
 
       // ── Auth ──────────────────────────────────────────────────────────
 
+      setProfile: (profile) => set({ profile }),
+
       signUp: (email, password, name) => {
         _passwords[email] = password;
         const profile: UserProfile = {
@@ -191,7 +223,28 @@ export const useStore = create<AppState>()(
 
       updateProfile: (patch) => {
         const p = get().profile;
-        if (!p) return;
+        if (!p) {
+          const hasRequired =
+            typeof patch.id === 'string' &&
+            typeof patch.email === 'string' &&
+            typeof patch.name === 'string' &&
+            typeof patch.timezone === 'string' &&
+            typeof patch.createdAt === 'string';
+          if (!hasRequired) return;
+          const full = patch as UserProfile;
+          set({
+            profile: {
+              id: full.id,
+              email: full.email,
+              name: full.name,
+              timezone: full.timezone,
+              ageRange: full.ageRange,
+              onboarded: Boolean(full.onboarded),
+              createdAt: full.createdAt,
+            },
+          });
+          return;
+        }
         set({ profile: { ...p, ...patch } });
       },
 
@@ -240,66 +293,174 @@ export const useStore = create<AppState>()(
         });
 
         set(s => ({ scheduledDoses: [...s.scheduledDoses, ...markedDoses] }));
+        syncFireAndForget(
+          syncActivation(state.profile.id, active, markedDoses),
+          { kind: 'activation', payload: { userId: state.profile.id, active, doses: markedDoses } },
+        );
         return active;
       },
 
       pauseProtocol: (activeId) => {
+        const pausedAt = new Date().toISOString();
+        const profileId = get().profile?.id;
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
-            ap.id === activeId ? { ...ap, status: 'paused' as ProtocolStatus, pausedAt: new Date().toISOString() } : ap
+            ap.id === activeId ? { ...ap, status: 'paused' as ProtocolStatus, pausedAt } : ap
           ),
         }));
+        if (profileId) {
+          syncFireAndForget(
+            syncActiveStatus(profileId, activeId, { status: 'paused', pausedAt }),
+            { kind: 'activeStatus', payload: { userId: profileId, activeId, patch: { status: 'paused', pausedAt } } },
+          );
+        }
       },
 
       resumeProtocol: (activeId) => {
+        const profileId = get().profile?.id;
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
             ap.id === activeId ? { ...ap, status: 'active' as ProtocolStatus, pausedAt: undefined } : ap
           ),
         }));
+        if (profileId) {
+          syncFireAndForget(
+            syncActiveStatus(profileId, activeId, { status: 'active' }),
+            { kind: 'activeStatus', payload: { userId: profileId, activeId, patch: { status: 'active' } } },
+          );
+        }
       },
 
       completeProtocol: (activeId) => {
+        const completedAt = new Date().toISOString();
+        const profileId = get().profile?.id;
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
-            ap.id === activeId ? { ...ap, status: 'completed' as ProtocolStatus, completedAt: new Date().toISOString() } : ap
+            ap.id === activeId ? { ...ap, status: 'completed' as ProtocolStatus, completedAt } : ap
           ),
         }));
+        if (profileId) {
+          syncFireAndForget(
+            syncActiveStatus(profileId, activeId, { status: 'completed', completedAt }),
+            { kind: 'activeStatus', payload: { userId: profileId, activeId, patch: { status: 'completed', completedAt } } },
+          );
+        }
       },
 
       createCustomProtocol: (p) => {
+        const profileId = get().profile?.id;
         const protocol: Protocol = {
           ...p,
           id: uuid(),
-          ownerId: get().profile?.id,
+          ownerId: profileId,
           isTemplate: false,
           createdAt: new Date().toISOString(),
         };
         set(s => ({ protocols: [...s.protocols, protocol] }));
+        if (profileId) {
+          syncFireAndForget(
+            syncProtocolUpsert(profileId, protocol),
+            { kind: 'protocolUpsert', payload: { userId: profileId, protocol } },
+          );
+        }
         return protocol;
       },
 
       updateProtocol: (id, patch) => {
-        set(s => ({
-          protocols: s.protocols.map(p => p.id === id ? { ...p, ...patch } : p),
-        }));
+        const profileId = get().profile?.id;
+        let nextProtocol: Protocol | null = null;
+        set(s => {
+          const protocols = s.protocols.map(p => {
+            if (p.id !== id) return p;
+            nextProtocol = { ...p, ...patch };
+            return nextProtocol;
+          });
+          const activeProtocols = s.activeProtocols.map(ap =>
+            ap.protocolId === id && nextProtocol ? { ...ap, protocol: nextProtocol } : ap
+          );
+          return { protocols, activeProtocols };
+        });
+        if (profileId && nextProtocol) {
+          syncFireAndForget(
+            syncProtocolUpsert(profileId, nextProtocol),
+            { kind: 'protocolUpsert', payload: { userId: profileId, protocol: nextProtocol } },
+          );
+        }
+      },
+
+      deleteProtocol: (id) => {
+        const profileId = get().profile?.id;
+        set(s => {
+          const removedActiveIds = s.activeProtocols
+            .filter(ap => ap.protocolId === id)
+            .map(ap => ap.id);
+          const removedDoseIds = s.scheduledDoses
+            .filter(d => removedActiveIds.includes(d.activeProtocolId))
+            .map(d => d.id);
+          return {
+            protocols: s.protocols.filter(p => p.id !== id),
+            activeProtocols: s.activeProtocols.filter(ap => ap.protocolId !== id),
+            scheduledDoses: s.scheduledDoses.filter(d => !removedActiveIds.includes(d.activeProtocolId)),
+            doseRecords: s.doseRecords.filter(r => !removedDoseIds.includes(r.scheduledDoseId)),
+          };
+        });
+        if (profileId) {
+          syncFireAndForget(
+            syncProtocolDelete(profileId, id),
+            { kind: 'protocolDelete', payload: { userId: profileId, protocolId: id } },
+          );
+        }
       },
 
       addProtocolItem: (protocolId, item) => {
+        const profileId = get().profile?.id;
         const newItem: ProtocolItem = { ...item, id: uuid(), protocolId };
-        set(s => ({
-          protocols: s.protocols.map(p =>
-            p.id === protocolId ? { ...p, items: [...p.items, newItem] } : p
-          ),
-        }));
+        let targetProtocol: Protocol | null = null;
+        set(s => {
+          const protocols = s.protocols.map(p => {
+            if (p.id !== protocolId) return p;
+            targetProtocol = { ...p, items: [...p.items, newItem] };
+            return targetProtocol;
+          });
+          const activeProtocols = s.activeProtocols.map(ap =>
+            ap.protocolId === protocolId && targetProtocol ? { ...ap, protocol: targetProtocol } : ap
+          );
+          return { protocols, activeProtocols };
+        });
+        if (profileId && targetProtocol) {
+          syncFireAndForget(
+            syncProtocolUpsert(profileId, targetProtocol),
+            { kind: 'protocolUpsert', payload: { userId: profileId, protocol: targetProtocol } },
+          );
+        }
       },
 
       removeProtocolItem: (protocolId, itemId) => {
-        set(s => ({
-          protocols: s.protocols.map(p =>
-            p.id === protocolId ? { ...p, items: p.items.filter(i => i.id !== itemId) } : p
-          ),
-        }));
+        const profileId = get().profile?.id;
+        let targetProtocol: Protocol | null = null;
+        set(s => {
+          const protocols = s.protocols.map(p => {
+            if (p.id !== protocolId) return p;
+            targetProtocol = { ...p, items: p.items.filter(i => i.id !== itemId) };
+            return targetProtocol;
+          });
+          const activeProtocols = s.activeProtocols.map(ap =>
+            ap.protocolId === protocolId && targetProtocol ? { ...ap, protocol: targetProtocol } : ap
+          );
+          return { protocols, activeProtocols };
+        });
+        if (profileId) {
+          syncFireAndForget(
+            syncProtocolItemDelete(profileId, protocolId, itemId),
+            { kind: 'protocolItemDelete', payload: { userId: profileId, protocolId, itemId } },
+          );
+          if (targetProtocol) {
+            syncFireAndForget(
+              syncProtocolUpsert(profileId, targetProtocol),
+              { kind: 'protocolUpsert', payload: { userId: profileId, protocol: targetProtocol } },
+            );
+          }
+        }
       },
 
       // ── Schedule ──────────────────────────────────────────────────────
@@ -311,6 +472,8 @@ export const useStore = create<AppState>()(
 
       takeDose: (doseId, note) => {
         const state = get();
+        const dose = state.scheduledDoses.find(d => d.id === doseId);
+        if (!dose) return;
         const record: DoseRecord = {
           id: uuid(),
           userId: state.profile?.id ?? '',
@@ -325,10 +488,18 @@ export const useStore = create<AppState>()(
           ),
           doseRecords: [...s.doseRecords, record],
         }));
+        if (state.profile?.id) {
+          syncFireAndForget(
+            syncDoseAction(state.profile.id, dose, { status: 'taken' }, record),
+            { kind: 'doseAction', payload: { userId: state.profile.id, dose, patch: { status: 'taken' }, record } },
+          );
+        }
       },
 
       skipDose: (doseId, note) => {
         const state = get();
+        const dose = state.scheduledDoses.find(d => d.id === doseId);
+        if (!dose) return;
         const record: DoseRecord = {
           id: uuid(),
           userId: state.profile?.id ?? '',
@@ -343,22 +514,41 @@ export const useStore = create<AppState>()(
           ),
           doseRecords: [...s.doseRecords, record],
         }));
+        if (state.profile?.id) {
+          syncFireAndForget(
+            syncDoseAction(state.profile.id, dose, { status: 'skipped' }, record),
+            { kind: 'doseAction', payload: { userId: state.profile.id, dose, patch: { status: 'skipped' }, record } },
+          );
+        }
       },
 
       snoozeDose: (doseId, minutes) => {
+        const state = get();
+        const dose = state.scheduledDoses.find(d => d.id === doseId);
+        if (!dose) return;
         const snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString();
+        const record: DoseRecord = {
+          id: uuid(),
+          userId: state.profile?.id ?? '',
+          scheduledDoseId: doseId,
+          action: 'snoozed',
+          recordedAt: new Date().toISOString(),
+        };
         set(s => ({
           scheduledDoses: s.scheduledDoses.map(d =>
             d.id === doseId ? { ...d, status: 'snoozed' as DoseStatus, snoozedUntil } : d
           ),
-          doseRecords: [...s.doseRecords, {
-            id: uuid(),
-            userId: s.profile?.id ?? '',
-            scheduledDoseId: doseId,
-            action: 'snoozed',
-            recordedAt: new Date().toISOString(),
-          }],
+          doseRecords: [...s.doseRecords, record],
         }));
+        if (state.profile?.id) {
+          syncFireAndForget(
+            syncDoseAction(state.profile.id, dose, { status: 'snoozed', snoozedUntil }, record),
+            {
+              kind: 'doseAction',
+              payload: { userId: state.profile.id, dose, patch: { status: 'snoozed', snoozedUntil }, record },
+            },
+          );
+        }
       },
 
       regenerateDoses: (activeProtocolId) => {
@@ -383,6 +573,15 @@ export const useStore = create<AppState>()(
           newDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
         set(s => ({ scheduledDoses: [...s.scheduledDoses, ...newDoses] }));
+        if (state.profile?.id) {
+          syncFireAndForget(
+            syncRegeneratedDoses(state.profile.id, active, fromDate, newDoses),
+            {
+              kind: 'regeneratedDoses',
+              payload: { userId: state.profile.id, active, fromDate, newDoses },
+            },
+          );
+        }
       },
 
       // ── Settings ──────────────────────────────────────────────────────

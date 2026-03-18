@@ -3,26 +3,48 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { getCurrentUser } from '@/lib/supabase/auth';
+import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
+import { startSyncOutbox } from '@/lib/supabase/syncOutbox';
 import { BottomNav } from '@/components/app/BottomNav';
 import { ToastProvider } from '@/components/ui/Toast';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { profile, updateProfile } = useStore();
+  const { profile, setProfile } = useStore();
   const [checking, setChecking] = useState(!profile); // skip check if already in store
 
   useEffect(() => {
+    startSyncOutbox();
     if (profile?.onboarded) { setChecking(false); return; }
 
-    getCurrentUser().then(user => {
+    let cancelled = false;
+    async function boot() {
+      const user = await getCurrentUser();
+      if (cancelled) return;
       if (!user) {
         router.replace('/login');
-      } else {
-        updateProfile(user);
-        if (!user.onboarded) router.replace('/onboarding');
         setChecking(false);
+        return;
       }
-    });
+
+      setProfile(user);
+      if (!user.onboarded) {
+        router.replace('/onboarding');
+        setChecking(false);
+        return;
+      }
+
+      try {
+        await pullStoreFromSupabase();
+      } catch {
+        // Keep app usable if cloud pull fails; local store still works.
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    }
+
+    boot();
+    return () => { cancelled = true; };
   }, []);
 
   if (checking || !profile?.onboarded) return (

@@ -53,7 +53,7 @@ export async function supabaseSignIn(
     .from('profiles')
     .select('*')
     .eq('id', data.user.id)
-    .single();
+    .maybeSingle();
 
   const profile: UserProfile = {
     id: data.user.id,
@@ -86,7 +86,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   return {
     id: user.id,

@@ -21,10 +21,17 @@ const CATEGORIES: { value: ProtocolCategory; label: string }[] = [
 
 type ItemDraft = Omit<ProtocolItem, 'id' | 'protocolId'>;
 
+function frequencyLabel(item: { frequencyType: FrequencyType; frequencyValue?: number }) {
+  if (item.frequencyType === 'every_n_days') {
+    return `every ${item.frequencyValue ?? 1} days`;
+  }
+  return item.frequencyType.replace(/_/g, ' ');
+}
+
 function emptyItem(): ItemDraft {
   return {
     itemType: 'medication', name: '', doseForm: 'tablet', route: 'oral',
-    frequencyType: 'daily', times: ['08:00'], withFood: 'any',
+    frequencyType: 'daily', frequencyValue: undefined, times: ['08:00'], withFood: 'any',
     startDay: 1, sortOrder: 0, icon: '💊', color: 'blue',
   };
 }
@@ -161,7 +168,7 @@ export default function NewProtocolPage() {
                 <span className="text-xl">{it.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-[#F0F6FC] truncate">{it.name} {it.doseAmount ? `${it.doseAmount}${it.doseUnit}` : ''}</div>
-                  <div className="text-xs text-[#8B949E]">{it.frequencyType.replace(/_/g,' ')} · {it.times.join(', ')}</div>
+                  <div className="text-xs text-[#8B949E]">{frequencyLabel(it)} · {it.times.join(', ')}</div>
                 </div>
                 <button onClick={() => { setDraft({ ...it }); setEditingIdx(idx); }} className="text-[#8B949E] hover:text-[#3B82F6] text-sm px-2">✏️</button>
                 <button onClick={() => removeItem(idx)} className="text-[#8B949E] hover:text-[#EF4444] text-sm px-2">✕</button>
@@ -221,6 +228,21 @@ export default function NewProtocolPage() {
                   {value:'weekly',label:'Weekly'},
                 ]}
               />
+
+              {draft.frequencyType === 'every_n_days' && (
+                <Input
+                  label="Every N days"
+                  type="number"
+                  value={String(draft.frequencyValue ?? 2)}
+                  onChange={e =>
+                    setDraft(d => ({
+                      ...d,
+                      frequencyValue: Math.max(1, parseInt(e.target.value || '1', 10)),
+                    }))
+                  }
+                  placeholder="e.g. 3"
+                />
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Time</label>

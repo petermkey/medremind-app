@@ -23,7 +23,7 @@ export default function LoginPage() {
     const { profile, error: authError } = await supabaseSignIn(email, password);
     setLoading(false);
     if (authError || !profile) { setError(authError ?? 'Sign-in failed. Check your credentials.'); return; }
-    store.updateProfile(profile);
+    store.setProfile(profile);
     router.push(profile.onboarded ? '/app' : '/onboarding');
   }
 
