@@ -2,6 +2,8 @@
 Date: 2026-03-18
 Owner: CTO / Backend Reliability / QA
 
+> Historical incident closure pass. For current runtime logic and status, use `docs/system-logic.md` and `docs/current-status.md`.
+
 ## 1. Executive summary
 Verified live persistence chain against real runtime (`http://localhost:3000`), real Supabase project (`hagypgvfkjkncznoctoq`), real authenticated users, browser UI/network, and direct database reads.
 

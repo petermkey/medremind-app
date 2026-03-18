@@ -2,6 +2,8 @@
 Date: 2026-03-18
 Scope: runtime validation of local Zustand <-> Supabase persistence, auth/account binding, reload/relogin/cross-session behavior, and recovery flows.
 
+> Historical report (point-in-time pass). Current behavior source of truth is `docs/system-logic.md` and `docs/current-status.md`.
+
 ## 1) Executive verification summary
 - Claim "real-time CRUD sync works": **partially true before this pass**, now **verified with hardening**.
 - Claim "autoload from Supabase on app entry": **implemented and wired** (`/app` layout boot path).

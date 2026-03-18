@@ -2,6 +2,8 @@
 Date: 2026-03-18
 Owner: Incident Follow-up (Data Reliability)
 
+> Historical report (point-in-time pass). Current behavior source of truth is `docs/system-logic.md` and `docs/current-status.md`.
+
 ## 1. Executive verification summary
 Claim status after live validation:
 - Real-time CRUD sync from Zustand to Supabase: PARTIALLY TRUE.

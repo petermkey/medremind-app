@@ -1,105 +1,179 @@
 # MedRemind System Logic (Current)
 
 Date: 2026-03-18
+Status: active source of truth
 
-## 1. Persistence Model
+## 1. State and persistence model
 
-Source of truth is layered:
-1. Local Zustand store (`src/lib/store/store.ts`) for immediate UX.
-2. Supabase tables for account-bound cloud persistence.
-3. Local sync outbox (`src/lib/supabase/syncOutbox.ts`) for failed-write replay.
+The application uses layered persistence:
 
-Local storage keys:
-- `medremind-store` - persisted app state.
-- `medremind-sync-outbox-v1` - queued cloud operations for retry.
+1. Local Zustand state for immediate UX (`src/lib/store/store.ts`).
+2. Supabase as account-bound cloud persistence (`src/lib/supabase/*`).
+3. Local outbox retry queue for failed cloud writes (`src/lib/supabase/syncOutbox.ts`).
 
-## 2. Cloud Sync Lifecycle
+Browser keys:
 
-Write path:
-- UI action updates local store optimistically.
-- Matching cloud call is fired via `realtimeSync`.
-- If cloud call fails, operation is queued in outbox.
-- Outbox retries with exponential backoff and on online/visibility events.
+- `medremind-store`
+- `medremind-sync-outbox-v1`
 
-Read path:
-- `/app` layout boot authenticates user and calls `pullStoreFromSupabase()`.
-- Cloud rows are mapped to local entities and injected into Zustand state.
+## 2. Auth bootstrap and cloud load
 
-## 3. Supabase Entity Mapping
+App shell boot (`src/app/app/layout.tsx`) performs:
 
-- `protocols` (`owner_id`) <-> local `protocols`
+1. start outbox processing
+2. read current Supabase user
+3. if no user: reset local user-scoped state and redirect to `/login`
+4. if user changed: reset local user-scoped state to prevent cross-account bleed
+5. set profile from auth
+6. pull cloud state from Supabase (`pullStoreFromSupabase`)
+
+If cloud pull fails, app remains usable with local state.
+
+## 3. Supabase mapping
+
+- `profiles` (`id`) <-> `profile`
+- `notification_settings` (`user_id`) <-> `notificationSettings`
+- `protocols` (`owner_id`) <-> custom `protocols`
 - `protocol_items` (`protocol_id`) <-> `protocol.items`
-- `active_protocols` (`user_id`) <-> local `activeProtocols`
-- `scheduled_doses` (`user_id`) <-> local `scheduledDoses`
-- `dose_records` (`user_id`) <-> local `doseRecords`
-- `profiles` (`id`) <-> local `profile`
-- `notification_settings` (`user_id`) <-> local `notificationSettings`
+- `active_protocols` (`user_id`) <-> `activeProtocols`
+- `scheduled_doses` (`user_id`) <-> `scheduledDoses`
+- `dose_records` (`user_id`) <-> `doseRecords`
+- `drugs` (`created_by`, `is_custom=true`) <-> custom `drugs`
 
-## 4. Recovery Flows
+## 4. Sync lifecycle and outbox
 
-Implemented in settings page:
-- Export snapshot to JSON file.
-- Backup current local state into Supabase.
-- Restore local state from Supabase.
-- Load raw local snapshot payload.
-- Import raw snapshot payload into Supabase.
+Write path pattern:
+
+1. UI action mutates local Zustand state optimistically.
+2. Matching cloud write is attempted via `realtimeSync.ts`.
+3. On failure, operation is enqueued in outbox.
+4. Outbox retries with exponential backoff.
+
+Outbox triggers:
+
+- app start
+- online event
+- tab visibility regain
+- manual flush from Settings (`Flush sync now`)
+
+Global sync status UI:
+
+- `SyncStatusPill` in app shell
+- states: `Synced`, `Syncing N`, `Sync error`
+
+## 5. Safe sign-out behavior
+
+Settings sign-out flow:
+
+1. If outbox has pending ops, app attempts forced flush.
+2. If pending remains after timeout, user gets confirmation dialog.
+3. On sign-out completion, outbox is cleared and local user data is reset.
+
+## 6. Recovery flows
+
+Settings supports:
+
+- export current snapshot to file
+- backup current local state to Supabase
+- restore local state from Supabase
+- load raw local snapshot payload
+- import snapshot payload into Supabase
 
 Primary modules:
+
 - `src/lib/supabase/cloudStore.ts`
 - `src/lib/supabase/importStore.ts`
 
-## 5. Protocol and Item CRUD UX
+## 7. Protocol editing and composition
 
-Protocol list page (`/app/protocols`):
-- Swipe left (touch) or drag left (mouse) on a protocol card.
-- Actions:
-  - `Edit` - updates protocol metadata (name/description/category).
-  - `Delete` - removes protocol plus related active protocols/scheduled doses/dose records.
+Protocol list (`/app/protocols`):
 
-Protocol detail page (`/app/protocols/[id]`):
-- Swipe left/drag left on each protocol item.
-- Actions:
-  - `Edit` - updates item fields (name, dose, unit, frequency, time).
-  - `Delete` - removes item.
-- If protocol is active, edit/delete triggers dose regeneration.
+- swipe/drag actions per protocol:
+  - edit -> opens `/app/protocols/[id]?edit=1`
+  - delete
 
-## 6. Frequency Rules
+Protocol detail (`/app/protocols/[id]`):
 
-Supported item frequencies in current UI:
-- `daily`
-- `twice_daily`
-- `three_times_daily`
-- `weekly`
-- `every_n_days` (requires explicit `N` value)
+- metadata edit: name/description/category
+- full item composition CRUD:
+  - add item
+  - edit item
+  - delete item
+- supported item fields follow current protocol item schema:
+  - item type, name
+  - dose amount/unit/form
+  - route
+  - frequency + Every N days value
+  - time
+  - with food
+  - instructions
+  - icon/color
 
-Notes:
-- For `every_n_days`, UI now captures `frequencyValue`.
-- Display labels render as `every N days`.
+If protocol instance is active, item composition changes trigger dose regeneration.
 
-## 7. Regeneration Safety Rules
+## 8. Dose action logic
 
-`syncRegeneratedDoses` avoids destructive deletes:
-- Loads existing future doses.
-- Protects doses with status `taken/skipped/snoozed`.
-- Protects doses referenced by `dose_records` (FK safety).
-- Deletes only non-protected future doses.
-- Upserts new generated doses excluding protected schedule slots.
+### Take
 
-This prevents FK failures like:
-- deleting `scheduled_doses` rows referenced by `dose_records`.
+- sets dose status to `taken`
+- appends `dose_records` action `taken`
 
-## 8. Known Constraints
+### Skip
 
-- Conflict resolution is currently last-write-wins.
-- Outbox stores full operation payloads (can grow for large entities).
-- No dedicated automated integration suite yet for full persistence matrix.
+- sets dose status to `skipped`
+- appends `dose_records` action `skipped`
+- skipped dose is removed from active queue rendering for the selected day
 
-## 9. Sync Visibility and Safe Sign-out
+### Snooze
 
-- Global app shell shows sync state pill:
-  - `Synced`
-  - `Syncing N`
-  - `Sync error`
-- Settings page includes `Flush sync now` to force outbox replay.
-- Sign out attempts to flush pending sync operations first.
-- If pending operations remain after timeout, sign out requires explicit confirmation.
+UI offers options:
+
+- 15 minutes
+- 1 hour
+- this evening
+- tomorrow
+
+Snooze updates:
+
+- status `snoozed`
+- `snoozedUntil`
+- `scheduledDate`
+- `scheduledTime`
+- appends `dose_records` action `snoozed`
+
+## 9. Pause/resume visibility rules
+
+Pause/resume changes `active_protocols.status`.
+
+Visibility rule now applied consistently in schedule selectors:
+
+- today/future dates: show doses only from active protocol instances (`status === active`)
+- past dates: keep historical doses visible regardless of current protocol status
+
+Implications:
+
+- pausing removes active upcoming doses from user-facing schedule surfaces
+- pausing does not erase or hide past recorded history
+- resuming restores upcoming visibility for that protocol
+
+## 10. Calendar and schedule surfaces
+
+There is no separate full calendar page currently.
+
+Calendar-like surface is the week strip on `/app`.
+
+- day entries come from `getDaySchedule(selectedDate)`
+- date markers come from `getVisibleDoseDates()`
+- both follow the pause visibility rules above
+
+## 11. Known limitations
+
+- conflict policy is effectively last-write-wins
+- outbox is client-side only (device-local)
+- no automated end-to-end persistence matrix in CI yet
+- no server-side idempotency framework for all mutation classes
+
+## 12. Historical documents
+
+Point-in-time verification reports are preserved in `docs/` for audit history.
+They may describe earlier states and should not override this file.
