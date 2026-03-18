@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { v4 as uuid } from 'uuid';
 import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
@@ -34,6 +33,13 @@ function emptyItem(): ItemDraft {
     frequencyType: 'daily', frequencyValue: undefined, times: ['08:00'], withFood: 'any',
     startDay: 1, sortOrder: 0, icon: '💊', color: 'blue',
   };
+}
+
+function generateDraftItemId() {
+  const c = globalThis.crypto as { randomUUID?: () => string } | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  const rand = Math.random().toString(16).slice(2, 10);
+  return `protocol-item-${Date.now()}-${rand}`;
 }
 
 export default function NewProtocolPage() {
@@ -98,7 +104,7 @@ export default function NewProtocolPage() {
         description: description.trim() || undefined,
         category,
         durationDays: duration === 'fixed' ? parseInt(durationDays) : undefined,
-        items: items.map((it, i) => ({ ...it, id: uuid(), protocolId: '_temp_', sortOrder: i })),
+        items: items.map((it, i) => ({ ...it, id: generateDraftItemId(), protocolId: '_temp_', sortOrder: i })),
         isArchived: false,
       });
       createdProtocolId = protocol.id;

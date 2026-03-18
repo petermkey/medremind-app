@@ -52,6 +52,18 @@ export async function waitForRealtimeSyncIdle(timeoutMs = 8_000): Promise<{ ok: 
 const today = () => format(new Date(), 'yyyy-MM-dd');
 const nowTime = () => format(new Date(), 'HH:mm');
 
+function generateId(prefix: string): string {
+  try {
+    return uuid();
+  } catch (error) {
+    console.error('[id-generation-fallback]', prefix, error);
+    const c = globalThis.crypto as { randomUUID?: () => string } | undefined;
+    if (c?.randomUUID) return c.randomUUID();
+    const rand = Math.random().toString(16).slice(2, 10);
+    return `${prefix}-${Date.now()}-${rand}`;
+  }
+}
+
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
   const tracked = trackRealtimeSync(task);
   void tracked
@@ -85,7 +97,7 @@ function expandItemToDoses(
       const td = format(targetDate, 'yyyy-MM-dd');
       if (td >= fromDate && td <= toDate) {
         doses.push({
-          id: uuid(),
+          id: generateId('dose'),
           userId: activeProtocol.userId,
           activeProtocolId: activeProtocol.id,
           protocolItemId: item.id,
@@ -132,7 +144,7 @@ function expandItemToDoses(
     if (include) {
       for (const time of item.times) {
         doses.push({
-          id: uuid(),
+          id: generateId('dose'),
           userId: activeProtocol.userId,
           activeProtocolId: activeProtocol.id,
           protocolItemId: item.id,
@@ -313,7 +325,7 @@ export const useStore = create<AppState>()(
         if (!protocol || !state.profile) throw new Error('Protocol or profile not found');
 
         const active: ActiveProtocol = {
-          id: uuid(),
+          id: generateId('active'),
           userId: state.profile.id,
           protocolId,
           protocol,
@@ -402,7 +414,7 @@ export const useStore = create<AppState>()(
         const profileId = get().profile?.id;
         const protocol: Protocol = {
           ...p,
-          id: uuid(),
+          id: generateId('protocol'),
           ownerId: profileId,
           isTemplate: false,
           createdAt: new Date().toISOString(),
@@ -465,7 +477,7 @@ export const useStore = create<AppState>()(
 
       addProtocolItem: (protocolId, item) => {
         const profileId = get().profile?.id;
-        const newItem: ProtocolItem = { ...item, id: uuid(), protocolId };
+        const newItem: ProtocolItem = { ...item, id: generateId('protocol-item'), protocolId };
         let targetProtocol: Protocol | null = null;
         set(s => {
           const protocols = s.protocols.map(p => {
@@ -556,7 +568,7 @@ export const useStore = create<AppState>()(
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
         const record: DoseRecord = {
-          id: uuid(),
+          id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
           action: 'taken',
@@ -582,7 +594,7 @@ export const useStore = create<AppState>()(
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
         const record: DoseRecord = {
-          id: uuid(),
+          id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
           action: 'skipped',
@@ -615,7 +627,7 @@ export const useStore = create<AppState>()(
         const scheduledDate = format(targetDate, 'yyyy-MM-dd');
         const scheduledTime = format(targetDate, 'HH:mm');
         const record: DoseRecord = {
-          id: uuid(),
+          id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
           action: 'snoozed',
