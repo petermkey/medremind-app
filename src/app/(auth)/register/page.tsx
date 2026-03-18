@@ -44,6 +44,7 @@ export default function RegisterPage() {
       return;
     }
 
+    store.resetUserData();
     store.setProfile(profile);
     router.push('/onboarding');
   }

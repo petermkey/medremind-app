@@ -63,6 +63,12 @@ export type SyncStatus = {
   lastSuccessAt: string | null;
 };
 
+export type FlushSyncResult = {
+  ok: boolean;
+  pending: number;
+  lastError: string | null;
+};
+
 const KEY = 'medremind-sync-outbox-v1';
 const listeners = new Set<(status: SyncStatus) => void>();
 
@@ -145,6 +151,12 @@ async function executeOperation(op: SyncOperation) {
   }
 }
 
+function waitMs(ms: number) {
+  return new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 export function getSyncStatusSnapshot(): SyncStatus {
   return { ...status };
 }
@@ -182,7 +194,8 @@ export function enqueueSyncOperation(op: SyncOperation) {
   void pumpOutbox();
 }
 
-export async function pumpOutbox() {
+export async function pumpOutbox(options?: { force?: boolean }) {
+  const force = options?.force ?? false;
   if (!hasWindow() || pumping) return;
   pumping = true;
   status.running = true;
@@ -198,7 +211,7 @@ export async function pumpOutbox() {
 
   const now = Date.now();
   for (const item of [...queue]) {
-    if (item.nextAttemptAt > now) continue;
+    if (!force && item.nextAttemptAt > now) continue;
     try {
       await executeOperation(item);
       queue = queue.filter(q => q.id !== item.id);
@@ -227,6 +240,25 @@ export async function pumpOutbox() {
   pumping = false;
 }
 
+export async function flushSyncOutbox(timeoutMs = 10_000): Promise<FlushSyncResult> {
+  if (!hasWindow()) return { ok: true, pending: 0, lastError: null };
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    await pumpOutbox({ force: true });
+    const pending = readQueue().length;
+    status.pending = pending;
+    emit();
+    if (pending === 0) {
+      return { ok: true, pending: 0, lastError: null };
+    }
+    await waitMs(250);
+  }
+  const pending = readQueue().length;
+  status.pending = pending;
+  emit();
+  return { ok: pending === 0, pending, lastError: status.lastError };
+}
+
 export function startSyncOutbox() {
   if (started || !hasWindow()) return;
   started = true;
@@ -241,4 +273,17 @@ export function startSyncOutbox() {
     if (document.visibilityState === 'visible') void pumpOutbox();
   });
   void pumpOutbox();
+}
+
+export function clearSyncOutbox() {
+  if (!hasWindow()) return;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  localStorage.removeItem(KEY);
+  status.pending = 0;
+  status.running = false;
+  status.lastError = null;
+  emit();
 }

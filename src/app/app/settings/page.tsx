@@ -9,7 +9,13 @@ import {
   pullStoreFromSupabase,
 } from '@/lib/supabase/cloudStore';
 import { importStoreSnapshotToSupabase } from '@/lib/supabase/importStore';
-import { getSyncStatusSnapshot, subscribeSyncStatus, type SyncStatus } from '@/lib/supabase/syncOutbox';
+import {
+  clearSyncOutbox,
+  flushSyncOutbox,
+  getSyncStatusSnapshot,
+  subscribeSyncStatus,
+  type SyncStatus,
+} from '@/lib/supabase/syncOutbox';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -38,6 +44,7 @@ export default function SettingsPage() {
   const [syncStatus, setSyncStatus] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [outbox, setOutbox] = useState<SyncStatus>(getSyncStatusSnapshot());
+  const [flushing, setFlushing] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -83,13 +90,33 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
+    if (outbox.pending > 0 || outbox.running) {
+      setFlushing(true);
+      setSyncStatus(`Syncing ${outbox.pending} pending change(s) before sign out...`);
+      try {
+        const result = await flushSyncOutbox(8_000);
+        if (!result.ok) {
+          const proceed = window.confirm(
+            `There are still ${result.pending} unsynced change(s). Sign out anyway?`,
+          );
+          if (!proceed) {
+            show('Sign out canceled. Please wait for sync completion.', 'warning');
+            return;
+          }
+        }
+      } finally {
+        setFlushing(false);
+      }
+    }
     await supabaseSignOut();
+    clearSyncOutbox();
     signOut();
     router.push('/login');
   }
 
   async function handleDeleteAccount() {
     await supabaseSignOut();
+    clearSyncOutbox();
     signOut();
     if (typeof window !== 'undefined') localStorage.clear();
     router.push('/register');
@@ -169,6 +196,24 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleFlushSyncNow() {
+    setFlushing(true);
+    setSyncStatus('Flushing pending sync operations...');
+    try {
+      const result = await flushSyncOutbox(10_000);
+      if (result.ok) {
+        setSyncStatus('All pending sync operations completed.');
+        show('✓ Sync queue is clean');
+      } else {
+        const message = `Still pending: ${result.pending}. Last error: ${result.lastError ?? 'unknown'}.`;
+        setSyncStatus(message);
+        show(message, 'warning');
+      }
+    } finally {
+      setFlushing(false);
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
@@ -236,7 +281,7 @@ export default function SettingsPage() {
 
         {/* Account */}
         <Section title="⚙️ Account">
-          <Button variant="secondary" fullWidth onClick={handleSignOut}>Sign Out</Button>
+          <Button variant="secondary" fullWidth onClick={handleSignOut} loading={flushing}>Sign Out</Button>
           {!showDeleteConfirm ? (
             <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-[#EF4444] hover:underline text-center w-full mt-1">
               Delete account and all data
@@ -270,6 +315,9 @@ export default function SettingsPage() {
             </Button>
             <Button variant="secondary" size="sm" onClick={handleRestoreFromCloud} loading={syncing}>
               Restore from cloud
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleFlushSyncNow} loading={flushing}>
+              Flush sync now
             </Button>
           </div>
           <div className="flex gap-2">

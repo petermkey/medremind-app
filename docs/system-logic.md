@@ -93,3 +93,13 @@ This prevents FK failures like:
 - Conflict resolution is currently last-write-wins.
 - Outbox stores full operation payloads (can grow for large entities).
 - No dedicated automated integration suite yet for full persistence matrix.
+
+## 9. Sync Visibility and Safe Sign-out
+
+- Global app shell shows sync state pill:
+  - `Synced`
+  - `Syncing N`
+  - `Sync error`
+- Settings page includes `Flush sync now` to force outbox replay.
+- Sign out attempts to flush pending sync operations first.
+- If pending operations remain after timeout, sign out requires explicit confirmation.

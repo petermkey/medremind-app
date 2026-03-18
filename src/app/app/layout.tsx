@@ -6,27 +6,31 @@ import { getCurrentUser } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
 import { startSyncOutbox } from '@/lib/supabase/syncOutbox';
 import { BottomNav } from '@/components/app/BottomNav';
+import { SyncStatusPill } from '@/components/app/SyncStatusPill';
 import { ToastProvider } from '@/components/ui/Toast';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { profile, setProfile } = useStore();
-  const [checking, setChecking] = useState(!profile); // skip check if already in store
+  const { profile, setProfile, resetUserData } = useStore();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     startSyncOutbox();
-    if (profile?.onboarded) { setChecking(false); return; }
-
     let cancelled = false;
     async function boot() {
       const user = await getCurrentUser();
       if (cancelled) return;
       if (!user) {
+        resetUserData();
         router.replace('/login');
         setChecking(false);
         return;
       }
 
+      if (profile?.id && profile.id !== user.id) {
+        // Prevent cross-account bleed from persisted local state while switching users.
+        resetUserData();
+      }
       setProfile(user);
       if (!user.onboarded) {
         router.replace('/onboarding');
@@ -62,6 +66,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           sm:shadow-[0_40px_80px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.04)]
           overflow-hidden relative
         ">
+          <div className="absolute left-4 bottom-24 z-20 pointer-events-none">
+            <SyncStatusPill />
+          </div>
           <div className="flex-1 overflow-hidden">
             {children}
           </div>

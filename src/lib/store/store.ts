@@ -141,6 +141,7 @@ interface AppState {
 
   // Actions — Auth
   setProfile: (profile: UserProfile | null) => void;
+  resetUserData: () => void;
   signUp: (email: string, password: string, name: string) => UserProfile;
   signIn: (email: string, password: string) => UserProfile | null;
   signOut: () => void;
@@ -197,6 +198,20 @@ export const useStore = create<AppState>()(
       // ── Auth ──────────────────────────────────────────────────────────
 
       setProfile: (profile) => set({ profile }),
+      resetUserData: () => set({
+        profile: null,
+        notificationSettings: {
+          pushEnabled: false,
+          emailEnabled: false,
+          leadTimeMin: 0,
+          digestTime: '07:00',
+        },
+        protocols: SEED_PROTOCOLS,
+        activeProtocols: [],
+        scheduledDoses: [],
+        doseRecords: [],
+        drugs: SEED_DRUGS,
+      }),
 
       signUp: (email, password, name) => {
         _passwords[email] = password;
@@ -219,7 +234,20 @@ export const useStore = create<AppState>()(
         return get().profile;
       },
 
-      signOut: () => set({ profile: null }),
+      signOut: () => set({
+        profile: null,
+        notificationSettings: {
+          pushEnabled: false,
+          emailEnabled: false,
+          leadTimeMin: 0,
+          digestTime: '07:00',
+        },
+        protocols: SEED_PROTOCOLS,
+        activeProtocols: [],
+        scheduledDoses: [],
+        doseRecords: [],
+        drugs: SEED_DRUGS,
+      }),
 
       updateProfile: (patch) => {
         const p = get().profile;
