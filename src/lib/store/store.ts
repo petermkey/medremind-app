@@ -26,13 +26,35 @@ import {
   type SyncOperation,
 } from '@/lib/supabase/syncOutbox';
 
+const inflightRealtimeSync = new Set<Promise<unknown>>();
+
+function trackRealtimeSync(task: Promise<unknown>) {
+  inflightRealtimeSync.add(task);
+  void task.finally(() => {
+    inflightRealtimeSync.delete(task);
+  });
+  return task;
+}
+
+export async function waitForRealtimeSyncIdle(timeoutMs = 8_000): Promise<{ ok: boolean; pending: number }> {
+  const startedAt = Date.now();
+  while (inflightRealtimeSync.size > 0) {
+    if (Date.now() - startedAt >= timeoutMs) {
+      return { ok: false, pending: inflightRealtimeSync.size };
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return { ok: true, pending: 0 };
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────
 
 const today = () => format(new Date(), 'yyyy-MM-dd');
 const nowTime = () => format(new Date(), 'HH:mm');
 
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
-  void task
+  const tracked = trackRealtimeSync(task);
+  void tracked
     .then(() => {
       markSyncSuccess();
     })

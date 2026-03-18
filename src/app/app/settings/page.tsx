@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useStore } from '@/lib/store/store';
+import { useStore, waitForRealtimeSyncIdle } from '@/lib/store/store';
 import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
 import {
   backupCurrentStoreToSupabase,
@@ -90,6 +90,16 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
+    const realtimeResult = await waitForRealtimeSyncIdle(8_000);
+    if (!realtimeResult.ok) {
+      const proceed = window.confirm(
+        `There are still ${realtimeResult.pending} in-flight sync request(s). Sign out anyway?`,
+      );
+      if (!proceed) {
+        show('Sign out canceled. Please wait for sync completion.', 'warning');
+        return;
+      }
+    }
     if (outbox.pending > 0 || outbox.running) {
       setFlushing(true);
       setSyncStatus(`Syncing ${outbox.pending} pending change(s) before sign out...`);
