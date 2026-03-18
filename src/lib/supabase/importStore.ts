@@ -229,7 +229,7 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
     .map(ap => {
       const mappedProtocolId = protocolIdMap.get(ap.protocolId) ?? null;
       if (!mappedProtocolId) return null;
-      const newActiveId = isUuid(ap.id) ? ap.id : crypto.randomUUID();
+      const newActiveId = isUuid(ap.id) ? ap.id : stableUuid(`active:${userId}`, ap.id);
       activeIdMap.set(ap.id, newActiveId);
       return {
         id: newActiveId,
@@ -260,7 +260,7 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
       const mappedActiveId = activeIdMap.get(d.activeProtocolId) ?? null;
       const mappedItemId = protocolItemIdMap.get(d.protocolItemId) ?? null;
       if (!mappedActiveId || !mappedItemId) return null;
-      const newDoseId = isUuid(d.id) ? d.id : crypto.randomUUID();
+      const newDoseId = isUuid(d.id) ? d.id : stableUuid(`dose:${mappedActiveId}`, d.id);
       doseIdMap.set(d.id, newDoseId);
       return {
         id: newDoseId,
@@ -287,7 +287,7 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
     .map(r => {
       const mappedDoseId = doseIdMap.get(r.scheduledDoseId) ?? null;
       if (!mappedDoseId) return null;
-      const newRecordId = isUuid(r.id) ? r.id : crypto.randomUUID();
+      const newRecordId = isUuid(r.id) ? r.id : stableUuid(`record:${userId}`, r.id);
       return {
         id: newRecordId,
         user_id: userId,

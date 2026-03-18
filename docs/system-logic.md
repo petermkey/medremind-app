@@ -175,7 +175,33 @@ Calendar-like surface is the week strip on `/app`.
 - no automated end-to-end persistence matrix in CI yet
 - no server-side idempotency framework for all mutation classes
 
-## 12. Historical documents
+## 12. ID hardening and restore idempotency (2026-03-18)
+
+Protocol finalization root cause (exact path):
+
+- In the protocol create wizard finalize handler (`src/app/app/protocols/new/page.tsx`), draft items previously called `uuid()` directly while building `items` for `createCustomProtocol`.
+- In the same runtime period, store creation paths also had direct `uuid()` calls for protocol, active protocol, dose, and dose record IDs.
+- When that UUID generation path threw in browser runtime, finalization aborted in the submit path and surfaced `Could not finalize protocol` (`[protocol-finalize-failed]`), so protocol creation/finalization could fail before completion.
+
+Current safe ID generation paths:
+
+- Local creation now uses guarded generation in store (`src/lib/store/store.ts` `generateId`) and safe draft item ID generation in new protocol page.
+- Cloud sync normalization uses deterministic UUID mapping for non-UUID local IDs in `src/lib/supabase/realtimeSync.ts` (`cloudProtocolId`, `cloudProtocolItemId`, `cloudActiveId`, `cloudDoseId`, `cloudRecordId`).
+
+Import/restore idempotency hardening:
+
+- `src/lib/supabase/importStore.ts` now uses deterministic `stableUuid(...)` (not random) for imported non-UUID:
+  - `active_protocols.id`
+  - `scheduled_doses.id`
+  - `dose_records.id`
+- This prevents duplicate rows across repeated restore/import of the same snapshot caused by random remapping of the same logical entities.
+
+Out of scope of this fix:
+
+- General server-side idempotency across all mutation classes.
+- Non-import duplicate causes unrelated to ID generation.
+
+## 13. Historical documents
 
 Point-in-time verification reports are preserved in `docs/` for audit history.
 They may describe earlier states and should not override this file.
