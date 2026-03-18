@@ -17,6 +17,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     startSyncOutbox();
     let cancelled = false;
+    async function pullWithRetry(attempts = 3, delayMs = 700) {
+      let lastError: unknown = null;
+      for (let i = 0; i < attempts; i++) {
+        try {
+          await pullStoreFromSupabase();
+          return;
+        } catch (error) {
+          lastError = error;
+          if (i < attempts - 1) {
+            await new Promise(resolve => setTimeout(resolve, delayMs * (i + 1)));
+          }
+        }
+      }
+      throw lastError;
+    }
+
     async function boot() {
       const user = await getCurrentUser();
       if (cancelled) return;
@@ -39,8 +55,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        await pullStoreFromSupabase();
-      } catch {
+        await pullWithRetry();
+      } catch (error) {
+        console.error('[cloud-pull-on-boot-failed]', error);
         // Keep app usable if cloud pull fails; local store still works.
       } finally {
         if (!cancelled) setChecking(false);

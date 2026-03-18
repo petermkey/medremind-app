@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import type { Protocol, ProtocolCategory } from '@/types';
+import { SEED_PROTOCOLS } from '@/lib/data/seed';
 
 const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
   general: '🌿', cardiovascular: '❤️', metabolic: '⚙️',
@@ -33,7 +34,42 @@ export default function ProtocolsPage() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
-  const filtered = protocols.filter(p => {
+  const seedTemplateKeySet = new Set(
+    SEED_PROTOCOLS.map(p => `${p.name.toLowerCase()}|${p.category}`),
+  );
+
+  const dedupedProtocols = (() => {
+    const byDisplayKey = new Map<string, Protocol>();
+    const isSeedProtocol = (id: string) => SEED_PROTOCOLS.some(p => p.id === id);
+    const hasActiveInstance = (id: string) =>
+      activeProtocols.some(ap => ap.protocolId === id && (ap.status === 'active' || ap.status === 'paused'));
+
+    for (const p of protocols) {
+      const templateKey = `${p.name.toLowerCase()}|${p.category}`;
+      const displayKey = seedTemplateKeySet.has(templateKey)
+        ? `template:${templateKey}`
+        : `protocol:${p.id}`;
+      const existing = byDisplayKey.get(displayKey);
+      if (!existing) {
+        byDisplayKey.set(displayKey, p);
+        continue;
+      }
+
+      const pActive = hasActiveInstance(p.id);
+      const existingActive = hasActiveInstance(existing.id);
+      if (pActive && !existingActive) {
+        byDisplayKey.set(displayKey, p);
+        continue;
+      }
+      if (!pActive && !existingActive && isSeedProtocol(p.id) && !isSeedProtocol(existing.id)) {
+        byDisplayKey.set(displayKey, p);
+      }
+    }
+
+    return Array.from(byDisplayKey.values());
+  })();
+
+  const filtered = dedupedProtocols.filter(p => {
     if (p.isArchived) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     const isActive = activeProtocols.some(ap => ap.protocolId === p.id && ap.status === 'active');

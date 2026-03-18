@@ -81,36 +81,59 @@ export default function SchedulePage() {
     .filter(d => d.status === 'pending' || d.status === 'snoozed' || (d.status as string) === 'upcoming')
     .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
 
-  function getSnoozeUntil(dose: ScheduledDose, option: '15m' | '1h' | 'evening' | 'tomorrow') {
-    const now = new Date();
-    if (option === '15m') return addMinutes(now, 15);
-    if (option === '1h') return addMinutes(now, 60);
-    if (option === 'evening') {
-      const evening = new Date(now);
-      evening.setHours(19, 0, 0, 0);
-      if (evening.getTime() <= now.getTime()) {
-        evening.setHours(21, 0, 0, 0);
-      }
-      return evening.getTime() > now.getTime() ? evening : addMinutes(now, 15);
-    }
-    const [hours, minutes] = dose.scheduledTime.split(':').map(Number);
-    const tomorrow = addDays(now, 1);
-    tomorrow.setHours(hours, minutes, 0, 0);
-    return tomorrow;
+  function toDateTime(dateStr: string, timeStr: string) {
+    return parseISO(`${dateStr}T${timeStr}:00`);
   }
 
-  function applySnooze(option: '15m' | '1h' | 'evening' | 'tomorrow') {
+  function getSnoozeUntil(dose: ScheduledDose, option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
+    const now = new Date();
+    const intendedTime = dose.protocolItem.times[0] ?? dose.scheduledTime;
+    const [intendedHours, intendedMinutes] = intendedTime.split(':').map(Number);
+
+    if (option === '1h') return addMinutes(now, 60);
+
+    if (option === 'evening') {
+      // App-defined evening slot.
+      return toDateTime(dose.scheduledDate, '21:00');
+    }
+
+    if (option === 'tomorrow') {
+      const target = addDays(parseISO(dose.scheduledDate), 1);
+      target.setHours(intendedHours, intendedMinutes, 0, 0);
+      return target;
+    }
+
+    const nextWeek = addDays(parseISO(dose.scheduledDate), 7);
+    nextWeek.setHours(intendedHours, intendedMinutes, 0, 0);
+    return nextWeek;
+  }
+
+  function applySnooze(option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
     if (!snoozeTargetDose) return;
-    const until = getSnoozeUntil(snoozeTargetDose, option);
+    const baseUntil = getSnoozeUntil(snoozeTargetDose, option);
+    const until = (() => {
+      const occupied = new Set(
+        scheduledDoses
+          .filter(d => d.id !== snoozeTargetDose.id && d.protocolItemId === snoozeTargetDose.protocolItemId)
+          .map(d => `${d.scheduledDate}|${d.scheduledTime}`),
+      );
+      const candidate = new Date(baseUntil);
+      for (let i = 0; i < 72; i++) {
+        const key = `${format(candidate, 'yyyy-MM-dd')}|${format(candidate, 'HH:mm')}`;
+        if (!occupied.has(key)) return candidate;
+        candidate.setMinutes(candidate.getMinutes() + 5);
+      }
+      return baseUntil;
+    })();
     snoozeDose(snoozeTargetDose.id, { until: until.toISOString() });
     const label =
-      option === '15m'
-        ? '15 minutes'
-        : option === '1h'
-          ? '1 hour'
-          : option === 'evening'
-            ? `this evening (${fmtTime(format(until, 'HH:mm'))})`
-            : `tomorrow (${fmtTime(format(until, 'HH:mm'))})`;
+      option === '1h'
+        ? '1 hour'
+        : option === 'evening'
+          ? `this evening (${fmtTime(format(until, 'HH:mm'))})`
+          : option === 'tomorrow'
+            ? `tomorrow (${fmtTime(format(until, 'HH:mm'))})`
+            : `next week (${fmtTime(format(until, 'HH:mm'))})`;
     show(`⏰ Snoozed to ${label}`, 'warning');
     setSnoozeTargetDose(null);
   }
@@ -225,10 +248,10 @@ export default function SchedulePage() {
               {snoozeTargetDose.protocolItem.name}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => applySnooze('15m')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">15 minutes</button>
               <button onClick={() => applySnooze('1h')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">1 hour</button>
               <button onClick={() => applySnooze('evening')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">This evening</button>
               <button onClick={() => applySnooze('tomorrow')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Tomorrow</button>
+              <button onClick={() => applySnooze('next_week')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Next week</button>
             </div>
             <button onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#8B949E]">Cancel</button>
           </div>

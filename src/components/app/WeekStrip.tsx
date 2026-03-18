@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useMemo, useRef } from 'react';
 import { addDays, format, isSameDay, parseISO } from 'date-fns';
 
 interface Props {
@@ -9,8 +10,18 @@ interface Props {
 
 export function WeekStrip({ selectedDate, onSelectDate, doseDateSet }: Props) {
   const today = new Date();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 3));
+  const selected = parseISO(selectedDate);
+  const anchorDate = Number.isNaN(selected.getTime()) ? today : selected;
+  const days = useMemo(
+    () => Array.from({ length: 121 }, (_, i) => addDays(anchorDate, i - 60)),
+    [anchorDate],
+  );
   const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const selectedRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [selectedDate, days]);
 
   return (
     <div className="flex gap-1.5 overflow-x-auto pb-1 px-5">
@@ -23,6 +34,7 @@ export function WeekStrip({ selectedDate, onSelectDate, doseDateSet }: Props) {
         return (
           <button
             key={dateStr}
+            ref={isSelected ? selectedRef : null}
             onClick={() => onSelectDate(dateStr)}
             className={[
               'flex flex-col items-center min-w-[44px] px-1 py-2 rounded-2xl border transition-all duration-200 flex-shrink-0',

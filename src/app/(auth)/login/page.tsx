@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { supabaseSignIn } from '@/lib/supabase/auth';
+import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -25,6 +26,11 @@ export default function LoginPage() {
     if (authError || !profile) { setError(authError ?? 'Sign-in failed. Check your credentials.'); return; }
     store.resetUserData();
     store.setProfile(profile);
+    try {
+      await pullStoreFromSupabase();
+    } catch (error) {
+      console.error('[cloud-pull-after-login-failed]', error);
+    }
     router.push(profile.onboarded ? '/app' : '/onboarding');
   }
 

@@ -1,6 +1,6 @@
 'use client';
-import { useMemo } from 'react';
-import { format, subDays, eachDayOfInterval } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
+import { addDays, eachDayOfInterval, format, subDays } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 
 function pctToColor(pct: number) {
@@ -10,14 +10,92 @@ function pctToColor(pct: number) {
   return '#10B981';
 }
 
+const RING_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#EF4444'];
+
+type RingDatum = {
+  key: string;
+  color: string;
+  pct: number;
+  total: number;
+};
+
+function DayRings({
+  rings,
+  size = 44,
+  stroke = 4,
+}: {
+  rings: RingDatum[];
+  size?: number;
+  stroke?: number;
+}) {
+  const count = Math.max(rings.length, 1);
+  const gap = 2;
+  const maxRadius = size / 2 - stroke / 2;
+  const minRadius = Math.max(2, maxRadius - (count - 1) * (stroke + gap));
+  const radii =
+    count === 1
+      ? [maxRadius]
+      : Array.from({ length: count }, (_, i) => maxRadius - i * ((maxRadius - minRadius) / (count - 1)));
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
+      {rings.map((ring, idx) => {
+        const radius = radii[idx] ?? minRadius;
+        const circumference = 2 * Math.PI * radius;
+        const progress = Math.max(0, Math.min(100, ring.pct));
+        const dashOffset = circumference * (1 - progress / 100);
+        const isHollow = ring.total === 0 || progress === 0;
+
+        return (
+          <g key={ring.key}>
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={ring.color}
+              strokeOpacity={ring.total > 0 ? 0.35 : 0.18}
+              strokeWidth={stroke}
+            />
+            {!isHollow && (
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={ring.color}
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+              />
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function ProgressPage() {
-  const { scheduledDoses, activeProtocols, getAdherencePct, getStreak } = useStore();
+  const { scheduledDoses, activeProtocols, getStreak } = useStore();
+  const [calendarRange, setCalendarRange] = useState<30 | 60 | 90>(30);
+  const [isMobile, setIsMobile] = useState(false);
 
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
 
-  // Last 30 days for heatmap
-  const days30 = eachDayOfInterval({ start: subDays(today, 29), end: today });
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 640);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const futureDays = Math.floor(calendarRange / 3);
+  const pastDays = calendarRange - 1 - futureDays;
+  const calendarDays = eachDayOfInterval({ start: subDays(today, pastDays), end: addDays(today, futureDays) });
 
   const stats = useMemo(() => {
     const total = scheduledDoses.length;
@@ -28,18 +106,79 @@ export default function ProgressPage() {
     return { total, taken, skipped, overdue, pct };
   }, [scheduledDoses]);
 
-  // Weekly (last 7 days) adherence per day
+  const protocolTracks = useMemo(() => {
+    const withWeight = activeProtocols
+      .map((ap, idx) => {
+        const total = scheduledDoses.filter(d => d.activeProtocolId === ap.id).length;
+        const seedColor = ap.protocol.items.find(i => i.color)?.color;
+        const color =
+          seedColor === 'blue' ? '#3B82F6' :
+          seedColor === 'green' ? '#10B981' :
+          seedColor === 'yellow' ? '#F59E0B' :
+          seedColor === 'pink' ? '#EC4899' :
+          seedColor === 'purple' ? '#8B5CF6' :
+          seedColor === 'red' ? '#EF4444' :
+          RING_COLORS[idx % RING_COLORS.length];
+        return { id: ap.id, name: ap.protocol.name, color, weight: total };
+      })
+      .sort((a, b) => b.weight - a.weight);
+    return withWeight.slice(0, 4);
+  }, [activeProtocols, scheduledDoses]);
+
+  const dayProtocolStats = useMemo(() => {
+    const map = new Map<string, Map<string, { total: number; taken: number }>>();
+    for (const dose of scheduledDoses) {
+      const dayMap = map.get(dose.scheduledDate) ?? new Map<string, { total: number; taken: number }>();
+      const current = dayMap.get(dose.activeProtocolId) ?? { total: 0, taken: 0 };
+      current.total += 1;
+      if (dose.status === 'taken') current.taken += 1;
+      dayMap.set(dose.activeProtocolId, current);
+      map.set(dose.scheduledDate, dayMap);
+    }
+    return map;
+  }, [scheduledDoses]);
+
+  const buildRingsForDate = (dateStr: string): RingDatum[] => {
+    const dayMap = dayProtocolStats.get(dateStr);
+    const isFuture = dateStr > todayStr;
+    return protocolTracks.map(track => {
+      const stat = dayMap?.get(track.id);
+      const total = stat?.total ?? 0;
+      const taken = stat?.taken ?? 0;
+      const pct = total ? Math.round((taken / total) * 100) : 0;
+      return {
+        key: `${dateStr}:${track.id}`,
+        color: track.color,
+        pct: isFuture ? 0 : pct,
+        total,
+      };
+    });
+  };
+
   const weeklyData = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = subDays(today, 6 - i);
       const dateStr = format(d, 'yyyy-MM-dd');
-      return { date: dateStr, label: format(d, 'EEE'), pct: getAdherencePct(dateStr) };
+      return { date: dateStr, label: format(d, 'EEE'), day: format(d, 'd') };
     });
-  }, [scheduledDoses]);
+  }, [today]);
 
   const streak = getStreak();
 
   const activeCount = activeProtocols.filter(ap => ap.status === 'active').length;
+  const todayStatus = useMemo(() => {
+    const todayDoses = scheduledDoses.filter(d => d.scheduledDate === todayStr);
+    return {
+      taken: todayDoses.filter(d => d.status === 'taken').length,
+      skipped: todayDoses.filter(d => d.status === 'skipped').length,
+      remaining: todayDoses.filter(d => d.status !== 'taken' && d.status !== 'skipped').length,
+    };
+  }, [scheduledDoses, todayStr]);
+  const weeklyRingSize = isMobile ? 30 : 38;
+  const weeklyRingStroke = isMobile ? 3 : 3.5;
+  const calendarRingSize = isMobile ? (calendarRange === 90 ? 20 : calendarRange === 60 ? 24 : 28) : (calendarRange === 90 ? 24 : calendarRange === 60 ? 28 : 34);
+  const calendarRingStroke = isMobile ? 2.4 : 3;
+  const cellHeight = isMobile ? (calendarRange === 90 ? 40 : 46) : 56;
 
   return (
     <div className="flex flex-col h-full">
@@ -65,45 +204,79 @@ export default function ProgressPage() {
           ))}
         </div>
 
-        {/* Weekly bar chart */}
+        {/* Weekly protocol rings */}
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
           <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">Last 7 Days</div>
-          <div className="flex items-end gap-2 h-20">
-            {weeklyData.map(({ date, label, pct }) => (
-              <div key={date} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full rounded-t-md transition-all duration-500" style={{ height: `${Math.max(pct, 4)}%`, background: pctToColor(pct), minHeight: 4 }} />
+          <div className="grid grid-cols-7 gap-2">
+            {weeklyData.map(({ date, label, day }) => (
+              <div key={date} className="flex flex-col items-center gap-1.5">
+                <DayRings rings={buildRingsForDate(date)} size={weeklyRingSize} stroke={weeklyRingStroke} />
                 <span className="text-[10px] text-[#8B949E]">{label}</span>
+                <span className="text-[10px] text-[#F0F6FC] font-semibold">{day}</span>
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-3 mt-3 text-[11px] text-[#8B949E]">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block" /> 80%+</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#FBBF24] inline-block" /> 50-79%</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#EF4444] inline-block" /> &lt;50%</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[11px] text-[#8B949E]">
+            {protocolTracks.map(track => (
+              <span key={track.id} className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: track.color }} />
+                {track.name}
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] text-[#8B949E]">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block" /> Taken {todayStatus.taken}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block" /> Remaining {todayStatus.remaining}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#8B949E] inline-block" /> Skipped {todayStatus.skipped}</span>
           </div>
         </div>
 
-        {/* 30-day heatmap */}
+        {/* 30-day calendar with protocol rings */}
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
-          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">30-Day Adherence</div>
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(10, 1fr)' }}>
-            {days30.map(d => {
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest">Calendar</div>
+            <div className="flex items-center gap-1">
+              {[30, 60, 90].map(value => (
+                <button
+                  key={value}
+                  onClick={() => setCalendarRange(value as 30 | 60 | 90)}
+                  className={[
+                    'px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors',
+                    calendarRange === value ? 'bg-[#3B82F6] text-white' : 'bg-[#1C2333] text-[#8B949E] hover:text-[#F0F6FC]',
+                  ].join(' ')}
+                >
+                  {value}d
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+              <div key={d} className="text-[10px] text-[#8B949E] text-center font-semibold">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: (new Date(calendarDays[0]).getDay() + 6) % 7 }).map((_, i) => (
+              <div key={`pad-${i}`} style={{ height: `${cellHeight}px` }} />
+            ))}
+            {calendarDays.map(d => {
               const dateStr = format(d, 'yyyy-MM-dd');
-              const pct = getAdherencePct(dateStr);
               const isToday = dateStr === todayStr;
               return (
-                <div
-                  key={dateStr}
-                  title={`${dateStr}: ${pct}%`}
-                  className={`aspect-square rounded-md transition-colors ${isToday ? 'ring-1 ring-white/30' : ''}`}
-                  style={{ background: pctToColor(pct) }}
-                />
+                <div key={dateStr} style={{ height: `${cellHeight}px` }} className="flex flex-col items-center justify-center gap-0.5">
+                  <div className={isToday ? 'ring-1 ring-white/35 rounded-full' : ''}>
+                    <DayRings rings={buildRingsForDate(dateStr)} size={calendarRingSize} stroke={calendarRingStroke} />
+                  </div>
+                  <span className={`text-[10px] ${isToday ? 'text-[#F0F6FC] font-bold' : 'text-[#8B949E]'}`}>
+                    {format(d, 'd')}
+                  </span>
+                </div>
               );
             })}
           </div>
           <div className="flex items-center justify-between mt-3 text-[11px] text-[#8B949E]">
-            <span>{format(days30[0], 'MMM d')}</span>
-            <span>Today</span>
+            <span>{format(calendarDays[0], 'MMM d')}</span>
+            <span>{format(calendarDays[calendarDays.length - 1], 'MMM d')}</span>
           </div>
         </div>
 

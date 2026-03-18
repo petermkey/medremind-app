@@ -59,6 +59,62 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+function toDateString(value: Date): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, '0');
+  const d = String(value.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function toTimeString(value: Date): string {
+  const h = String(value.getHours()).padStart(2, '0');
+  const m = String(value.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function isDoseSlotConflict(message: string | undefined): boolean {
+  if (!message) return false;
+  return message.includes('scheduled_doses_active_protocol_id_protocol_item_id_schedul_key');
+}
+
+async function findNextAvailableDoseSlot(
+  userId: string,
+  doseId: string,
+  activeProtocolId: string,
+  protocolId: string,
+  protocolItemId: string,
+  baseDate: string,
+  baseTime: string,
+): Promise<{ scheduledDate: string; scheduledTime: string } | null> {
+  const supabase = getSupabaseClient();
+  const start = new Date(`${baseDate}T${baseTime}:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const cDoseId = cloudDoseId(userId, doseId);
+  const cActiveId = cloudActiveId(userId, activeProtocolId);
+  const cItemId = cloudProtocolItemId(userId, protocolId, protocolItemId);
+
+  const cursor = new Date(start);
+  for (let i = 0; i < 72; i++) {
+    const slotDate = toDateString(cursor);
+    const slotTime = toTimeString(cursor);
+    const { data, error } = await supabase
+      .from('scheduled_doses')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('active_protocol_id', cActiveId)
+      .eq('protocol_item_id', cItemId)
+      .eq('scheduled_date', slotDate)
+      .eq('scheduled_time', slotTime);
+    if (error) return null;
+    const occupiedByAnother = (data ?? []).some((row: { id: string }) => row.id !== cDoseId);
+    if (!occupiedByAnother) {
+      return { scheduledDate: slotDate, scheduledTime: slotTime };
+    }
+    cursor.setMinutes(cursor.getMinutes() + 5);
+  }
+  return null;
+}
+
 async function upsertProtocolWithItems(userId: string, protocol: Protocol) {
   const supabase = getSupabaseClient();
   const cProtocolId = cloudProtocolId(userId, protocol.id);
@@ -69,7 +125,7 @@ async function upsertProtocolWithItems(userId: string, protocol: Protocol) {
     description: protocol.description ?? null,
     category: protocol.category ?? 'custom',
     duration_days: protocol.durationDays ?? null,
-    is_template: false,
+    is_template: Boolean(protocol.isTemplate),
     is_archived: Boolean(protocol.isArchived),
     created_at: protocol.createdAt ?? new Date().toISOString(),
   };
@@ -338,17 +394,51 @@ export async function syncDoseAction(
 ) {
   const supabase = getSupabaseClient();
   const cDoseId = cloudDoseId(userId, dose.id);
+  const targetDate = patch.scheduledDate ?? dose.scheduledDate;
+  const targetTime = patch.scheduledTime ?? dose.scheduledTime;
+  const baseUpdate = {
+    status: patch.status,
+    snoozed_until: patch.snoozedUntil ?? null,
+    scheduled_date: targetDate,
+    scheduled_time: targetTime,
+  };
 
-  const { error: dErr } = await supabase
+  let { error: dErr } = await supabase
     .from('scheduled_doses')
-    .update({
-      status: patch.status,
-      snoozed_until: patch.snoozedUntil ?? null,
-      scheduled_date: patch.scheduledDate ?? dose.scheduledDate,
-      scheduled_time: patch.scheduledTime ?? dose.scheduledTime,
-    })
+    .update(baseUpdate)
     .eq('id', cDoseId)
     .eq('user_id', userId);
+
+  if (
+    dErr &&
+    isDoseSlotConflict(dErr.message) &&
+    Boolean(patch.scheduledDate || patch.scheduledTime)
+  ) {
+    const resolvedSlot = await findNextAvailableDoseSlot(
+      userId,
+      dose.id,
+      dose.activeProtocolId,
+      dose.activeProtocol.protocolId,
+      dose.protocolItemId,
+      targetDate,
+      targetTime,
+    );
+    if (resolvedSlot) {
+      const resolvedDateTime = new Date(`${resolvedSlot.scheduledDate}T${resolvedSlot.scheduledTime}:00`);
+      const { error: retryErr } = await supabase
+        .from('scheduled_doses')
+        .update({
+          status: patch.status,
+          snoozed_until: Number.isNaN(resolvedDateTime.getTime()) ? patch.snoozedUntil ?? null : resolvedDateTime.toISOString(),
+          scheduled_date: resolvedSlot.scheduledDate,
+          scheduled_time: resolvedSlot.scheduledTime,
+        })
+        .eq('id', cDoseId)
+        .eq('user_id', userId);
+      dErr = retryErr;
+    }
+  }
+
   if (dErr) throw new Error(`Dose status sync failed: ${dErr.message}`);
 
   if (record) {

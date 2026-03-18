@@ -30,7 +30,7 @@ function frequencyLabel(item: { frequencyType: FrequencyType; frequencyValue?: n
 
 function emptyItem(): ItemDraft {
   return {
-    itemType: 'medication', name: '', doseForm: 'tablet', route: 'oral',
+    itemType: 'medication', name: '', doseUnit: 'mg', doseForm: 'tablet', route: 'oral',
     frequencyType: 'daily', frequencyValue: undefined, times: ['08:00'], withFood: 'any',
     startDay: 1, sortOrder: 0, icon: '💊', color: 'blue',
   };
@@ -38,9 +38,10 @@ function emptyItem(): ItemDraft {
 
 export default function NewProtocolPage() {
   const router = useRouter();
-  const { createCustomProtocol, activateProtocol } = useStore();
+  const { profile, createCustomProtocol, activateProtocol } = useStore();
   const { show } = useToast();
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Step 1
   const [name, setName] = useState('');
@@ -78,22 +79,52 @@ export default function NewProtocolPage() {
   }
 
   function handleFinish() {
-    const protocol = createCustomProtocol({
-      name: name.trim(),
-      description: description.trim() || undefined,
-      category,
-      durationDays: duration === 'fixed' ? parseInt(durationDays) : undefined,
-      items: items.map((it, i) => ({ ...it, id: uuid(), protocolId: '_temp_', sortOrder: i })),
-      isArchived: false,
-    });
-
-    if (activateNow) {
-      activateProtocol(protocol.id, format(new Date(), 'yyyy-MM-dd'));
-      show('✓ Protocol created and activated');
-    } else {
-      show('✓ Protocol saved');
+    if (isSubmitting) return;
+    if (!items.length) {
+      show('Add at least one item before finalizing', 'warning');
+      return;
     }
-    router.push('/app/protocols');
+    for (const item of items) {
+      if (item.frequencyType === 'every_n_days' && (!item.frequencyValue || item.frequencyValue < 1)) {
+        show(`Set "Every N days" value for ${item.name || 'an item'}`, 'warning');
+        return;
+      }
+    }
+    setIsSubmitting(true);
+    let createdProtocolId: string | null = null;
+    try {
+      const protocol = createCustomProtocol({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        category,
+        durationDays: duration === 'fixed' ? parseInt(durationDays) : undefined,
+        items: items.map((it, i) => ({ ...it, id: uuid(), protocolId: '_temp_', sortOrder: i })),
+        isArchived: false,
+      });
+      createdProtocolId = protocol.id;
+
+      if (activateNow) {
+        try {
+          if (!profile?.id) {
+            throw new Error('Profile not ready for activation');
+          }
+          activateProtocol(protocol.id, format(new Date(), 'yyyy-MM-dd'));
+          show('✓ Protocol created and activated');
+        } catch (activationError) {
+          console.error('[protocol-activation-failed]', activationError);
+          show('Protocol created, but activation failed. Activate it from Protocols.', 'warning');
+        }
+      } else {
+        show('✓ Protocol saved');
+      }
+      router.push('/app/protocols');
+    } catch (error) {
+      console.error('[protocol-finalize-failed]', error);
+      if (createdProtocolId) console.error('[protocol-created-before-fail]', createdProtocolId);
+      show('Could not finalize protocol. Please try again.', 'warning');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const COLORS = ['blue','green','purple','yellow','red','pink'];
@@ -221,7 +252,17 @@ export default function NewProtocolPage() {
                 </>
               )}
 
-              <Select label="Frequency" value={draft.frequencyType} onChange={e => setDraft(d => ({ ...d, frequencyType: e.target.value as FrequencyType }))}
+              <Select label="Frequency" value={draft.frequencyType} onChange={e => {
+                const nextFrequency = e.target.value as FrequencyType;
+                setDraft(d => ({
+                  ...d,
+                  frequencyType: nextFrequency,
+                  frequencyValue:
+                    nextFrequency === 'every_n_days'
+                      ? Math.max(1, d.frequencyValue ?? 2)
+                      : undefined,
+                }));
+              }}
                 options={[
                   {value:'daily',label:'Once daily'},{value:'twice_daily',label:'Twice daily'},
                   {value:'three_times_daily',label:'Three times daily'},{value:'every_n_days',label:'Every N days'},
@@ -304,9 +345,9 @@ export default function NewProtocolPage() {
             </div>
 
             <div className="flex gap-3">
-              <Button variant="secondary" fullWidth onClick={() => setStep(2)}>← Back</Button>
-              <Button fullWidth size="lg" onClick={handleFinish}>
-                {activateNow ? 'Create & Activate' : 'Save Protocol'}
+              <Button variant="secondary" fullWidth onClick={() => setStep(2)} disabled={isSubmitting}>← Back</Button>
+              <Button fullWidth size="lg" onClick={handleFinish} loading={isSubmitting} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : (activateNow ? 'Create & Activate' : 'Save Protocol')}
               </Button>
             </div>
           </div>

@@ -127,7 +127,16 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   const ownedProtocolsRaw = (protocolsRes.data ?? []) as Record<string, unknown>[];
   const activeProtocolRows = (activeRes.data ?? []) as Record<string, unknown>[];
   const activeProtocolIds = activeProtocolRows.map(row => String(row.protocol_id));
-  const ownedProtocolIds = ownedProtocolsRaw.map(p => String(p.id));
+  const activeProtocolIdSet = new Set(activeProtocolIds);
+  const seedTemplateKeys = new Set(
+    SEED_PROTOCOLS.map(p => `${p.name.toLowerCase()}|${p.category}`),
+  );
+  const isLikelyMirroredTemplate = (row: Record<string, unknown>) => {
+    const key = `${String(row.name ?? '').toLowerCase()}|${String(row.category ?? 'custom')}`;
+    return seedTemplateKeys.has(key) && activeProtocolIdSet.has(String(row.id));
+  };
+  const visibleOwnedProtocolsRaw = ownedProtocolsRaw.filter(row => !isLikelyMirroredTemplate(row));
+  const ownedProtocolIds = visibleOwnedProtocolsRaw.map(p => String(p.id));
   const missingActiveProtocolIds = activeProtocolIds.filter(id => !ownedProtocolIds.includes(id));
 
   const extraProtocolsRes = missingActiveProtocolIds.length
@@ -135,7 +144,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     : { data: [], error: null as { message: string } | null };
   if (extraProtocolsRes.error) throw new Error(`Active protocol templates read failed: ${extraProtocolsRes.error.message}`);
 
-  const cloudProtocolsRaw = [...ownedProtocolsRaw, ...((extraProtocolsRes.data ?? []) as Record<string, unknown>[])];
+  const cloudProtocolsRaw = [...visibleOwnedProtocolsRaw, ...((extraProtocolsRes.data ?? []) as Record<string, unknown>[])];
   const cloudProtocolIds = Array.from(new Set(cloudProtocolsRaw.map(p => String(p.id))));
 
   const protocolItemsRes = cloudProtocolIds.length
@@ -193,7 +202,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     for (const i of p.items) itemMap.set(i.id, i);
   }
 
-  const activeProtocols: ActiveProtocol[] = activeProtocolRows
+  const activeCandidates: ActiveProtocol[] = activeProtocolRows
     .map(row => {
       const protocolId = String(row.protocol_id);
       const protocol = protocolMap.get(protocolId);
@@ -214,19 +223,64 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     })
     .filter(Boolean) as ActiveProtocol[];
 
-  const activeMap = new Map<string, ActiveProtocol>(activeProtocols.map(ap => [ap.id, ap]));
+  const statusRank: Record<ActiveProtocol['status'], number> = {
+    active: 3,
+    paused: 2,
+    completed: 1,
+    abandoned: 0,
+  };
+  const seedTemplateKeysForActive = new Set(
+    SEED_PROTOCOLS.map(p => `${p.name.toLowerCase()}|${p.category}`),
+  );
+  const activeGroupKey = (candidate: ActiveProtocol) => {
+    const templateKey = `${candidate.protocol.name.toLowerCase()}|${candidate.protocol.category}`;
+    if (seedTemplateKeysForActive.has(templateKey)) return `seed:${templateKey}`;
+    return `protocol:${candidate.protocolId}`;
+  };
+
+  const canonicalByGroup = new Map<string, ActiveProtocol>();
+  const groupByProtocolId = new Map<string, string>();
+  for (const candidate of activeCandidates) {
+    const group = activeGroupKey(candidate);
+    groupByProtocolId.set(candidate.protocolId, group);
+    const existing = canonicalByGroup.get(group);
+    if (!existing) {
+      canonicalByGroup.set(group, candidate);
+      continue;
+    }
+    const existingRank = statusRank[existing.status] ?? 0;
+    const candidateRank = statusRank[candidate.status] ?? 0;
+    const existingTs = Date.parse(existing.createdAt || '');
+    const candidateTs = Date.parse(candidate.createdAt || '');
+    if (
+      candidateRank > existingRank ||
+      (candidateRank === existingRank && (Number.isFinite(candidateTs) ? candidateTs : 0) > (Number.isFinite(existingTs) ? existingTs : 0))
+    ) {
+      canonicalByGroup.set(group, candidate);
+    }
+  }
+
+  const activeProtocols = Array.from(canonicalByGroup.values());
+  const activeAliasMap = new Map<string, ActiveProtocol>();
+  for (const candidate of activeCandidates) {
+    const group = groupByProtocolId.get(candidate.protocolId);
+    const canonical = group ? canonicalByGroup.get(group) : undefined;
+    if (canonical) {
+      activeAliasMap.set(candidate.id, canonical);
+    }
+  }
 
   const scheduledDoses: ScheduledDose[] = ((scheduledRes.data ?? []) as Record<string, unknown>[])
     .map(row => {
-      const activeId = String(row.active_protocol_id);
+      const sourceActiveId = String(row.active_protocol_id);
       const itemId = String(row.protocol_item_id);
-      const activeProtocol = activeMap.get(activeId);
+      const activeProtocol = activeAliasMap.get(sourceActiveId);
       const protocolItem = itemMap.get(itemId);
       if (!activeProtocol || !protocolItem) return null;
       return {
         id: String(row.id),
         userId: String(row.user_id),
-        activeProtocolId: activeId,
+        activeProtocolId: activeProtocol.id,
         protocolItemId: itemId,
         protocolItem,
         activeProtocol,
