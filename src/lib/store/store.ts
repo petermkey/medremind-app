@@ -64,6 +64,59 @@ function generateId(prefix: string): string {
   }
 }
 
+function hash32(input: string, seed: number): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function stableUuid(namespace: string, source: string): string {
+  const input = `${namespace}:${source}`;
+  const p1 = hash32(input, 0x811c9dc5).toString(16).padStart(8, '0');
+  const p2 = hash32(input, 0x9e3779b9).toString(16).padStart(8, '0');
+  const p3 = hash32(input, 0x85ebca6b).toString(16).padStart(8, '0');
+  const p4 = hash32(input, 0xc2b2ae35).toString(16).padStart(8, '0');
+  const hex = `${p1}${p2}${p3}${p4}`;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function buildSnoozeReplacementDoseId(sourceDoseId: string, scheduledDate: string, scheduledTime: string): string {
+  return stableUuid(`dose-snooze-replacement:${sourceDoseId}`, `${scheduledDate}|${scheduledTime}`);
+}
+
+function resolveSnoozeTargetSlot(
+  doses: ScheduledDose[],
+  sourceDose: ScheduledDose,
+  baseTarget: Date,
+): { scheduledDate: string; scheduledTime: string; snoozedUntil: string } {
+  const cursor = new Date(baseTarget);
+  for (let i = 0; i < 72; i++) {
+    const scheduledDate = format(cursor, 'yyyy-MM-dd');
+    const scheduledTime = format(cursor, 'HH:mm');
+    const replacementDoseId = buildSnoozeReplacementDoseId(sourceDose.id, scheduledDate, scheduledTime);
+    const occupied = doses.some(d =>
+      d.activeProtocolId === sourceDose.activeProtocolId
+      && d.protocolItemId === sourceDose.protocolItemId
+      && d.scheduledDate === scheduledDate
+      && d.scheduledTime === scheduledTime
+      && d.id !== sourceDose.id
+      && d.id !== replacementDoseId
+    );
+    if (!occupied) {
+      return { scheduledDate, scheduledTime, snoozedUntil: cursor.toISOString() };
+    }
+    cursor.setMinutes(cursor.getMinutes() + 5);
+  }
+  return {
+    scheduledDate: format(baseTarget, 'yyyy-MM-dd'),
+    scheduledTime: format(baseTarget, 'HH:mm'),
+    snoozedUntil: baseTarget.toISOString(),
+  };
+}
+
 function normalizeDurationDays(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
   const days = Math.trunc(value);
@@ -726,41 +779,62 @@ export const useStore = create<AppState>()(
           ? new Date(Date.now() + option * 60000)
           : new Date(option.until);
         if (Number.isNaN(targetDate.getTime())) return;
-        const snoozedUntil = targetDate.toISOString();
-        const scheduledDate = format(targetDate, 'yyyy-MM-dd');
-        const scheduledTime = format(targetDate, 'HH:mm');
+        const resolvedSlot = resolveSnoozeTargetSlot(state.scheduledDoses, dose, targetDate);
+        const { snoozedUntil, scheduledDate, scheduledTime } = resolvedSlot;
+        const replacementDoseId = buildSnoozeReplacementDoseId(dose.id, scheduledDate, scheduledTime);
+        const replacementDose: ScheduledDose = {
+          ...dose,
+          id: replacementDoseId,
+          scheduledDate,
+          scheduledTime,
+          status: 'pending',
+          snoozedUntil: undefined,
+        };
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'snoozed',
         );
-        const sameSnoozeTarget = (
-          dose.status === 'snoozed'
-          && dose.snoozedUntil === snoozedUntil
-          && dose.scheduledDate === scheduledDate
-          && dose.scheduledTime === scheduledTime
-        );
+        const recordNote = `snooze-replacement|original=${doseId}|replacement=${replacementDoseId}|target=${scheduledDate}T${scheduledTime}`;
         const record: DoseRecord = existingRecord ?? {
           id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
           action: 'snoozed',
           recordedAt: new Date().toISOString(),
+          note: recordNote,
         };
         const shouldAppendRecord = !existingRecord;
-        const shouldUpdateStatus = !sameSnoozeTarget;
-        if (shouldAppendRecord || shouldUpdateStatus) {
+        const shouldUpdateRecordNote = Boolean(existingRecord && existingRecord.note !== recordNote);
+        const originalNeedsUpdate = dose.status !== 'snoozed' || dose.snoozedUntil !== snoozedUntil;
+        const existingReplacement = state.scheduledDoses.find(d => d.id === replacementDoseId);
+        const replacementNeedsUpsert = !existingReplacement
+          || existingReplacement.status !== 'pending'
+          || existingReplacement.scheduledDate !== scheduledDate
+          || existingReplacement.scheduledTime !== scheduledTime;
+        if (shouldAppendRecord || shouldUpdateRecordNote || originalNeedsUpdate || replacementNeedsUpsert) {
           set(s => ({
-            scheduledDoses: s.scheduledDoses.map(d =>
-              d.id === doseId
-                ? {
-                  ...d,
-                  status: 'snoozed' as DoseStatus,
-                  snoozedUntil,
-                  scheduledDate,
-                  scheduledTime,
-                }
-                : d
-            ),
-            doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+            scheduledDoses: (() => {
+              const updated = s.scheduledDoses.map(d =>
+                d.id === doseId
+                  ? {
+                    ...d,
+                    status: 'snoozed' as DoseStatus,
+                    snoozedUntil,
+                  }
+                  : d
+              );
+              const idx = updated.findIndex(d => d.id === replacementDoseId);
+              if (idx >= 0) {
+                updated[idx] = { ...updated[idx], ...replacementDose };
+              } else {
+                updated.push(replacementDose);
+              }
+              return updated;
+            })(),
+            doseRecords: shouldAppendRecord
+              ? [...s.doseRecords, record]
+              : shouldUpdateRecordNote
+                ? s.doseRecords.map(r => (r.id === record.id ? { ...r, note: recordNote } : r))
+                : s.doseRecords,
           }));
         }
         if (state.profile?.id) {
@@ -768,16 +842,16 @@ export const useStore = create<AppState>()(
             syncDoseAction(
               state.profile.id,
               dose,
-              { status: 'snoozed', snoozedUntil, scheduledDate, scheduledTime },
-              record,
+              { status: 'snoozed', snoozedUntil, replacementDose },
+              shouldAppendRecord ? record : (shouldUpdateRecordNote ? { ...record, note: recordNote } : record),
             ),
             {
               kind: 'doseAction',
               payload: {
                 userId: state.profile.id,
                 dose,
-                patch: { status: 'snoozed', snoozedUntil, scheduledDate, scheduledTime },
-                record,
+                patch: { status: 'snoozed', snoozedUntil, replacementDose },
+                record: shouldAppendRecord ? record : (shouldUpdateRecordNote ? { ...record, note: recordNote } : record),
               },
             },
           );

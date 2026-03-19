@@ -121,7 +121,9 @@ Behavior:
 
 - Each action updates dose status locally.
 - Each action appends immutable `DoseRecord`.
-- Snooze updates both status and scheduled date/time (plus `snoozedUntil`).
+- Snooze no longer mutates the original row's scheduled slot in place.
+- Snooze marks the original row as `snoozed` and creates a replacement `pending` row at the target slot.
+- Snooze stores transitional traceability in the snooze `DoseRecord.note` (`original`, `replacement`, `target`).
 
 Schedule UI (`src/app/app/page.tsx`) provides snooze options:
 
@@ -136,7 +138,8 @@ Snooze conflict avoidance in UI:
 
 Cloud sync conflict fallback:
 
-- `syncDoseAction` retries snooze update with next available slot when unique slot conflict is returned.
+- `syncDoseAction` syncs snooze as a two-row operation (update original + upsert replacement).
+- If replacement slot conflicts, sync retries with next available slot and keeps original `snoozed_until` aligned.
 
 ## 8. Day schedule and visibility rules
 

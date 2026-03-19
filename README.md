@@ -48,7 +48,7 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 - Skip visibility rule:
   - skipped dose is removed from active queue for that day.
 - Snooze rule:
-  - snooze reschedules dose date/time (not only status).
+  - snooze marks the original row as `snoozed` and creates a replacement `pending` row at the new slot.
 
 ## Project Structure
 

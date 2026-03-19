@@ -49,7 +49,7 @@ export default function SchedulePage() {
 
   const doses = useMemo(() => getDaySchedule(selectedDate), [selectedDate, scheduledDoses]);
   const visibleDoses = useMemo(
-    () => doses.filter(d => d.status !== 'skipped'),
+    () => doses.filter(d => d.status !== 'skipped' && d.status !== 'snoozed'),
     [doses],
   );
 
@@ -78,7 +78,7 @@ export default function SchedulePage() {
   const pct = total ? Math.round((taken / total) * 100) : 0;
 
   const nextDose = doses
-    .filter(d => d.status === 'pending' || d.status === 'snoozed' || (d.status as string) === 'upcoming')
+    .filter(d => d.status === 'pending' || (d.status as string) === 'upcoming')
     .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
 
   function toDateTime(dateStr: string, timeStr: string) {

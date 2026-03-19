@@ -389,57 +389,132 @@ export async function syncDoseAction(
     snoozedUntil?: string;
     scheduledDate?: string;
     scheduledTime?: string;
+    replacementDose?: ScheduledDose;
   },
   record?: DoseRecord,
 ) {
   const supabase = getSupabaseClient();
   const cDoseId = cloudDoseId(userId, dose.id);
-  const targetDate = patch.scheduledDate ?? dose.scheduledDate;
-  const targetTime = patch.scheduledTime ?? dose.scheduledTime;
-  const baseUpdate = {
-    status: patch.status,
-    snoozed_until: patch.snoozedUntil ?? null,
-    scheduled_date: targetDate,
-    scheduled_time: targetTime,
-  };
+  let syncError: { message: string } | null = null;
+  const replacementDose = patch.replacementDose;
 
-  let { error: dErr } = await supabase
-    .from('scheduled_doses')
-    .update(baseUpdate)
-    .eq('id', cDoseId)
-    .eq('user_id', userId);
+  if (replacementDose) {
+    const { error: originalErr } = await supabase
+      .from('scheduled_doses')
+      .update({
+        status: patch.status,
+        snoozed_until: patch.snoozedUntil ?? null,
+      })
+      .eq('id', cDoseId)
+      .eq('user_id', userId);
+    if (originalErr) syncError = originalErr;
 
-  if (
-    dErr &&
-    isDoseSlotConflict(dErr.message) &&
-    Boolean(patch.scheduledDate || patch.scheduledTime)
-  ) {
-    const resolvedSlot = await findNextAvailableDoseSlot(
-      userId,
-      dose.id,
-      dose.activeProtocolId,
-      dose.activeProtocol.protocolId,
-      dose.protocolItemId,
-      targetDate,
-      targetTime,
-    );
-    if (resolvedSlot) {
-      const resolvedDateTime = new Date(`${resolvedSlot.scheduledDate}T${resolvedSlot.scheduledTime}:00`);
-      const { error: retryErr } = await supabase
-        .from('scheduled_doses')
-        .update({
-          status: patch.status,
-          snoozed_until: Number.isNaN(resolvedDateTime.getTime()) ? patch.snoozedUntil ?? null : resolvedDateTime.toISOString(),
-          scheduled_date: resolvedSlot.scheduledDate,
-          scheduled_time: resolvedSlot.scheduledTime,
-        })
-        .eq('id', cDoseId)
-        .eq('user_id', userId);
-      dErr = retryErr;
+    if (!syncError) {
+      const cReplacementDoseId = cloudDoseId(userId, replacementDose.id);
+      const cReplacementActiveId = cloudActiveId(userId, replacementDose.activeProtocolId);
+      const cReplacementItemId = cloudProtocolItemId(
+        userId,
+        replacementDose.activeProtocol.protocolId,
+        replacementDose.protocolItemId,
+      );
+      const upsertReplacementAt = async (scheduledDate: string, scheduledTime: string) => {
+        const row = {
+          id: cReplacementDoseId,
+          user_id: userId,
+          active_protocol_id: cReplacementActiveId,
+          protocol_item_id: cReplacementItemId,
+          scheduled_date: scheduledDate,
+          scheduled_time: scheduledTime,
+          status: 'pending',
+          snoozed_until: null,
+        };
+        return supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
+      };
+
+      let targetDate = replacementDose.scheduledDate;
+      let targetTime = replacementDose.scheduledTime;
+      let { error: replacementErr } = await upsertReplacementAt(targetDate, targetTime);
+      if (replacementErr && isDoseSlotConflict(replacementErr.message)) {
+        const resolvedSlot = await findNextAvailableDoseSlot(
+          userId,
+          replacementDose.id,
+          replacementDose.activeProtocolId,
+          replacementDose.activeProtocol.protocolId,
+          replacementDose.protocolItemId,
+          targetDate,
+          targetTime,
+        );
+        if (resolvedSlot) {
+          targetDate = resolvedSlot.scheduledDate;
+          targetTime = resolvedSlot.scheduledTime;
+          const { error: retryErr } = await upsertReplacementAt(targetDate, targetTime);
+          replacementErr = retryErr;
+          if (!replacementErr) {
+            const resolvedDateTime = new Date(`${targetDate}T${targetTime}:00`);
+            const { error: updateOriginalErr } = await supabase
+              .from('scheduled_doses')
+              .update({
+                snoozed_until: Number.isNaN(resolvedDateTime.getTime())
+                  ? patch.snoozedUntil ?? null
+                  : resolvedDateTime.toISOString(),
+              })
+              .eq('id', cDoseId)
+              .eq('user_id', userId);
+            if (updateOriginalErr) replacementErr = updateOriginalErr;
+          }
+        }
+      }
+      if (replacementErr) syncError = replacementErr;
     }
+  } else {
+    const targetDate = patch.scheduledDate ?? dose.scheduledDate;
+    const targetTime = patch.scheduledTime ?? dose.scheduledTime;
+    const baseUpdate = {
+      status: patch.status,
+      snoozed_until: patch.snoozedUntil ?? null,
+      scheduled_date: targetDate,
+      scheduled_time: targetTime,
+    };
+
+    let { error: dErr } = await supabase
+      .from('scheduled_doses')
+      .update(baseUpdate)
+      .eq('id', cDoseId)
+      .eq('user_id', userId);
+
+    if (
+      dErr &&
+      isDoseSlotConflict(dErr.message) &&
+      Boolean(patch.scheduledDate || patch.scheduledTime)
+    ) {
+      const resolvedSlot = await findNextAvailableDoseSlot(
+        userId,
+        dose.id,
+        dose.activeProtocolId,
+        dose.activeProtocol.protocolId,
+        dose.protocolItemId,
+        targetDate,
+        targetTime,
+      );
+      if (resolvedSlot) {
+        const resolvedDateTime = new Date(`${resolvedSlot.scheduledDate}T${resolvedSlot.scheduledTime}:00`);
+        const { error: retryErr } = await supabase
+          .from('scheduled_doses')
+          .update({
+            status: patch.status,
+            snoozed_until: Number.isNaN(resolvedDateTime.getTime()) ? patch.snoozedUntil ?? null : resolvedDateTime.toISOString(),
+            scheduled_date: resolvedSlot.scheduledDate,
+            scheduled_time: resolvedSlot.scheduledTime,
+          })
+          .eq('id', cDoseId)
+          .eq('user_id', userId);
+        dErr = retryErr;
+      }
+    }
+    if (dErr) syncError = dErr;
   }
 
-  if (dErr) throw new Error(`Dose status sync failed: ${dErr.message}`);
+  if (syncError) throw new Error(`Dose status sync failed: ${syncError.message}`);
 
   if (record) {
     const row = {

@@ -39,6 +39,7 @@ type SyncPayloadMap = {
       snoozedUntil?: string;
       scheduledDate?: string;
       scheduledTime?: string;
+      replacementDose?: ScheduledDose;
     };
     record?: DoseRecord;
   };
