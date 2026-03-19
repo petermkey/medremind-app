@@ -11,8 +11,9 @@ import type {
 import { SEED_PROTOCOLS, SEED_DRUGS } from '@/lib/data/seed';
 import type { Drug } from '@/types';
 import {
+  syncArchiveProtocolCommand,
   syncActivation,
-  syncActiveStatus,
+  syncCompleteProtocolCommand,
   syncPauseProtocolCommand,
   syncResumeProtocolCommand,
   syncSnoozeDoseCommand,
@@ -136,8 +137,12 @@ function doseSlotKey(protocolItemId: string, scheduledDate: string, scheduledTim
   return `${protocolItemId}|${scheduledDate}|${scheduledTime.slice(0, 5)}`;
 }
 
-function buildLifecycleCommandOperationId(kind: 'pause' | 'resume', activeId: string, at: string): string {
-  return `${kind}:${activeId}:${at}`;
+function buildLifecycleCommandOperationId(
+  kind: 'pause' | 'resume' | 'complete' | 'archive',
+  entityId: string,
+  at: string,
+): string {
+  return `${kind}:${entityId}:${at}`;
 }
 
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
@@ -500,6 +505,7 @@ export const useStore = create<AppState>()(
       completeProtocol: (activeId) => {
         const completedAt = new Date().toISOString();
         const profileId = get().profile?.id;
+        const clientOperationId = buildLifecycleCommandOperationId('complete', activeId, completedAt);
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
             ap.id === activeId ? { ...ap, status: 'completed' as ProtocolStatus, completedAt } : ap
@@ -507,8 +513,11 @@ export const useStore = create<AppState>()(
         }));
         if (profileId) {
           syncFireAndForget(
-            syncActiveStatus(profileId, activeId, { status: 'completed', completedAt }),
-            { kind: 'activeStatus', payload: { userId: profileId, activeId, patch: { status: 'completed', completedAt } } },
+            syncCompleteProtocolCommand(profileId, activeId, completedAt, clientOperationId),
+            {
+              kind: 'completeCommand',
+              payload: { userId: profileId, activeId, completedAt, clientOperationId },
+            },
           );
         }
       },
@@ -598,6 +607,8 @@ export const useStore = create<AppState>()(
         const hasHandledHistory = hasDoseRecordHistory || hasHandledDoseStatus;
 
         if (hasHandledHistory) {
+          const archivedAt = new Date().toISOString();
+          const clientOperationId = buildLifecycleCommandOperationId('archive', id, archivedAt);
           let archivedProtocol: Protocol | null = null;
           set(s => {
             const protocols = s.protocols.map(p => {
@@ -618,22 +629,12 @@ export const useStore = create<AppState>()(
           });
           if (profileId && archivedProtocol) {
             syncFireAndForget(
-              syncProtocolUpsert(profileId, archivedProtocol),
-              { kind: 'protocolUpsert', payload: { userId: profileId, protocol: archivedProtocol } },
+              syncArchiveProtocolCommand(profileId, archivedProtocol, relatedActiveIds, clientOperationId),
+              {
+                kind: 'archiveCommand',
+                payload: { userId: profileId, protocol: archivedProtocol, activeIds: relatedActiveIds, clientOperationId },
+              },
             );
-            for (const active of relatedActive) {
-              syncFireAndForget(
-                syncActiveStatus(profileId, active.id, { status: 'abandoned' }),
-                {
-                  kind: 'activeStatus',
-                  payload: {
-                    userId: profileId,
-                    activeId: active.id,
-                    patch: { status: 'abandoned' },
-                  },
-                },
-              );
-            }
           }
           return { mode: 'archived' as const };
         }

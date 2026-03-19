@@ -4,6 +4,8 @@ import type { ActiveProtocol, DoseRecord, Protocol, ScheduledDose } from '@/type
 import {
   syncActivation,
   syncActiveStatus,
+  syncArchiveProtocolCommand,
+  syncCompleteProtocolCommand,
   syncPauseProtocolCommand,
   syncResumeProtocolCommand,
   syncDoseAction,
@@ -28,7 +30,9 @@ type SyncKind =
   | 'skipCommand'
   | 'snoozeCommand'
   | 'pauseCommand'
-  | 'resumeCommand';
+  | 'resumeCommand'
+  | 'completeCommand'
+  | 'archiveCommand';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -83,6 +87,18 @@ type SyncPayloadMap = {
     activeId: string;
     clientOperationId: string;
   };
+  completeCommand: {
+    userId: string;
+    activeId: string;
+    completedAt: string;
+    clientOperationId: string;
+  };
+  archiveCommand: {
+    userId: string;
+    protocol: Protocol;
+    activeIds: string[];
+    clientOperationId: string;
+  };
 };
 
 export type SyncOperation =
@@ -97,7 +113,9 @@ export type SyncOperation =
   | { kind: 'skipCommand'; payload: SyncPayloadMap['skipCommand'] }
   | { kind: 'snoozeCommand'; payload: SyncPayloadMap['snoozeCommand'] }
   | { kind: 'pauseCommand'; payload: SyncPayloadMap['pauseCommand'] }
-  | { kind: 'resumeCommand'; payload: SyncPayloadMap['resumeCommand'] };
+  | { kind: 'resumeCommand'; payload: SyncPayloadMap['resumeCommand'] }
+  | { kind: 'completeCommand'; payload: SyncPayloadMap['completeCommand'] }
+  | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -230,6 +248,20 @@ async function executeOperation(op: SyncOperation) {
       return syncResumeProtocolCommand(
         op.payload.userId,
         op.payload.activeId,
+        op.payload.clientOperationId,
+      );
+    case 'completeCommand':
+      return syncCompleteProtocolCommand(
+        op.payload.userId,
+        op.payload.activeId,
+        op.payload.completedAt,
+        op.payload.clientOperationId,
+      );
+    case 'archiveCommand':
+      return syncArchiveProtocolCommand(
+        op.payload.userId,
+        op.payload.protocol,
+        op.payload.activeIds,
         op.payload.clientOperationId,
       );
     default:

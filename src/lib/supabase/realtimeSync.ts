@@ -564,7 +564,7 @@ async function upsertActiveSyncOperationLedger(
   activeId: string,
   clientOperationId: string,
   payload: Record<string, unknown>,
-  operationKind: 'pause_command' | 'resume_command',
+  operationKind: 'pause_command' | 'resume_command' | 'complete_command',
 ) {
   const supabase = getSupabaseClient();
   const row = {
@@ -573,6 +573,38 @@ async function upsertActiveSyncOperationLedger(
     operation_kind: operationKind,
     entity_type: 'active_protocol',
     entity_id: cloudActiveId(userId, activeId),
+    idempotency_key: clientOperationId,
+    payload,
+    status: 'inflight',
+    attempt_count: 1,
+    source: 'client',
+    next_attempt_at: null,
+    last_error: null,
+    completed_at: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from('sync_operations').upsert(row, {
+    onConflict: 'user_id,idempotency_key',
+  });
+  if (error) {
+    console.warn('[sync-operations-ledger]', error.message);
+  }
+}
+
+async function upsertProtocolSyncOperationLedger(
+  userId: string,
+  protocolId: string,
+  clientOperationId: string,
+  payload: Record<string, unknown>,
+  operationKind: 'archive_command',
+) {
+  const supabase = getSupabaseClient();
+  const row = {
+    id: cloudOperationId(userId, clientOperationId),
+    user_id: userId,
+    operation_kind: operationKind,
+    entity_type: 'protocol',
+    entity_id: cloudProtocolId(userId, protocolId),
     idempotency_key: clientOperationId,
     payload,
     status: 'inflight',
@@ -1117,6 +1149,100 @@ export async function syncResumeProtocolCommand(
       status: 'active',
       pausedAt: null,
     };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
+  }
+}
+
+export async function syncCompleteProtocolCommand(
+  userId: string,
+  activeId: string,
+  completedAt: string,
+  clientOperationId: string,
+): Promise<ActiveCommandResult> {
+  const supabase = getSupabaseClient();
+  const cActiveId = cloudActiveId(userId, activeId);
+  await upsertActiveSyncOperationLedger(
+    userId,
+    activeId,
+    clientOperationId,
+    {
+      activeId,
+      cloudActiveId: cActiveId,
+      status: 'completed',
+      completedAt,
+    },
+    'complete_command',
+  );
+
+  try {
+    const { error } = await supabase
+      .from('active_protocols')
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        paused_at: null,
+      })
+      .eq('id', cActiveId)
+      .eq('user_id', userId);
+    if (error) throw new Error(`Complete command sync failed: ${error.message}`);
+
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'succeeded');
+
+    return {
+      clientOperationId,
+      status: 'completed',
+      pausedAt: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
+  }
+}
+
+export async function syncArchiveProtocolCommand(
+  userId: string,
+  protocol: Protocol,
+  activeIds: string[],
+  clientOperationId: string,
+): Promise<{ clientOperationId: string; status: 'archived' }> {
+  const supabase = getSupabaseClient();
+  const cloudActiveIds = activeIds.map(activeId => cloudActiveId(userId, activeId));
+  await upsertProtocolSyncOperationLedger(
+    userId,
+    protocol.id,
+    clientOperationId,
+    {
+      protocolId: protocol.id,
+      cloudProtocolId: cloudProtocolId(userId, protocol.id),
+      activeIds,
+      cloudActiveIds,
+      status: 'abandoned',
+      isArchived: true,
+    },
+    'archive_command',
+  );
+
+  try {
+    await upsertProtocolWithItems(userId, protocol);
+    if (cloudActiveIds.length) {
+      const { error: activeErr } = await supabase
+        .from('active_protocols')
+        .update({
+          status: 'abandoned',
+          paused_at: null,
+          completed_at: null,
+        })
+        .eq('user_id', userId)
+        .in('id', cloudActiveIds);
+      if (activeErr) throw new Error(`Archive command sync failed: ${activeErr.message}`);
+    }
+
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'succeeded');
+    return { clientOperationId, status: 'archived' };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await updateActiveSyncOperationLedger(userId, clientOperationId, 'failed', message);
