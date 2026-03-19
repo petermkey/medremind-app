@@ -27,10 +27,11 @@ If you are touching:
 ## 3. Critical regression checklist
 
 1. `npm run build`
-2. Auth boundary sanity (register/login/onboarding/app entry)
-3. Protocol create/activate/update-duration/regenerate sanity
-4. Dose action sanity (take/skip/snooze + AddDoseSheet)
-5. Refresh + relogin + settings sign-out guard path
+2. `npm run test:e2e` (public smoke always, authenticated smoke when `E2E_EMAIL` and `E2E_PASSWORD` are set)
+3. Auth boundary sanity (register/login/onboarding/app entry)
+4. Protocol create/activate/update-duration/regenerate sanity
+5. Dose action sanity (take/skip/snooze + AddDoseSheet)
+6. Refresh + relogin + settings sign-out guard path
 
 ## 4. Documentation maintenance rule
 

@@ -95,6 +95,27 @@ Optional:
 - `npm run dev`
 - `npm run build`
 - `npm run start`
+- `npm run test:e2e` (Playwright smoke matrix)
+- `npm run test:e2e:headed`
+- `npm run test:e2e:install` (install Chromium for Playwright)
+
+## E2E Smoke Matrix
+
+Playwright smoke tests live in `tests/e2e/smoke.spec.ts`.
+
+They include:
+
+- public route and unauthenticated guard checks
+- authenticated smoke checks (login/app boot, create+activate fixed-duration protocol, settings flush/sign-out)
+
+Authenticated checks require test credentials:
+
+- `E2E_EMAIL`
+- `E2E_PASSWORD`
+
+Optional:
+
+- `E2E_BASE_URL` (if using an already running environment instead of local webServer)
 
 ## Documentation Notes
 
