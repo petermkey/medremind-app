@@ -75,6 +75,12 @@ export async function supabaseSignOut(): Promise<void> {
   await supabase.auth.signOut();
 }
 
+export async function resendSignupConfirmationEmail(email: string): Promise<string | null> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.auth.resend({ type: 'signup', email });
+  return error ? error.message : null;
+}
+
 // ─── Get current session (used on app load) ───────────────────────────────
 
 export async function getCurrentUser(): Promise<UserProfile | null> {
