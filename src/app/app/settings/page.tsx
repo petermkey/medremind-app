@@ -69,7 +69,7 @@ export default function SettingsPage() {
     const patch = { name: name.trim(), timezone, ageRange: ageRange as '18-30'|'31-50'|'51-70'|'70+' };
     updateProfile(patch);
     const p = useStore.getState().profile;
-    if (p) await saveProfile({ ...p, ...patch });
+    if (p) saveProfile({ ...p, ...patch }).catch(() => {});
     show('✓ Profile saved');
   }
 

@@ -672,6 +672,7 @@ export const useStore = create<AppState>()(
         const state = get();
         const active = state.activeProtocols.find(a => a.id === activeProtocolId);
         if (!active) return;
+        const liveProtocol = state.protocols.find(p => p.id === active.protocolId) ?? active.protocol;
 
         // Remove existing future doses for this protocol
         const nowDate = today();
@@ -685,7 +686,7 @@ export const useStore = create<AppState>()(
         const fromDate = nowDate;
         const toDate = format(addDays(parseISO(fromDate), 89), 'yyyy-MM-dd');
         const newDoses: ScheduledDose[] = [];
-        for (const item of active.protocol.items) {
+        for (const item of liveProtocol.items) {
           const raw = expandItemToDoses(item, active, fromDate, toDate);
           newDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
