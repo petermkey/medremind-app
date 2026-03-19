@@ -112,10 +112,10 @@ function expandItemToDoses(
 
   // Walk day by day within range
   let cursor = new Date(Math.max(from.getTime(), start.getTime()));
-  const end = to;
+  let end = to;
   if (activeProtocol.endDate) {
     const protocolEnd = parseISO(activeProtocol.endDate);
-    if (isBefore(protocolEnd, end)) cursor = new Date(Math.min(cursor.getTime(), protocolEnd.getTime()));
+    if (isBefore(protocolEnd, end)) end = protocolEnd;
   }
 
   while (!isAfter(cursor, end)) {
