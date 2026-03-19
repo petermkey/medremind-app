@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
@@ -17,6 +17,7 @@ function validate(name: string, email: string, password: string, confirm: string
 }
 
 export default function RegisterPage() {
+  const RESEND_COOLDOWN_SECONDS = 30;
   const router = useRouter();
   const store = useStore();
   const [name, setName] = useState('');
@@ -30,7 +31,16 @@ export default function RegisterPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [resendError, setResendError] = useState(false);
+  const [resendCooldownLeft, setResendCooldownLeft] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldownLeft <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldownLeft(prev => Math.max(prev - 1, 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldownLeft]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,13 +77,16 @@ export default function RegisterPage() {
   }
 
   async function handleResendConfirmation() {
+    if (resendCooldownLeft > 0) return;
     if (!email.trim()) {
       setResendMessage('Enter your email first.');
+      setResendError(true);
       return;
     }
     setResendLoading(true);
     setResendMessage('');
     setResendError(false);
+    setResendCooldownLeft(RESEND_COOLDOWN_SECONDS);
     const resendError = await resendSignupConfirmationEmail(email.trim());
     setResendLoading(false);
     if (resendError) {
@@ -112,10 +125,14 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={handleResendConfirmation}
-                  disabled={resendLoading}
+                  disabled={resendLoading || resendCooldownLeft > 0}
                   className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline disabled:opacity-60"
                 >
-                  {resendLoading ? 'Sending…' : 'Resend confirmation email'}
+                  {resendLoading
+                    ? 'Sending…'
+                    : resendCooldownLeft > 0
+                    ? `Resend available in ${resendCooldownLeft}s`
+                    : 'Resend confirmation email'}
                 </button>
               )}
               {resendMessage && (
