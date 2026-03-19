@@ -21,6 +21,7 @@ Overall: beta, with focused hardening already landed across auth, protocol/sched
 - Improved swipe targeting and action accessibility labels in key schedule/protocol rows
 - Progress screen lifecycle-aware selector path (avoids raw `scheduledDoses` scans)
 - Take action command path with client operation id/idempotency (`syncTakeDoseCommand`)
+- Skip action command path with client operation id/idempotency (`syncSkipDoseCommand`)
 
 ## 3. Partially hardened / still fragile areas
 

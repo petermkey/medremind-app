@@ -124,6 +124,7 @@ Behavior:
 - Snooze marks the original row as `snoozed` and creates a replacement `pending` row at the target slot.
 - Snooze stores transitional traceability in the snooze `DoseRecord.note` (`original`, `replacement`, `target`).
 - Take sync path uses command-style idempotency (`clientOperationId`) and writes to `sync_operations` ledger when available.
+- Skip sync path uses the same command/idempotency contract as take (`clientOperationId` + ledger when available).
 
 Schedule UI (`src/app/app/page.tsx`) provides snooze options:
 
@@ -139,6 +140,7 @@ Snooze conflict avoidance in UI:
 Cloud sync conflict fallback:
 
 - `takeDose` uses `syncTakeDoseCommand` (command path with idempotency key and authoritative ack payload).
+- `skipDose` uses `syncSkipDoseCommand` (same command path guarantees as take).
 - `syncDoseAction` syncs snooze as a two-row operation (update original + upsert replacement).
 - If replacement slot conflicts, sync retries with next available slot and keeps original `snoozed_until` aligned.
 

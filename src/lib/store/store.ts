@@ -14,6 +14,7 @@ import {
   syncActivation,
   syncActiveStatus,
   syncDoseAction,
+  syncSkipDoseCommand,
   syncTakeDoseCommand,
   syncProtocolDelete,
   syncProtocolItemDelete,
@@ -850,6 +851,7 @@ export const useStore = create<AppState>()(
           recordedAt: new Date().toISOString(),
           note,
         };
+        const clientOperationId = `skip:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateStatus = dose.status !== 'skipped';
         if (shouldAppendRecord || shouldUpdateStatus) {
@@ -862,8 +864,11 @@ export const useStore = create<AppState>()(
         }
         if (state.profile?.id) {
           syncFireAndForget(
-            syncDoseAction(state.profile.id, dose, { status: 'skipped' }, record),
-            { kind: 'doseAction', payload: { userId: state.profile.id, dose, patch: { status: 'skipped' }, record } },
+            syncSkipDoseCommand(state.profile.id, dose, record, clientOperationId),
+            {
+              kind: 'skipCommand',
+              payload: { userId: state.profile.id, dose, record, clientOperationId },
+            },
           );
         }
       },

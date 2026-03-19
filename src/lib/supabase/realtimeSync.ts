@@ -547,17 +547,18 @@ type TakeCommandResult = {
   recordId: string | null;
 };
 
-async function upsertTakeSyncOperationLedger(
+async function upsertDoseSyncOperationLedger(
   userId: string,
   clientOperationId: string,
   dose: ScheduledDose,
   payload: Record<string, unknown>,
+  operationKind: 'take_command' | 'skip_command',
 ) {
   const supabase = getSupabaseClient();
   const row = {
     id: cloudOperationId(userId, clientOperationId),
     user_id: userId,
-    operation_kind: 'take_command',
+    operation_kind: operationKind,
     entity_type: 'scheduled_dose',
     entity_id: cloudDoseId(userId, dose.id),
     idempotency_key: clientOperationId,
@@ -621,7 +622,13 @@ export async function syncTakeDoseCommand(
     cloudRecordId: cRecordId,
     recordedAt: record.recordedAt,
   };
-  await upsertTakeSyncOperationLedger(userId, clientOperationId, dose, commandPayload);
+  await upsertDoseSyncOperationLedger(
+    userId,
+    clientOperationId,
+    dose,
+    commandPayload,
+    'take_command',
+  );
 
   try {
     const { error: doseErr } = await supabase
@@ -649,6 +656,70 @@ export async function syncTakeDoseCommand(
     return {
       clientOperationId,
       status: 'taken',
+      scheduledDate: dose.scheduledDate,
+      scheduledTime: dose.scheduledTime,
+      recordId: cRecordId,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateTakeSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
+  }
+}
+
+export async function syncSkipDoseCommand(
+  userId: string,
+  dose: ScheduledDose,
+  record: DoseRecord,
+  clientOperationId: string,
+): Promise<TakeCommandResult> {
+  const supabase = getSupabaseClient();
+  const cDoseId = cloudDoseId(userId, dose.id);
+  const cRecordId = cloudRecordId(userId, record.id);
+  const commandPayload = {
+    doseId: dose.id,
+    cloudDoseId: cDoseId,
+    scheduledDate: dose.scheduledDate,
+    scheduledTime: dose.scheduledTime,
+    action: 'skipped',
+    recordId: record.id,
+    cloudRecordId: cRecordId,
+    recordedAt: record.recordedAt,
+  };
+  await upsertDoseSyncOperationLedger(
+    userId,
+    clientOperationId,
+    dose,
+    commandPayload,
+    'skip_command',
+  );
+
+  try {
+    const { error: doseErr } = await supabase
+      .from('scheduled_doses')
+      .update({
+        status: 'skipped',
+      })
+      .eq('id', cDoseId)
+      .eq('user_id', userId);
+    if (doseErr) throw new Error(`Dose status sync failed: ${doseErr.message}`);
+
+    const recordRow = {
+      id: cRecordId,
+      user_id: userId,
+      scheduled_dose_id: cDoseId,
+      action: 'skipped',
+      recorded_at: record.recordedAt,
+      note: record.note ?? null,
+    };
+    const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
+    if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
+
+    await updateTakeSyncOperationLedger(userId, clientOperationId, 'succeeded');
+
+    return {
+      clientOperationId,
+      status: 'skipped',
       scheduledDate: dose.scheduledDate,
       scheduledTime: dose.scheduledTime,
       recordId: cRecordId,
