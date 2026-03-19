@@ -64,6 +64,12 @@ function generateId(prefix: string): string {
   }
 }
 
+function normalizeDurationDays(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const days = Math.trunc(value);
+  return days > 0 ? days : undefined;
+}
+
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
   const tracked = trackRealtimeSync(task);
   void tracked
@@ -323,10 +329,7 @@ export const useStore = create<AppState>()(
         const state = get();
         const protocol = state.protocols.find(p => p.id === protocolId);
         if (!protocol || !state.profile) throw new Error('Protocol or profile not found');
-        const fixedDurationDays =
-          typeof protocol.durationDays === 'number' && Number.isFinite(protocol.durationDays)
-            ? Math.trunc(protocol.durationDays)
-            : undefined;
+        const fixedDurationDays = normalizeDurationDays(protocol.durationDays);
         const endDate =
           fixedDurationDays && fixedDurationDays > 0
             ? format(addDays(parseISO(startDate), fixedDurationDays - 1), 'yyyy-MM-dd')
@@ -423,6 +426,7 @@ export const useStore = create<AppState>()(
         const profileId = get().profile?.id;
         const protocol: Protocol = {
           ...p,
+          durationDays: normalizeDurationDays(p.durationDays),
           id: generateId('protocol'),
           ownerId: profileId,
           isTemplate: false,
@@ -441,10 +445,16 @@ export const useStore = create<AppState>()(
       updateProtocol: (id, patch) => {
         const profileId = get().profile?.id;
         let nextProtocol: Protocol | null = null;
+        const normalizedPatch: Partial<Protocol> = {
+          ...patch,
+          ...(Object.prototype.hasOwnProperty.call(patch, 'durationDays')
+            ? { durationDays: normalizeDurationDays(patch.durationDays) }
+            : {}),
+        };
         set(s => {
           const protocols = s.protocols.map(p => {
             if (p.id !== id) return p;
-            nextProtocol = { ...p, ...patch };
+            nextProtocol = { ...p, ...normalizedPatch };
             return nextProtocol;
           });
           const activeProtocols = s.activeProtocols.map(ap =>
