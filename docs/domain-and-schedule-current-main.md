@@ -1,184 +1,125 @@
 # Domain and Schedule Logic (Current Main)
 
 Date: 2026-03-19
-Scope: protocol lifecycle, dose generation, and day/schedule behavior on `main`
+Scope: protocol lifecycle, dose generation, schedule visibility, and read-model selectors on current `main`
 
-## 1. Core domain entities
+## 1. Core entities and statuses
 
-Defined in `src/types/index.ts` and managed in `src/lib/store/store.ts`:
+Managed primarily in `src/lib/store/store.ts`:
 
-- `Protocol`
-- `ProtocolItem`
-- `ActiveProtocol`
-- `ScheduledDose`
-- `DoseRecord`
+- `Protocol`, `ProtocolItem`, `ActiveProtocol`, `ScheduledDose`, `DoseRecord`
 
-Key status enums:
+Protocol statuses:
 
-- Protocol status: `active | paused | completed | abandoned`
-- Dose status: `pending | taken | skipped | snoozed | overdue`
+- `active`, `paused`, `completed`, `abandoned`
 
-## 2. Protocol creation and finalization
+Dose statuses:
 
-Entry UI: `src/app/app/protocols/new/page.tsx`.
+- `pending`, `taken`, `skipped`, `snoozed`, `overdue`
 
-Flow:
+## 2. Protocol creation and activation
 
-1. Step 1 validates protocol metadata.
-2. Step 2 composes protocol items.
-3. Step 3 finalizes and optionally activates.
+- Fixed-duration inputs are validated as positive whole numbers.
+- `durationDays` is normalized defensively in store.
+- Activation computes inclusive `endDate` for fixed-duration protocols.
+- Dose generation horizon is capped by inclusive `endDate` when present.
 
-Current safeguards:
+## 3. Duration update and regeneration behavior
 
-- Fixed-duration input is validated at entry:
-- only positive whole numbers are accepted (`parseFixedDurationDays`).
-- invalid fixed duration blocks progression/finalization with user warning.
-- Draft item IDs use safe local generation (`generateDraftItemId`) before passing into store.
-- Final save path catches and reports finalize errors with controlled UI warning.
+When protocol duration changes on active instances:
 
-Store create path:
+1. active instance `endDate` is recomputed
+2. `regenerateDoses(activeId)` runs for impacted active instances
 
-- `createCustomProtocol(...)` normalizes `durationDays` defensively (`normalizeDurationDays`).
-- Protocol ID is generated via guarded `generateId('protocol')`.
+Regeneration behavior:
 
-## 3. ID hardening in protocol flow
+- uses live protocol snapshot from current store
+- removes only future pending rows for target active instance
+- preserves handled rows and rows with durable history linkage
+- rebuilds forward horizon while avoiding occupied retained slots
 
-`src/lib/store/store.ts` uses `generateId(prefix)` in all local write paths relevant to protocol flow:
+## 4. Lifecycle transitions and archive behavior
 
-- profile creation (`signUp` fallback path)
-- protocol creation
-- active protocol creation
-- protocol item creation
-- scheduled dose generation
-- dose record creation (take/skip/snooze)
+Store lifecycle actions:
 
-`generateId` behavior:
+- `pauseProtocol`, `resumeProtocol`, `completeProtocol`, `deleteProtocol`
 
-1. try `uuid()`
-2. fallback to `crypto.randomUUID()`
-3. fallback to `prefix + timestamp + random`
+Archive rule:
 
-This is the current mitigation for runtime UUID generation failures.
+- `deleteProtocol` archives protocol/instances when handled history exists
+- hard delete path is used only when no handled history exists
 
-## 4. Activation and fixed-duration end boundary
+Command sync wiring (landed):
 
-Activation path: `activateProtocol(protocolId, startDate)` in store.
+- pause/resume/complete/archive command sync paths are used from store actions
 
-Current behavior:
+## 5. Dose action semantics
 
-- Reads protocol duration via `normalizeDurationDays(protocol.durationDays)`.
-- Computes `active.endDate` with `computeInclusiveEndDate(startDate, durationDays)`.
-- Inclusive rule is active:
-- `durationDays = 1` -> only start date is valid.
-- `durationDays = 3` -> start date + day2 + day3 valid.
-
-Dose generation during activation:
-
-- Generates up to a 90-day horizon from start date.
-- `expandItemToDoses` caps generation at `active.endDate` when present.
-
-## 5. Update protocol + immediate reconciliation
-
-Update path: `updateProtocol(id, patch)` in store.
-
-Current behavior when `durationDays` changes:
-
-1. Normalize incoming duration defensively.
-2. Detect duration change.
-3. Update active instances for that protocol (`endDate` recomputed inclusively).
-4. Trigger `regenerateDoses(activeId)` for each active instance (except completed).
-
-Result:
-
-- Duration shortening removes future doses outside new boundary.
-- Duration extension adds missing future doses up to new boundary.
-- Ongoing protocols (`durationDays` undefined) remain uncapped.
-
-## 6. Regeneration logic
-
-Path: `regenerateDoses(activeProtocolId)`.
-
-Current behavior:
-
-- Uses live protocol reference from current store:
-- `state.protocols.find(...) ?? active.protocol`
-- Deletes only future pending doses (`scheduledDate >= today`, `status === pending`) for target active protocol.
-- Preserves future handled rows and any row with durable execution history (`doseRecords` linkage).
-- Rebuilds future doses from today over 90-day horizon and skips insertion for occupied retained slots.
-- `expandItemToDoses` still enforces active `endDate` cap.
-- Sync path (`syncRegeneratedDoses`) follows the same pending-only reconciliation rule and slot protection for retained rows.
-
-## 7. Dose actions
-
-Store actions:
+Actions:
 
 - `takeDose(doseId, note?)`
 - `skipDose(doseId, note?)`
 - `snoozeDose(doseId, option)`
 
-Behavior:
+Semantics:
 
-- Each action updates dose status locally.
-- Each action appends immutable `DoseRecord`.
-- Snooze no longer mutates the original row's scheduled slot in place.
-- Snooze marks the original row as `snoozed` and creates a replacement `pending` row at the target slot.
-- Snooze stores transitional traceability in the snooze `DoseRecord.note` (`original`, `replacement`, `target`).
-- Take sync path uses command-style idempotency (`clientOperationId`) and writes to `sync_operations` ledger when available.
-- Skip sync path uses the same command/idempotency contract as take (`clientOperationId` + ledger when available).
-- Take and skip command paths dual-write durable history into additive `execution_events` (idempotent by `idempotency_key`).
+- take/skip update status and append immutable `DoseRecord`
+- snooze marks original row as `snoozed`
+- snooze creates replacement `pending` row at target slot
+- snooze lineage metadata is stored in record note (`original`, `replacement`, `target`)
 
-Schedule UI (`src/app/app/page.tsx`) provides snooze options:
+UI snooze options currently include:
 
-- 1 hour
-- this evening
-- tomorrow
-- next week
+- `1 hour`
+- `this evening`
+- `tomorrow`
+- `next week`
 
-Snooze conflict avoidance in UI:
+If a target slot conflicts, UI shifts forward in 5-minute increments.
 
-- If target slot is occupied for same item, it shifts forward in 5-minute increments.
+## 6. Command-based sync and additive write-through
 
-Cloud sync conflict fallback:
+Dose command paths:
 
-- `takeDose` uses `syncTakeDoseCommand` (command path with idempotency key and authoritative ack payload).
-- `skipDose` uses `syncSkipDoseCommand` (same command path guarantees as take).
-- `syncDoseAction` syncs snooze as a two-row operation (update original + upsert replacement).
-- If replacement slot conflicts, sync retries with next available slot and keeps original `snoozed_until` aligned.
+- take/skip/snooze use idempotent client operation IDs
+- each command writes to legacy bridge paths and `execution_events`
 
-## 8. Day schedule and visibility rules
+Lifecycle command paths:
 
-`getDaySchedule(date)`:
+- pause/resume/complete/archive use idempotent command semantics
 
-- Past dates: shows all doses for the date.
-- Today/future: shows doses only for currently active protocol instances.
+Activation path:
 
-`getVisibleDoseDates()`:
+- future rows are written through to `planned_occurrences` (`activation_write_through_c4`)
 
-- Includes past doses regardless of active status.
-- Includes today/future only for currently active protocol instances.
+## 7. Visibility and read-model selector behavior
 
-Practical outcome:
+## `/app` today/schedule
 
-- Pausing protocol hides upcoming doses from active surfaces.
-- Historical records stay visible.
+- actionable queue uses lifecycle-aware selector path
+- skipped and snoozed rows are not in primary actionable queue
+- next-dose path uses selector-based actionable set
 
-## 9. AddDoseSheet behavior
+## Progress
 
-Path: `src/components/app/AddDoseSheet.tsx`.
+- progress day and summary metrics use selector-based lifecycle-aware inputs
 
-Current behavior:
+## Protocol detail
 
-- Can create/use "My Protocol" when no active protocol exists.
-- Ensures activation if needed.
-- Adds item and then resolves active instance using fresh store state (`useStore.getState()`), not stale closure.
-- Calls `regenerateDoses` on resolved active instance.
+- `selectProtocolDetailReadModel` provides instance status, actionable future rows, handled history rows, and archive/command gating flags
 
-This prevents stale-instance bugs immediately after activation.
+## Calendar
 
-## 10. Known domain limitations on current main
+- visible date projection uses `selectCalendarVisibleDoseDates`
+- today/future dates honor active-instance and boundary/visibility rules
 
-- Rule engine is still centralized in one large store module.
-- Recurrence model supports common cases but not full advanced scheduling DSL.
-- Regeneration is local-first and eventually synced; server-side canonical rule engine is not present.
+## History
 
-These are part of the deferred domain redesign track, not unresolved regressions in the current hardened slices.
+- past-date history surface uses `selectHistoryDayRows`
+- handled and lineage-relevant rows remain visible for history integrity
+
+## 8. Known domain limitations (deferred)
+
+- rule engine remains centralized in one large store module
+- recurrence model is practical but not a full scheduling DSL
+- server-side canonical scheduling engine is not yet introduced

@@ -1,144 +1,133 @@
 # Architecture (Current Main)
 
 Date: 2026-03-19
-Source of truth: current `main` branch
+Source of truth: current `main`
 
 ## 1. Runtime stack and boundaries
 
 - Framework: Next.js App Router (`next@16`), React (`react@19`), TypeScript.
-- State: Zustand + `persist` middleware (`src/lib/store/store.ts`).
-- Date logic: `date-fns`.
-- Cloud backend: Supabase auth + Postgres tables via browser and server clients.
-- Styling/UI: Tailwind CSS with local component primitives.
+- State: Zustand + `persist` in `src/lib/store/store.ts`.
+- Date/time logic: `date-fns`.
+- Cloud backend: Supabase auth + Postgres via browser/server clients.
+- UI: Tailwind CSS + local component primitives.
 
 Runtime boundaries:
 
-- Client app shell and feature routes are under `src/app/app/*`.
-- Auth routes are under `src/app/(auth)/*`.
-- Edge auth guard is implemented in `src/proxy.ts`.
-- Supabase browser client is singleton-based in `src/lib/supabase/client.ts`.
+- App routes: `src/app/app/*`
+- Auth routes: `src/app/(auth)/*`
+- Route guard: `src/proxy.ts`
+- App bootstrap/auth gate: `src/app/app/layout.tsx`
+- Sync/write model: `src/lib/supabase/realtimeSync.ts`
+- Retry/outbox: `src/lib/supabase/syncOutbox.ts`
 
 ## 2. Routing model
 
-Public/auth routes:
+Public/auth:
 
-- `/` landing page (`src/app/page.tsx`)
-- `/register` (`src/app/(auth)/register/page.tsx`)
-- `/login` (`src/app/(auth)/login/page.tsx`)
-- `/onboarding` (`src/app/(auth)/onboarding/page.tsx`)
+- `/`
+- `/register`
+- `/login`
+- `/onboarding`
 
-App routes (guarded by proxy + client bootstrap):
+Guarded app:
 
-- `/app` schedule/today (`src/app/app/page.tsx`)
-- `/app/protocols` list (`src/app/app/protocols/page.tsx`)
-- `/app/protocols/new` wizard (`src/app/app/protocols/new/page.tsx`)
-- `/app/protocols/[id]` detail/edit (`src/app/app/protocols/[id]/page.tsx`)
-- `/app/meds` (`src/app/app/meds/page.tsx`)
-- `/app/progress` (`src/app/app/progress/page.tsx`)
-- `/app/settings` (`src/app/app/settings/page.tsx`)
+- `/app`
+- `/app/protocols`
+- `/app/protocols/new`
+- `/app/protocols/[id]`
+- `/app/meds`
+- `/app/progress`
+- `/app/settings`
 
-## 3. App boot architecture
+## 3. Boot and auth gate architecture
 
-`src/app/app/layout.tsx` owns bootstrapping and app-shell gating.
+`src/app/app/layout.tsx` sequence:
 
-Boot sequence:
+1. start outbox processing
+2. fetch current user
+3. handle fetch failure without infinite lock
+4. reset on no-user path
+5. reset on user identity mismatch
+6. set profile
+7. route non-onboarded users to onboarding
+8. pull cloud state with bounded retries
+9. keep app usable with local state if pull fails
 
-1. Start outbox processing (`startSyncOutbox`).
-2. Call `getCurrentUser()`.
-3. On auth fetch failure:
-- if local profile is onboarded, release loading state and keep shell usable.
-- otherwise reset local user data and redirect to `/login`.
-4. On no user: reset local user data and redirect to `/login`.
-5. On user switch (`profile.id` mismatch): reset local user data to prevent cross-account state bleed.
-6. Set profile in store.
-7. If user is not onboarded: redirect to `/onboarding`.
-8. Pull cloud state with retry (`pullStoreFromSupabase`, retry loop in layout).
-9. If pull fails, continue with local state (non-fatal).
+This design prevents indefinite auth bootstrap spinner lock.
 
-This is the current guard against indefinite spinner lock during auth bootstrap failures.
-
-## 4. Server-side auth gate (proxy)
-
-`src/proxy.ts`:
-
-- Refreshes Supabase session by awaiting `supabase.auth.getUser()`.
-- Redirects unauthenticated `/app*` requests to `/login`.
-- Redirects authenticated users away from `/login` and `/register` to `/app`.
-
-Current limitation:
-
-- Proxy does not evaluate profile onboarding state; onboarding redirect remains client-side in app layout.
-
-## 5. State architecture
-
-Primary state container: `src/lib/store/store.ts`.
-
-Persisted keys:
-
-- `medremind-store`
-- `medremind-sync-outbox-v1` (separate outbox module)
-
-Persist partialization:
-
-- Persists profile, notification settings, active protocols, scheduled doses, dose records, and custom protocols only.
-- Seed templates are re-merged during hydration (`merge` function).
-
-Key helper internals in store:
-
-- `generateId(prefix)` with guarded fallback path (uuid -> crypto.randomUUID -> timestamp-random string).
-- `normalizeDurationDays(value)` for defensive fixed-duration normalization.
-- `computeInclusiveEndDate(startDate, durationDays)`.
-- `expandItemToDoses(...)` for dose generation over date ranges with end-date cap.
-
-## 6. Cloud persistence architecture
-
-Primary modules:
-
-- `src/lib/supabase/realtimeSync.ts` for direct cloud writes.
-- `src/lib/supabase/syncOutbox.ts` for retry queue/backoff.
-- `src/lib/supabase/cloudStore.ts` for backup/export/pull.
-- `src/lib/supabase/importStore.ts` for snapshot import.
+## 4. Persistence architecture
 
 Write model:
 
-- Local-first optimistic update in store.
-- Fire-and-forget sync call.
-- On failure, queue operation into outbox.
-- Outbox replays on app start/online/visible and manual flush.
+1. local optimistic store mutation
+2. direct sync call
+3. on failure, enqueue outbox item
+4. outbox retries with backoff
 
-Cloud ID mapping:
+Modules:
 
-- `realtimeSync.ts` maps local non-UUID IDs to deterministic stable UUIDs per entity class.
-- `importStore.ts` uses deterministic stable UUID mapping for non-UUID IDs on import.
+- direct writes: `src/lib/supabase/realtimeSync.ts`
+- outbox/retry: `src/lib/supabase/syncOutbox.ts`
+- cloud pull/backup/export: `src/lib/supabase/cloudStore.ts`
+- import/restore mapping: `src/lib/supabase/importStore.ts`
 
-## 7. PWA/runtime platform status
+## 5. Lifecycle command architecture (landed)
+
+Dose commands:
+
+- `syncTakeDoseCommand`
+- `syncSkipDoseCommand`
+- `syncSnoozeDoseCommand`
+
+Lifecycle commands:
+
+- `syncPauseProtocolCommand`
+- `syncResumeProtocolCommand`
+- `syncCompleteProtocolCommand`
+- `syncArchiveProtocolCommand`
+
+Command paths use client operation IDs and sync-operation ledger semantics where available.
+
+## 6. Additive migration architecture (landed in runtime)
+
+Active additive write-through on `main`:
+
+- `execution_events`: take/skip/snooze command writes
+- `planned_occurrences`: activation future-row write-through (`activation_write_through_c4`)
+
+Legacy tables remain active for runtime reads/writes during migration phase.
+
+## 7. Read-model selector migration architecture (landed)
+
+Selector-based read paths now cover:
+
+- `/app` actionable list / next-dose / summary metrics
+- `/app/progress` lifecycle-aware aggregation inputs
+- protocol detail lifecycle-aware read model
+- calendar-visible date projection
+- past-date history rows
+
+This reduced direct page-level raw scans in key screens.
+
+## 8. Platform status
 
 Present:
 
-- Manifest: `public/manifest.json`.
-- Icons: `public/icon-192.png`, `public/icon-512.png`.
-- Root metadata references manifest (`src/app/layout.tsx`).
-- `display: standalone`, `start_url: /app`.
+- PWA manifest + icons
+- standalone display metadata
 
-Not present on current main:
+Not present:
 
-- No explicit service worker registration code.
-- No app-specific offline cache logic in runtime code.
+- explicit service-worker registration/runtime offline cache layer
 
-## 8. Build and deployment essentials
-
-- Build command: `npm run build`.
-- Environment dependencies: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-- Auth + cloud flows degrade only partially without Supabase; app is built around signed-in sync.
-
-## 9. Critical files (high regression risk)
+## 9. High-risk files
 
 - `src/lib/store/store.ts`
+- `src/lib/supabase/realtimeSync.ts`
 - `src/app/app/layout.tsx`
 - `src/proxy.ts`
-- `src/lib/supabase/realtimeSync.ts`
 - `src/lib/supabase/importStore.ts`
 - `src/lib/supabase/cloudStore.ts`
 - `src/lib/supabase/syncOutbox.ts`
 
-Changes in these files should always include focused behavior verification (auth boot, protocol activation/regeneration, and sync resilience).
+Changes in these files require focused validation and docs updates in the same slice.

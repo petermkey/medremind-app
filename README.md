@@ -15,22 +15,20 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 
 - Authentication: register, login, onboarding
   - confirmation-aware signup flow (no forced onboarding when email confirmation is pending)
-  - resend confirmation action in register/login confirmation-required states
+  - resend confirmation actions with cooldown in confirmation-required states
 - Protocols:
   - seed templates
   - custom protocol creation
   - protocol metadata edit
   - protocol item composition edit (add/edit/delete)
+  - lifecycle transitions: activate, pause, resume, complete, archive-aware delete
 - Schedule:
   - per-day schedule view with week strip selector
   - dose actions: take, skip, snooze
-  - snooze options: `15 minutes`, `1 hour`, `this evening`, `tomorrow`
-- Protocol lifecycle:
-  - activate, pause, resume, complete
-  - fixed-duration protocols use inclusive end dates and validated positive duration input
+  - snooze options: `1 hour`, `this evening`, `tomorrow`, `next week`
 - Progress view:
   - adherence summary, weekly bars, 30-day heatmap
-- Recovery and sync operations in Settings:
+- Settings:
   - export snapshot
   - backup current state to cloud
   - restore from cloud
@@ -39,30 +37,28 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 
 ## Critical Runtime Rules (Current)
 
-- Local updates are optimistic.
+- Local updates are optimistic and synced asynchronously.
 - Failed cloud writes are queued in local outbox and retried with backoff.
-- `/app` boot pulls account state from Supabase.
-- Protocol pause visibility rule:
-  - paused protocols do not contribute active doses to today/future schedule surfaces.
-  - pause does not delete or hide historical (past-date) dose history.
-- Skip visibility rule:
-  - skipped dose is removed from active queue for that day.
-- Snooze rule:
-  - snooze marks the original row as `snoozed` and creates a replacement `pending` row at the new slot.
+- Sign-out path is guarded against in-flight/outbox data loss.
+- Fixed-duration protocols use inclusive end-date boundaries.
+- Snooze marks original row as `snoozed` and creates replacement `pending` row.
+- Additive write-through is active:
+  - command paths write execution facts into `execution_events`
+  - activation writes planned future rows into `planned_occurrences`
 
 ## Project Structure
 
 - `src/app` - routes/pages
 - `src/components` - UI and app components
 - `src/lib/store/store.ts` - Zustand state + domain logic
-- `src/lib/supabase/realtimeSync.ts` - cloud write operations
+- `src/lib/supabase/realtimeSync.ts` - cloud write operations and command paths
 - `src/lib/supabase/syncOutbox.ts` - retry outbox + sync status
 - `src/lib/supabase/cloudStore.ts` - cloud pull + snapshot export/backup
 - `src/lib/supabase/importStore.ts` - snapshot import to cloud
-- `supabase/001_initial.sql` - schema + policies
-- `docs/system-logic.md` - source of truth for current logic
-- `docs/current-status.md` - current maturity, risks, next priorities
-- `docs/agent-handover.md` - onboarding and test focus for new agents
+- `scripts/backfill-execution-history.mjs` - D2 backfill tooling
+- `scripts/backfill-planned-future-occurrences.mjs` - D3 backfill tooling
+- `scripts/validate-lifecycle-parity.mjs` - C5 parity tooling
+- `scripts/check-lifecycle-consistency.mjs` - D4 consistency checker
 
 ## Quick Start
 
@@ -76,10 +72,15 @@ Open `http://localhost:3000`.
 
 ## Environment Variables
 
-Required for Supabase integration:
+Runtime:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Operational tooling (D2/D3/C5/D4):
+
+- `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 Optional:
@@ -95,36 +96,37 @@ Optional:
 - `npm run dev`
 - `npm run build`
 - `npm run start`
-- `npm run test:e2e` (Playwright smoke matrix)
+- `npm run tool:backfill:execution-history`
+- `npm run tool:backfill:planned-future`
+- `npm run tool:validate:lifecycle-parity`
+- `node scripts/check-lifecycle-consistency.mjs`
+- `npm run test:e2e`
 - `npm run test:e2e:headed`
-- `npm run test:e2e:install` (install Chromium for Playwright)
+- `npm run test:e2e:install`
 
-## E2E Smoke Matrix
+## Branch and Governance Rules
 
-Playwright smoke tests live in `tests/e2e/smoke.spec.ts`.
+Authoritative process rules are documented in:
 
-They include:
+- `docs/project-rules-and-current-operating-model.md`
 
-- public route and unauthenticated guard checks
-- authenticated smoke checks (login/app boot, create+activate fixed-duration protocol, settings flush/sign-out)
+Key rules:
 
-Authenticated checks require test credentials:
-
-- `E2E_EMAIL`
-- `E2E_PASSWORD`
-
-Optional:
-
-- `E2E_BASE_URL` (if using an already running environment instead of local webServer)
+- `main` is source of truth.
+- New implementation branches must use `codex/<sprint-id>-<slice-name>`.
+- One slice per branch; no mixed-concern branches.
+- Use `main` directly only for merge/cleanup/operational runs unless explicitly instructed.
 
 ## Documentation Notes
 
-Several incident verification files in `docs/` are historical point-in-time reports.
-For current behavior and logic, use:
+For current behavior/process truth, start with:
 
-1. `docs/system-logic.md`
-2. `docs/current-status.md`
-3. `docs/agent-handover.md`
+1. `docs/project-rules-and-current-operating-model.md`
+2. `docs/system-logic.md`
+3. `docs/current-status.md`
+4. `docs/agent-handoff-current-main.md`
+
+Historical incident/release/design docs in `docs/` are timeline artifacts.
 
 ## Medical Disclaimer
 
