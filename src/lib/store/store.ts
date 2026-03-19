@@ -656,7 +656,10 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
-        const record: DoseRecord = {
+        const existingRecord = state.doseRecords.find(
+          r => r.scheduledDoseId === doseId && r.action === 'taken',
+        );
+        const record: DoseRecord = existingRecord ?? {
           id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
@@ -664,12 +667,16 @@ export const useStore = create<AppState>()(
           recordedAt: new Date().toISOString(),
           note,
         };
-        set(s => ({
-          scheduledDoses: s.scheduledDoses.map(d =>
-            d.id === doseId ? { ...d, status: 'taken' as DoseStatus } : d
-          ),
-          doseRecords: [...s.doseRecords, record],
-        }));
+        const shouldAppendRecord = !existingRecord;
+        const shouldUpdateStatus = dose.status !== 'taken';
+        if (shouldAppendRecord || shouldUpdateStatus) {
+          set(s => ({
+            scheduledDoses: s.scheduledDoses.map(d =>
+              d.id === doseId ? { ...d, status: 'taken' as DoseStatus } : d
+            ),
+            doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+          }));
+        }
         if (state.profile?.id) {
           syncFireAndForget(
             syncDoseAction(state.profile.id, dose, { status: 'taken' }, record),
@@ -682,7 +689,10 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
-        const record: DoseRecord = {
+        const existingRecord = state.doseRecords.find(
+          r => r.scheduledDoseId === doseId && r.action === 'skipped',
+        );
+        const record: DoseRecord = existingRecord ?? {
           id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
@@ -690,12 +700,16 @@ export const useStore = create<AppState>()(
           recordedAt: new Date().toISOString(),
           note,
         };
-        set(s => ({
-          scheduledDoses: s.scheduledDoses.map(d =>
-            d.id === doseId ? { ...d, status: 'skipped' as DoseStatus } : d
-          ),
-          doseRecords: [...s.doseRecords, record],
-        }));
+        const shouldAppendRecord = !existingRecord;
+        const shouldUpdateStatus = dose.status !== 'skipped';
+        if (shouldAppendRecord || shouldUpdateStatus) {
+          set(s => ({
+            scheduledDoses: s.scheduledDoses.map(d =>
+              d.id === doseId ? { ...d, status: 'skipped' as DoseStatus } : d
+            ),
+            doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+          }));
+        }
         if (state.profile?.id) {
           syncFireAndForget(
             syncDoseAction(state.profile.id, dose, { status: 'skipped' }, record),
@@ -715,27 +729,40 @@ export const useStore = create<AppState>()(
         const snoozedUntil = targetDate.toISOString();
         const scheduledDate = format(targetDate, 'yyyy-MM-dd');
         const scheduledTime = format(targetDate, 'HH:mm');
-        const record: DoseRecord = {
+        const existingRecord = state.doseRecords.find(
+          r => r.scheduledDoseId === doseId && r.action === 'snoozed',
+        );
+        const sameSnoozeTarget = (
+          dose.status === 'snoozed'
+          && dose.snoozedUntil === snoozedUntil
+          && dose.scheduledDate === scheduledDate
+          && dose.scheduledTime === scheduledTime
+        );
+        const record: DoseRecord = existingRecord ?? {
           id: generateId('dose-record'),
           userId: state.profile?.id ?? '',
           scheduledDoseId: doseId,
           action: 'snoozed',
           recordedAt: new Date().toISOString(),
         };
-        set(s => ({
-          scheduledDoses: s.scheduledDoses.map(d =>
-            d.id === doseId
-              ? {
-                ...d,
-                status: 'snoozed' as DoseStatus,
-                snoozedUntil,
-                scheduledDate,
-                scheduledTime,
-              }
-              : d
-          ),
-          doseRecords: [...s.doseRecords, record],
-        }));
+        const shouldAppendRecord = !existingRecord;
+        const shouldUpdateStatus = !sameSnoozeTarget;
+        if (shouldAppendRecord || shouldUpdateStatus) {
+          set(s => ({
+            scheduledDoses: s.scheduledDoses.map(d =>
+              d.id === doseId
+                ? {
+                  ...d,
+                  status: 'snoozed' as DoseStatus,
+                  snoozedUntil,
+                  scheduledDate,
+                  scheduledTime,
+                }
+                : d
+            ),
+            doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+          }));
+        }
         if (state.profile?.id) {
           syncFireAndForget(
             syncDoseAction(
