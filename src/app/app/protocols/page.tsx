@@ -110,7 +110,11 @@ export default function ProtocolsPage() {
       return;
     }
     if (!confirm(`Delete protocol "${protocol.name}"?`)) return;
-    deleteProtocol(protocol.id);
+    const result = deleteProtocol(protocol.id);
+    if (result.mode === 'archived') {
+      show('Protocol archived to preserve handled history', 'warning');
+      return;
+    }
     show('Protocol deleted', 'warning');
   }
 

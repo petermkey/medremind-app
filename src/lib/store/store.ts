@@ -200,7 +200,7 @@ interface AppState {
   completeProtocol: (activeId: string) => void;
   createCustomProtocol: (p: Omit<Protocol, 'id' | 'createdAt' | 'ownerId' | 'isTemplate'>) => Protocol;
   updateProtocol: (id: string, patch: Partial<Protocol>) => void;
-  deleteProtocol: (id: string) => void;
+  deleteProtocol: (id: string) => { mode: 'deleted' | 'archived' };
   addProtocolItem: (protocolId: string, item: Omit<ProtocolItem, 'id' | 'protocolId'>) => void;
   removeProtocolItem: (protocolId: string, itemId: string) => void;
 
@@ -497,26 +497,71 @@ export const useStore = create<AppState>()(
 
       deleteProtocol: (id) => {
         const profileId = get().profile?.id;
-        set(s => {
-          const removedActiveIds = s.activeProtocols
-            .filter(ap => ap.protocolId === id)
-            .map(ap => ap.id);
-          const removedDoseIds = s.scheduledDoses
-            .filter(d => removedActiveIds.includes(d.activeProtocolId))
-            .map(d => d.id);
-          return {
-            protocols: s.protocols.filter(p => p.id !== id),
-            activeProtocols: s.activeProtocols.filter(ap => ap.protocolId !== id),
-            scheduledDoses: s.scheduledDoses.filter(d => !removedActiveIds.includes(d.activeProtocolId)),
-            doseRecords: s.doseRecords.filter(r => !removedDoseIds.includes(r.scheduledDoseId)),
-          };
-        });
+        const state = get();
+        const relatedActive = state.activeProtocols.filter(ap => ap.protocolId === id);
+        const relatedActiveIds = relatedActive.map(ap => ap.id);
+        const relatedDoses = state.scheduledDoses.filter(d => relatedActiveIds.includes(d.activeProtocolId));
+        const relatedDoseIds = new Set(relatedDoses.map(d => d.id));
+        const hasDoseRecordHistory = state.doseRecords.some(r => relatedDoseIds.has(r.scheduledDoseId));
+        const hasHandledDoseStatus = relatedDoses.some(d =>
+          d.status === 'taken' || d.status === 'skipped' || d.status === 'snoozed'
+        );
+        const hasHandledHistory = hasDoseRecordHistory || hasHandledDoseStatus;
+
+        if (hasHandledHistory) {
+          let archivedProtocol: Protocol | null = null;
+          set(s => {
+            const protocols = s.protocols.map(p => {
+              if (p.id !== id) return p;
+              archivedProtocol = { ...p, isArchived: true };
+              return archivedProtocol;
+            });
+            const activeProtocols = s.activeProtocols.map(ap => {
+              if (ap.protocolId !== id) return ap;
+              return {
+                ...ap,
+                status: 'abandoned' as ProtocolStatus,
+                completedAt: undefined,
+                protocol: archivedProtocol ?? ap.protocol,
+              };
+            });
+            return { protocols, activeProtocols };
+          });
+          if (profileId && archivedProtocol) {
+            syncFireAndForget(
+              syncProtocolUpsert(profileId, archivedProtocol),
+              { kind: 'protocolUpsert', payload: { userId: profileId, protocol: archivedProtocol } },
+            );
+            for (const active of relatedActive) {
+              syncFireAndForget(
+                syncActiveStatus(profileId, active.id, { status: 'abandoned' }),
+                {
+                  kind: 'activeStatus',
+                  payload: {
+                    userId: profileId,
+                    activeId: active.id,
+                    patch: { status: 'abandoned' },
+                  },
+                },
+              );
+            }
+          }
+          return { mode: 'archived' as const };
+        }
+
+        set(s => ({
+          protocols: s.protocols.filter(p => p.id !== id),
+          activeProtocols: s.activeProtocols.filter(ap => ap.protocolId !== id),
+          scheduledDoses: s.scheduledDoses.filter(d => !relatedActiveIds.includes(d.activeProtocolId)),
+          doseRecords: s.doseRecords.filter(r => !relatedDoseIds.has(r.scheduledDoseId)),
+        }));
         if (profileId) {
           syncFireAndForget(
             syncProtocolDelete(profileId, id),
             { kind: 'protocolDelete', payload: { userId: profileId, protocolId: id } },
           );
         }
+        return { mode: 'deleted' as const };
       },
 
       addProtocolItem: (protocolId, item) => {
