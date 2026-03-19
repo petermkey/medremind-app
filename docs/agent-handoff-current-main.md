@@ -1,114 +1,56 @@
 # Agent Handoff (Current Main)
 
 Date: 2026-03-19
-Audience: engineering agents continuing development from current `main`
+Audience: agents continuing work from current `main`
 
-## 1. Read-first order for new agents
+## 1. Source-of-truth scope
 
-1. `docs/system-logic.md`
-2. `docs/current-status.md`
-3. `docs/agent-handover.md`
-4. `docs/architecture-current-main.md`
-5. `docs/auth-and-persistence-current-main.md`
-6. `docs/domain-and-schedule-current-main.md`
-7. `docs/current-status-and-next-phase.md`
-8. `README.md`
+- Code source of truth: `main`.
+- Process/governance source: `docs/project-rules-and-current-operating-model.md`.
+- Behavior source: architecture/auth/domain/current-status docs.
+- Historical snapshots in `docs/` are context only.
 
-Historical incident/release docs in `docs/` are useful context, but not source-of-truth.
+## 2. Current product/runtime shape
 
-## 2. Product purpose and primary user journey
-
-MedRemind is a protocol-driven medication/adherence tracker.
-
-Typical journey:
-
-1. Register/login.
-2. Complete onboarding profile.
-3. Create or choose protocol.
-4. Activate protocol.
-5. Track doses on schedule screen with take/skip/snooze actions.
-6. Monitor adherence/progress.
-7. Manage sync and account actions in settings.
+- Protocol-driven medication/adherence tracking.
+- Local-first store with cloud sync and outbox retry.
+- Command-based lifecycle/dose sync with additive write-through coverage.
+- Selector-based lifecycle-aware read paths on key screens.
 
 ## 3. Most important code surfaces
 
-- Core state/domain: `src/lib/store/store.ts`
-- Auth wrappers: `src/lib/supabase/auth.ts`
-- App boot/auth gate: `src/app/app/layout.tsx`
-- Proxy routing guard: `src/proxy.ts`
+- Domain/store: `src/lib/store/store.ts`
+- Sync + commands: `src/lib/supabase/realtimeSync.ts`
+- Outbox: `src/lib/supabase/syncOutbox.ts`
+- Auth/layout/proxy: `src/lib/supabase/auth.ts`, `src/app/app/layout.tsx`, `src/proxy.ts`
 - Cloud pull/import/backup: `src/lib/supabase/cloudStore.ts`, `src/lib/supabase/importStore.ts`
-- Realtime sync + outbox: `src/lib/supabase/realtimeSync.ts`, `src/lib/supabase/syncOutbox.ts`
-- Protocol creation: `src/app/app/protocols/new/page.tsx`
-- Protocol list/detail editing: `src/app/app/protocols/page.tsx`, `src/app/app/protocols/[id]/page.tsx`
-- Schedule/today actions: `src/app/app/page.tsx`, `src/components/app/MedCard.tsx`, `src/components/app/AddDoseSheet.tsx`
 
-## 4. Stable behaviors already landed (do not regress)
+## 4. Landed migration/tooling summary
 
-Auth:
+Already landed on `main`:
 
-- register is confirmation-aware (no false onboarding when no session)
-- confirmation resend action exists on register/login
-- resend cooldown is enforced
-- onboarding and settings profile saves are non-blocking
-- app layout boot hardening avoids indefinite spinner lock
+- A1..A5, B1..B5, C1..C5, D1, D2, D4
+- D3 tooling implementation and command wiring
 
-Protocol/schedule:
+Operationally pending:
 
-- protocol creation/finalization uses hardened ID generation paths
-- fixed-duration input validation at creation
-- inclusive end date on activation for fixed-duration protocols
-- duration change triggers immediate active-dose reconciliation
-- regenerate uses live protocol snapshot
-- AddDoseSheet resolves active instance from fresh store after activation
+- Live-run D2/D3 apply flow with scoped validation
+- C5 parity run and D4 consistency run on real data
+- Consolidated anomaly triage for rollout/decommission readiness
 
-Persistence/sync:
+## 5. Mandatory execution model
 
-- deterministic import ID mapping for active protocols/scheduled doses/dose records
-- sign-out is guarded by in-flight + outbox checks with user confirmations
+1. Start from clean `main`.
+2. Create one correctly named slice branch when coding.
+3. Keep one concern per branch.
+4. Stop/report on drift or unrelated file contamination.
+5. Use `main` only for merge/cleanup/operational run tasks.
 
-UI/a11y:
+## 6. Operational run prerequisites
 
-- swipe targeting stabilized
-- secondary action labels added
-- schedule action labels/explicit button semantics added
+Required environment for D2/D3/C5/D4 scripts:
 
-## 5. Known high-risk areas
+- `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-- `store.ts` has dense domain + sync coupling.
-- Auth policy is split between proxy and client layout behavior.
-- Import/restore and regeneration paths can create subtle duplicates if ID/slot semantics are changed.
-- Outbox replay behavior can surface edge cases under unstable network.
-
-## 6. Safe working model for future slices
-
-- Always branch from current `main`.
-- One concern per branch.
-- One isolated commit per validated slice when possible.
-- Avoid broad refactors in high-risk files.
-- Validate focused behavior + `npm run build` before merge.
-
-## 7. Minimum regression checklist before merge
-
-1. `npm run build`
-2. Auth flow sanity:
-- register confirmation-required branch
-- login with unconfirmed branch + resend
-- login success path + onboarding/app routing
-3. Protocol flow sanity:
-- create protocol (fixed + ongoing)
-- activate protocol
-- duration update (shorten/extend) on active protocol
-4. Schedule actions:
-- take / skip / snooze
-- AddDoseSheet add-to-active path
-5. Persistence sanity:
-- refresh + relogin
-- settings sign-out path with sync guards
-
-## 8. Deferred larger tracks (start fresh from main)
-
-- Auth and email confirmation redesign
-- Domain and schedule engine redesign
-- UI and PWA pack audit
-
-These should continue only via new scoped branches from `main`, not by mining retired mixed branches.
+If missing, do not run tooling; report environment not ready.

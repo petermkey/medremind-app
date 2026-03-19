@@ -1,50 +1,48 @@
 # MedRemind System Logic (Current)
 
 Date: 2026-03-19
-Status: source-of-truth index for current main
+Status: top-level source-of-truth index for current `main`
 
 ## 1. Source-of-truth map
 
-This file is the top-level logic index.
-Detailed behavior docs are now split into:
+Use this order for current behavior and process truth:
 
-- `docs/architecture-current-main.md`
-- `docs/auth-and-persistence-current-main.md`
-- `docs/domain-and-schedule-current-main.md`
-- `docs/current-status-and-next-phase.md`
-- `docs/agent-handoff-current-main.md`
+1. `docs/project-rules-and-current-operating-model.md`
+2. `docs/architecture-current-main.md`
+3. `docs/auth-and-persistence-current-main.md`
+4. `docs/domain-and-schedule-current-main.md`
+5. `docs/current-status.md`
+6. `docs/current-status-and-next-phase.md`
+7. `docs/agent-handoff-current-main.md`
+8. `README.md`
 
-If any statement here conflicts with code, code on current `main` wins.
+If any statement conflicts with code, code on current `main` wins.
 
-## 2. Core logic summary
+## 2. Core runtime model
 
-- Local-first domain state is in `src/lib/store/store.ts` (Zustand + persist).
-- Cloud sync is in `src/lib/supabase/realtimeSync.ts` with outbox retries in `src/lib/supabase/syncOutbox.ts`.
-- Auth/session routing is split between `src/proxy.ts` and `src/app/app/layout.tsx`.
-- Protocol and schedule generation are store-driven and enforce fixed-duration inclusive end boundaries.
+- Local-first domain state: `src/lib/store/store.ts`.
+- Cloud sync and command paths: `src/lib/supabase/realtimeSync.ts`.
+- Retry/outbox: `src/lib/supabase/syncOutbox.ts`.
+- Auth routing: `src/proxy.ts` + `src/app/app/layout.tsx`.
+- Additive migration tables are active as write targets while legacy tables remain live.
 
-## 3. Critical invariants to preserve
+## 3. Critical invariants
 
-1. No indefinite auth bootstrap spinner in app layout.
-2. No false onboarding entry when signup has no immediate session.
+1. Auth bootstrap must not hang in an indefinite spinner.
+2. Signup with no immediate session must not force onboarding entry.
 3. Fixed-duration protocols use inclusive end-date boundaries.
-4. Duration changes on active protocols reconcile future doses immediately.
-5. Import/restore uses deterministic ID mapping for protocol-related entities.
-6. Sign-out protects pending sync (in-flight and outbox) before clearing local state.
+4. Duration updates reconcile future planned doses immediately.
+5. Snooze creates replacement-row lineage (original row remains traceable).
+6. Command-path sync for take/skip/snooze and pause/resume/complete/archive remains idempotent.
+7. Sign-out guard must protect pending realtime sync and outbox work.
 
-## 4. Recently landed hardened slices on main
+## 4. Migration posture on current main
 
-- Protocol finalization and protocol-flow ID hardening
-- Deterministic import ID mapping for restore idempotency
-- Signup profile ID safeguard
-- Confirmation-aware register flow + resend action + resend cooldown
-- Onboarding/settings non-blocking profile save
-- Layout boot hardening against indefinite spinner on auth bootstrap failure
-- AddDoseSheet active-instance resolution fix
-- Fixed-duration validation, activation end-date inclusion, and duration-change reconciliation
-- Accessibility and swipe-targeting fixes for schedule/protocol interactions
+- Core implementation slices A1..A5, B1..B5, C1..C5, D1, D2, and D4 are landed.
+- D3 tooling is landed; live environment execution is operational work.
+- Current priority is operational validation and anomaly triage, not broad new feature work.
 
 ## 5. Historical docs policy
 
-Files in `docs/` with incident/release timestamp naming are historical audit artifacts.
-They are useful for timeline context only and must not override current-main behavior docs.
+Historical incident/release/design snapshots in `docs/` are timeline artifacts.
+They do not override current-main source documents listed above.

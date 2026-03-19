@@ -1,182 +1,100 @@
 # Auth and Persistence Behavior (Current Main)
 
 Date: 2026-03-19
-Scope: register/login/onboarding, session bootstrap, cloud sync, import/restore, and logout safety
+Scope: register/login/onboarding, session bootstrap, cloud sync, import/restore, and sign-out safety
 
 ## 1. Auth surface and key files
 
 - Register: `src/app/(auth)/register/page.tsx`
 - Login: `src/app/(auth)/login/page.tsx`
 - Onboarding: `src/app/(auth)/onboarding/page.tsx`
-- App bootstrap/layout gate: `src/app/app/layout.tsx`
-- Proxy middleware: `src/proxy.ts`
-- Supabase auth wrapper: `src/lib/supabase/auth.ts`
+- App bootstrap: `src/app/app/layout.tsx`
+- Proxy guard: `src/proxy.ts`
+- Auth wrapper: `src/lib/supabase/auth.ts`
 
-## 2. Register flow (current)
+## 2. Register/login confirmation behavior
 
-Register submit calls `supabaseSignUp(...)`.
+Register:
 
-`supabaseSignUp` returns:
+- `supabaseSignUp` returns profile/error/session-availability signal.
+- Confirmation-required signups do not force onboarding entry.
+- Confirmation-required state exposes resend action.
+- Resend actions apply cooldown to prevent rapid repeats.
 
-- `profile`
-- `error`
-- `hasSession` (derived from Supabase sign-up response)
+Login:
 
-Behavior in register page:
+- Unconfirmed-email response enters confirmation-required state.
+- Login confirmation resend is available with cooldown.
+- Successful login resets local user state, sets profile, pulls cloud state non-fatally, and routes by onboarding flag.
 
-- If sign-up fails: show normalized error.
-- If sign-up succeeds but `hasSession=false` (confirmation-required):
-- do not enter onboarding
-- show confirmation-required info state
-- expose resend action
-- keep clear next step to sign in
-- If sign-up returns immediate session (`hasSession=true`):
-- reset local user-scoped data
-- set profile
-- navigate to onboarding
+## 3. Onboarding and profile persistence behavior
 
-Resend behavior:
+- Onboarding completion updates local profile immediately.
+- Cloud `saveProfile` is non-blocking for navigation.
+- Settings profile save follows non-blocking behavior.
 
-- Uses `resendSignupConfirmationEmail(email)`.
-- Has cooldown lockout (30 seconds) to prevent rapid repeated requests.
-- Shows success/error feedback inline.
+## 4. App bootstrap resilience
 
-## 3. Login flow (current)
+`src/app/app/layout.tsx` guarantees finite bootstrap behavior:
 
-Login submit calls `supabaseSignIn(email, password)`.
+- handles auth fetch failures explicitly
+- avoids indefinite loading lock
+- allows usable shell when safe local state exists
+- resets state and routes to login when required
 
-Behavior:
+## 5. Proxy responsibilities and limits
 
-- If auth error indicates unconfirmed email:
-- show explicit confirmation-required state
-- offer resend confirmation action
-- apply resend cooldown (30 seconds)
-- If sign-in succeeds:
-- reset local user data
-- set profile
-- attempt cloud pull (`pullStoreFromSupabase`) non-fatally
-- route by onboarding flag:
-- onboarded -> `/app`
-- not onboarded -> `/onboarding`
+`src/proxy.ts` currently handles coarse auth routing only:
 
-Error normalization in `auth.ts`:
+- unauthenticated `/app*` -> `/login`
+- authenticated `/login`/`/register` -> `/app`
 
-- email-not-confirmed class -> user-facing confirmation message
-- invalid credentials -> user-friendly invalid credentials message
+Onboarding enforcement remains client-side in layout/store flow.
 
-## 4. Onboarding behavior
+## 6. Local persistence and outbox model
 
-Onboarding page (`src/app/(auth)/onboarding/page.tsx`):
+Persisted store subset includes profile/settings/active protocols/scheduled doses/dose records/custom protocols.
+Seed templates are re-merged on hydration.
 
-- Completes local onboarding with `completeOnboarding(...)`.
-- Optionally activates selected starter protocol.
-- Persists profile via `saveProfile(...)` in non-blocking mode (`catch` only, no navigation block).
-- Always navigates to `/app` after local completion.
+Outbox model:
 
-This preserves UX continuity if profile write is delayed/failing.
+- local key: `medremind-sync-outbox-v1`
+- retries on app start, online, visibility changes, and manual flush
+- protects eventual cloud durability after transient failures
 
-## 5. App bootstrap and failure fallback
+## 7. Command-path sync and additive writes
 
-`src/app/app/layout.tsx` controls app entry safety.
+Landed command paths in `realtimeSync.ts`:
 
-Important behaviors:
+- take, skip, snooze dose commands
+- pause, resume, complete, archive lifecycle commands
 
-- Auth fetch failures are handled explicitly.
-- No-user path always resets user-scoped local state and redirects to `/login`.
-- Auth bootstrap failure no longer guarantees spinner lock; checking state resolves.
-- If auth fetch fails but local onboarded profile exists, app remains usable instead of hard lock.
+Additive writes:
 
-## 6. Proxy responsibilities and limits
+- command paths write execution facts into `execution_events`
+- activation writes planned future rows into `planned_occurrences`
 
-`src/proxy.ts` currently handles only coarse auth routing:
+## 8. Import/restore idempotency behavior
 
-- `/app*` blocked for unauthenticated requests.
-- `/login` and `/register` redirected to `/app` if session exists.
+`importStore.ts` maps non-UUID protocol-related IDs deterministically.
+This protects re-import/idempotency for active protocols, scheduled doses, and dose records.
 
-It does not enforce onboarding/profile completion semantics.
-That remains in client boot/layout logic.
+## 9. Sign-out guard sequence
 
-## 7. Local store persistence model
+Settings sign-out path:
 
-In `store.ts` persisted subset includes:
-
-- `profile`
-- `notificationSettings`
-- `activeProtocols`
-- `scheduledDoses`
-- `doseRecords`
-- custom protocols only
-
-Seed templates are merged back on hydration.
-
-This split is essential to preserve template availability while keeping user data scoped.
-
-## 8. Cloud sync model
-
-Write flow:
-
-1. mutate local store first
-2. call realtime sync writer
-3. if sync fails, enqueue operation in outbox
-4. retry with backoff until success
-
-Modules:
-
-- Direct sync: `src/lib/supabase/realtimeSync.ts`
-- Retry queue: `src/lib/supabase/syncOutbox.ts`
-
-Outbox details:
-
-- key: `medremind-sync-outbox-v1`
-- triggers: app start, online event, tab visibility, manual flush
-- status exposed via `SyncStatusPill`
-
-## 9. Logout/sign-out protection
-
-Settings sign-out path (`src/app/app/settings/page.tsx`) is guarded:
-
-1. wait for in-flight realtime sync (`waitForRealtimeSyncIdle`)
-2. if still pending, ask user to confirm sign-out anyway
-3. flush outbox if queue has pending items
-4. if still pending, ask user to confirm sign-out anyway
+1. wait for in-flight realtime sync idle
+2. confirm if in-flight work remains
+3. flush outbox
+4. confirm if outbox work remains
 5. sign out from Supabase
-6. clear outbox and local user state
-7. route to `/login`
+6. clear local user state and outbox
+7. route to login
 
-This protects against silent loss during pending writes.
+This avoids silent loss during pending writes.
 
-## 10. Cloud pull/backup/import/restore
+## 10. Current risks to preserve awareness
 
-- Pull from cloud: `pullStoreFromSupabase()`
-- Backup local snapshot to cloud: `backupCurrentStoreToSupabase()`
-- Export local snapshot JSON: `downloadCurrentStoreSnapshot()`
-- Import pasted snapshot JSON to cloud: `importStoreSnapshotToSupabase(raw)`
-
-`importStore.ts` idempotency hardening:
-
-- Non-UUID IDs are mapped deterministically (`stableUuid`) for protocol-related entities.
-- Active protocols, scheduled doses, and dose records get deterministic IDs.
-- Re-importing the same snapshot no longer creates random-ID duplicates for these entities.
-
-## 11. Recent auth/persistence fixes already in main
-
-Already landed behavior slices include:
-
-- confirmation-aware register flow
-- register resend action for confirmation-required state
-- resend cooldown on login/register confirmation actions
-- onboarding saveProfile made non-blocking
-- settings saveProfile made non-blocking
-- layout boot hardening against indefinite spinner on auth bootstrap failure
-- profile ID generation safeguarded with store `generateId` path
-- protocol/import ID hardening and deterministic import mapping
-
-These are live behaviors on current `main`, not pending branch work.
-
-## 12. High-risk assumptions to preserve
-
-- Never reintroduce blocking auth/profile writes that gate navigation.
-- Keep auth bootstrap finite: always resolve loading/checking state.
-- Preserve deterministic ID mapping in import/sync paths.
-- Preserve sign-out guard sequence (in-flight + outbox checks).
-- Keep cross-account reset guard when user identity changes.
+- auth policy split across proxy + client layout
+- heavy coupling of domain and sync concerns in store
+- device-local outbox backlog risk under prolonged failures
