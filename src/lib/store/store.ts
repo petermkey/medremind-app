@@ -323,6 +323,14 @@ export const useStore = create<AppState>()(
         const state = get();
         const protocol = state.protocols.find(p => p.id === protocolId);
         if (!protocol || !state.profile) throw new Error('Protocol or profile not found');
+        const fixedDurationDays =
+          typeof protocol.durationDays === 'number' && Number.isFinite(protocol.durationDays)
+            ? Math.trunc(protocol.durationDays)
+            : undefined;
+        const endDate =
+          fixedDurationDays && fixedDurationDays > 0
+            ? format(addDays(parseISO(startDate), fixedDurationDays - 1), 'yyyy-MM-dd')
+            : undefined;
 
         const active: ActiveProtocol = {
           id: generateId('active'),
@@ -331,6 +339,7 @@ export const useStore = create<AppState>()(
           protocol,
           status: 'active',
           startDate,
+          endDate,
           createdAt: new Date().toISOString(),
         };
 
