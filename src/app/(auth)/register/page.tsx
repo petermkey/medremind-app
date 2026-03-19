@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
+  const [resendError, setResendError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,6 +38,7 @@ export default function RegisterPage() {
     setInfo('');
     setConfirmationPending(false);
     setResendMessage('');
+    setResendError(false);
     const err = validate(name, email, password, confirm);
     if (err) { setError(err); return; }
     if (!agreed) { setError('Please accept the terms to continue.'); return; }
@@ -71,10 +73,12 @@ export default function RegisterPage() {
     }
     setResendLoading(true);
     setResendMessage('');
+    setResendError(false);
     const resendError = await resendSignupConfirmationEmail(email.trim());
     setResendLoading(false);
     if (resendError) {
       setResendMessage(resendError);
+      setResendError(true);
       return;
     }
     setResendMessage('Confirmation email sent. Please check your inbox.');
@@ -115,7 +119,7 @@ export default function RegisterPage() {
                 </button>
               )}
               {resendMessage && (
-                <p className="text-xs mt-2 text-[#8B949E]">{resendMessage}</p>
+                <p className={`text-xs mt-2 ${resendError ? 'text-[#EF4444]' : 'text-[#8B949E]'}`}>{resendMessage}</p>
               )}
               <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline">
                 Go to sign in

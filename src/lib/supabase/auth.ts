@@ -2,6 +2,21 @@
 import { getSupabaseClient } from './client';
 import type { UserProfile } from '@/types';
 
+function normalizeAuthErrorMessage(message: string): string {
+  if (/email[^.]*not[^.]*confirmed/i.test(message) || /email_not_confirmed/i.test(message)) {
+    return 'Please confirm your email before signing in.';
+  }
+  if (/invalid login credentials/i.test(message)) {
+    return 'Invalid email or password.';
+  }
+  return message;
+}
+
+export function isEmailConfirmationRequiredError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /email[^.]*not[^.]*confirmed/i.test(message) || /email_not_confirmed/i.test(message);
+}
+
 // ─── Sign up ───────────────────────────────────────────────────────────────
 
 export async function supabaseSignUp(
@@ -20,7 +35,7 @@ export async function supabaseSignUp(
     },
   });
 
-  if (error) return { profile: null, error: error.message, hasSession: false };
+  if (error) return { profile: null, error: normalizeAuthErrorMessage(error.message), hasSession: false };
   if (!data.user) return { profile: null, error: 'No user returned', hasSession: false };
 
   const profile: UserProfile = {
@@ -45,7 +60,7 @@ export async function supabaseSignIn(
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) return { profile: null, error: error.message };
+  if (error) return { profile: null, error: normalizeAuthErrorMessage(error.message) };
   if (!data.user) return { profile: null, error: 'Sign-in failed' };
 
   // Try to load profile from DB
@@ -78,7 +93,7 @@ export async function supabaseSignOut(): Promise<void> {
 export async function resendSignupConfirmationEmail(email: string): Promise<string | null> {
   const supabase = getSupabaseClient();
   const { error } = await supabase.auth.resend({ type: 'signup', email });
-  return error ? error.message : null;
+  return error ? normalizeAuthErrorMessage(error.message) : null;
 }
 
 // ─── Get current session (used on app load) ───────────────────────────────

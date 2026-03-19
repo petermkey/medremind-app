@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
-import { resendSignupConfirmationEmail, supabaseSignIn } from '@/lib/supabase/auth';
+import { isEmailConfirmationRequiredError, resendSignupConfirmationEmail, supabaseSignIn } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -18,19 +18,21 @@ export default function LoginPage() {
   const [emailUnconfirmed, setEmailUnconfirmed] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
+  const [resendError, setResendError] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setEmailUnconfirmed(false);
     setResendMessage('');
+    setResendError(false);
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setLoading(true);
     const { profile, error: authError } = await supabaseSignIn(email, password);
     setLoading(false);
     if (authError || !profile) {
       const message = authError ?? 'Sign-in failed. Check your credentials.';
-      const isUnconfirmed = /email[^.]*not[^.]*confirmed/i.test(message) || /email_not_confirmed/i.test(message);
+      const isUnconfirmed = isEmailConfirmationRequiredError(message);
       if (isUnconfirmed) {
         setEmailUnconfirmed(true);
         setError('');
@@ -56,10 +58,12 @@ export default function LoginPage() {
     }
     setResendLoading(true);
     setResendMessage('');
+    setResendError(false);
     const resendError = await resendSignupConfirmationEmail(email.trim());
     setResendLoading(false);
     if (resendError) {
       setResendMessage(resendError);
+      setResendError(true);
       return;
     }
     setResendMessage('Confirmation email sent. Please check your inbox.');
@@ -91,7 +95,7 @@ export default function LoginPage() {
                 {resendLoading ? 'Sending…' : 'Resend confirmation email'}
               </button>
               {resendMessage && (
-                <p className="text-xs mt-2 text-[#8B949E]">{resendMessage}</p>
+                <p className={`text-xs mt-2 ${resendError ? 'text-[#EF4444]' : 'text-[#8B949E]'}`}>{resendMessage}</p>
               )}
             </div>
           )}
