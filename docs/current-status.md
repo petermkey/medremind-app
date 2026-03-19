@@ -1,58 +1,47 @@
 # MedRemind Current Status
 
-Date: 2026-03-18
-Owner: engineering runtime status
+Date: 2026-03-19
+Owner: engineering runtime status on current main
 
 ## 1. Current maturity
 
-Overall: **beta with hardened client-side sync**, not yet production-closed for all reliability criteria.
+Overall: beta, with focused hardening already landed across auth, protocol/schedule boundaries, sync/idempotency, and accessibility.
 
-What is stable in current codebase:
+## 2. Stable areas on current main
 
-- Auth bootstrap with account-bound cloud pull
-- Optimistic local CRUD with retry outbox
-- Global sync status visibility in app shell
-- Manual outbox flush and guarded sign-out
-- Protocol metadata and composition editing
-- Dose actions (take/skip/snooze with multiple options)
-- Pause/resume behavior aligned with schedule visibility rules
+- Confirmation-aware register and login confirmation handling (with resend + cooldown)
+- Onboarding and settings profile save non-blocking behavior
+- App layout auth bootstrap hardening (no indefinite spinner lock path)
+- Protocol creation/finalization ID hardening and safe fallback ID generation
+- Fixed-duration validation and inclusive activation end-date behavior
+- Active-dose reconciliation when protocol duration changes
+- Live protocol resolution during regeneration
+- Deterministic import IDs for active protocols, doses, and records
+- Sync outbox retry lifecycle + guarded sign-out flow
+- Improved swipe targeting and action accessibility labels in key schedule/protocol rows
 
-## 2. Recently resolved issues
+## 3. Partially hardened / still fragile areas
 
-- Cross-account local state bleed at auth boundary
-- Missing protocol item composition editing in protocol edit flow
-- Snooze hardcoded to 15 minutes only
-- Skip leaving item in active queue
-- Paused protocols still visible in active today/future schedule
-- Register flow mismatch when signup required email confirmation but no active session
-- Fixed-duration protocol input/activation boundary issues (now validated + normalized)
-- Limited accessibility labels on secondary row actions (protocol swipe actions, card skip/snooze)
+- Auth policy is still split across proxy and client layout logic.
+- Domain scheduling rules are centralized in `store.ts` and tightly coupled to persistence/sync concerns.
+- Outbox remains device-local and can accumulate under prolonged failure conditions.
+- PWA is partial (manifest + icons present; no explicit service-worker runtime path).
 
-## 3. Current behavior summary
+## 4. Deferred larger initiatives
 
-- Cloud read/write target: Supabase project from environment variables.
-- Schedule visibility:
-  - today/future: only doses from active protocol instances
-  - past dates: historical doses remain visible
-- Snooze supports 4 choices: 15m, 1h, this evening, tomorrow.
-- Skip marks dose skipped and removes it from active queue view.
+Future work should continue only from fresh scoped branches off `main`:
 
-## 4. Known unresolved risks
+1. Auth and email confirmation redesign
+2. Domain and schedule engine redesign
+3. UI and PWA pack audit
 
-- Outbox is local-device only and can grow with large payloads.
-- No server-side generalized idempotency keys for all write classes.
-- No automated persistence matrix in CI yet.
-- Conflict handling remains last-write-wins.
+See `docs/current-status-and-next-phase.md` for detailed track framing.
 
-## 5. Technical debt hotspots
+## 5. Quality gate expectation for next slices
 
-- Store module carries both domain logic and sync orchestration in one file.
-- Recovery/import has limited conflict-safe merge semantics.
-- E2E coverage for cross-session and failure-injection scenarios is manual.
+Minimum before merge:
 
-## 6. Recommended next engineering priorities
-
-1. Add automated Playwright persistence matrix (refresh/relogin/second-session/outbox failure).
-2. Add server-side idempotency constraints for dose action and regeneration-sensitive writes.
-3. Add outbox operation compaction to reduce redundant queued writes.
-4. Add explicit environment/build badge enforcement for all user-facing deployments.
+1. `npm run build`
+2. Focused flow checks for touched behavior
+3. No mixed-concern commits
+4. Documentation update in same change when behavior changes

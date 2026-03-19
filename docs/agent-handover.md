@@ -1,59 +1,38 @@
 # Agent Handover and Onboarding
 
-Date: 2026-03-18
+Date: 2026-03-19
 Audience: new engineering/debugging agents
 
-## 1. Read-first order
+## 1. Read-first order (mandatory)
 
-1. `docs/system-logic.md`
-2. `docs/current-status.md`
-3. `README.md`
-4. Relevant historical report in `docs/` only if investigating a specific incident timeline
+1. `docs/agent-handoff-current-main.md`
+2. `docs/architecture-current-main.md`
+3. `docs/auth-and-persistence-current-main.md`
+4. `docs/domain-and-schedule-current-main.md`
+5. `docs/current-status-and-next-phase.md`
+6. `docs/system-logic.md`
+7. `docs/current-status.md`
+8. `README.md`
 
-## 2. Main code locations
+Historical incident/persistence/release notes in `docs/` are timeline artifacts, not source-of-truth.
 
-- Core state and domain logic: `src/lib/store/store.ts`
-- Cloud write operations: `src/lib/supabase/realtimeSync.ts`
-- Outbox/retry and sync status: `src/lib/supabase/syncOutbox.ts`
-- Cloud pull/backup/export: `src/lib/supabase/cloudStore.ts`
-- Snapshot import to cloud: `src/lib/supabase/importStore.ts`
-- App bootstrap/auth boundary: `src/app/app/layout.tsx`
-- Settings recovery and sign-out controls: `src/app/app/settings/page.tsx`
-- Schedule and week-strip logic: `src/app/app/page.tsx`
-- Protocol list/detail editing: `src/app/app/protocols/page.tsx`, `src/app/app/protocols/[id]/page.tsx`
+## 2. Quick orientation
 
-## 3. Business logic hotspots
+If you are touching:
 
-- Protocol lifecycle and dose generation are in `store.ts`.
-- Visibility behavior for paused protocols is enforced by schedule selectors in `store.ts`.
-- Snooze/skip behavior is split between UI (`/app/page.tsx`) and store action reducers (`store.ts`).
-- Sync failures are expected to be eventually retried by outbox, not immediately fatal.
+- Auth/bootstrap/routing: start with `src/app/app/layout.tsx`, `src/proxy.ts`, `src/lib/supabase/auth.ts`
+- Protocol/schedule/domain logic: start with `src/lib/store/store.ts`
+- Sync/import/restore: start with `src/lib/supabase/realtimeSync.ts`, `src/lib/supabase/syncOutbox.ts`, `src/lib/supabase/cloudStore.ts`, `src/lib/supabase/importStore.ts`
 
-## 4. Fragile areas to treat carefully
-
-- Auth boundary and local persisted state ownership.
-- Regeneration behavior when dose history exists (`dose_records` FK constraints).
-- Outbox payload growth and repeated replay operations.
-- Import/restore semantics when overlapping data already exists.
-
-## 5. Minimum regression checks after touching logic
+## 3. Critical regression checklist
 
 1. `npm run build`
-2. Login, create/edit protocol and items, activate protocol.
-3. Dose actions: take, skip, snooze (all snooze options).
-4. Pause protocol and verify:
-   - today/future schedule hidden
-   - past history still visible
-5. Refresh and relogin same account.
-6. Settings:
-   - flush sync now
-   - sign out with pending ops warning path
-   - restore from cloud
+2. Auth boundary sanity (register/login/onboarding/app entry)
+3. Protocol create/activate/update-duration/regenerate sanity
+4. Dose action sanity (take/skip/snooze + AddDoseSheet)
+5. Refresh + relogin + settings sign-out guard path
 
-## 6. Documentation maintenance rule
+## 4. Documentation maintenance rule
 
-When behavior changes, update these files in the same PR/commit:
-
-- `docs/system-logic.md`
-- `docs/current-status.md`
-- `README.md` (if user-visible behavior changes)
+When behavior changes, update the relevant current-main docs in the same branch.
+Prefer updating current-main source docs over adding ad hoc historical notes.

@@ -3,6 +3,8 @@
 Date: 2026-03-18
 Scope: activation + snooze persistence across logout/relogin
 
+> Historical release note (point-in-time). Current source of truth is the current-main docs pack: `docs/agent-handoff-current-main.md`, `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`, and `docs/current-status-and-next-phase.md`.
+
 ## Bug
 Users could activate a protocol and snooze a dose, then logout quickly and lose this state after relogin.
 
