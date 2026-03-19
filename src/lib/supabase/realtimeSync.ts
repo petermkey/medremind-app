@@ -336,19 +336,19 @@ export async function syncRegeneratedDoses(
     }
   }
 
-  const protectedStatuses = new Set<ScheduledDose['status']>(['taken', 'skipped', 'snoozed']);
-  const protectedSlots = new Set<string>();
+  const retainedSlots = new Set<string>();
   const deletableIds: string[] = [];
 
   for (const row of existing) {
     const hasRecord = protectedByRecord.has(row.id);
-    const isProtected = hasRecord || protectedStatuses.has(row.status);
     const slot = `${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
-    if (isProtected) {
-      protectedSlots.add(slot);
+    const isPending = row.status === 'pending';
+    const shouldDelete = isPending && !hasRecord;
+    if (shouldDelete) {
+      deletableIds.push(row.id);
       continue;
     }
-    deletableIds.push(row.id);
+    retainedSlots.add(slot);
   }
 
   for (const ids of chunk(deletableIds, 250)) {
@@ -373,7 +373,7 @@ export async function syncRegeneratedDoses(
     }))
     .filter(row => {
       const slot = `${row.protocol_item_id}|${row.scheduled_date}|${row.scheduled_time}`;
-      return !protectedSlots.has(slot);
+      return !retainedSlots.has(slot);
     });
   for (const part of chunk(rows, 250)) {
     const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });

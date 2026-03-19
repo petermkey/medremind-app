@@ -75,6 +75,10 @@ function computeInclusiveEndDate(startDate: string, durationDays: number | undef
   return format(addDays(parseISO(startDate), durationDays - 1), 'yyyy-MM-dd');
 }
 
+function doseSlotKey(protocolItemId: string, scheduledDate: string, scheduledTime: string): string {
+  return `${protocolItemId}|${scheduledDate}|${scheduledTime.slice(0, 5)}`;
+}
+
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
   const tracked = trackRealtimeSync(task);
   void tracked
@@ -789,23 +793,39 @@ export const useStore = create<AppState>()(
         const active = state.activeProtocols.find(a => a.id === activeProtocolId);
         if (!active) return;
         const liveProtocol = state.protocols.find(p => p.id === active.protocolId) ?? active.protocol;
-
-        // Remove existing future doses for this protocol
         const nowDate = today();
+        const doseIdsWithRecords = new Set(
+          state.doseRecords
+            .filter(record => Boolean(record.scheduledDoseId))
+            .map(record => record.scheduledDoseId),
+        );
+        const retainedFutureSlots = new Set<string>();
+
+        // Remove only pending future rows; preserve handled/history-attached rows.
         set(s => ({
-          scheduledDoses: s.scheduledDoses.filter(d =>
-            d.activeProtocolId !== activeProtocolId || d.scheduledDate < nowDate
-          ),
+          scheduledDoses: s.scheduledDoses.filter(d => {
+            if (d.activeProtocolId !== activeProtocolId) return true;
+            if (d.scheduledDate < nowDate) return true;
+            const hasDurableHistory = doseIdsWithRecords.has(d.id);
+            const isPending = d.status === 'pending';
+            const shouldDelete = isPending && !hasDurableHistory;
+            if (shouldDelete) return false;
+            retainedFutureSlots.add(doseSlotKey(d.protocolItemId, d.scheduledDate, d.scheduledTime));
+            return true;
+          }),
         }));
 
         // Re-generate from today
         const fromDate = nowDate;
         const toDate = format(addDays(parseISO(fromDate), 89), 'yyyy-MM-dd');
-        const newDoses: ScheduledDose[] = [];
+        const candidateDoses: ScheduledDose[] = [];
         for (const item of liveProtocol.items) {
           const raw = expandItemToDoses(item, active, fromDate, toDate);
-          newDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
+          candidateDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
+        const newDoses = candidateDoses.filter(
+          d => !retainedFutureSlots.has(doseSlotKey(d.protocolItemId, d.scheduledDate, d.scheduledTime)),
+        );
         set(s => ({ scheduledDoses: [...s.scheduledDoses, ...newDoses] }));
         if (state.profile?.id) {
           syncFireAndForget(
