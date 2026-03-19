@@ -788,7 +788,7 @@ export const useStore = create<AppState>()(
           scheduledDate,
           scheduledTime,
           status: 'pending',
-          snoozedUntil: undefined,
+          snoozedUntil,
         };
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'snoozed',
@@ -866,9 +866,20 @@ export const useStore = create<AppState>()(
 
         // Remove existing future doses for this protocol
         const nowDate = today();
+        const protectedSlots = new Set(
+          state.scheduledDoses
+            .filter(d =>
+              d.activeProtocolId === activeProtocolId
+              && d.scheduledDate >= nowDate
+              && Boolean(d.snoozedUntil)
+            )
+            .map(d => `${d.protocolItemId}|${d.scheduledDate}|${d.scheduledTime}`),
+        );
         set(s => ({
           scheduledDoses: s.scheduledDoses.filter(d =>
-            d.activeProtocolId !== activeProtocolId || d.scheduledDate < nowDate
+            d.activeProtocolId !== activeProtocolId
+            || d.scheduledDate < nowDate
+            || Boolean(d.snoozedUntil)
           ),
         }));
 
@@ -880,13 +891,16 @@ export const useStore = create<AppState>()(
           const raw = expandItemToDoses(item, active, fromDate, toDate);
           newDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
-        set(s => ({ scheduledDoses: [...s.scheduledDoses, ...newDoses] }));
+        const filteredNewDoses = newDoses.filter(d =>
+          !protectedSlots.has(`${d.protocolItemId}|${d.scheduledDate}|${d.scheduledTime}`),
+        );
+        set(s => ({ scheduledDoses: [...s.scheduledDoses, ...filteredNewDoses] }));
         if (state.profile?.id) {
           syncFireAndForget(
-            syncRegeneratedDoses(state.profile.id, active, fromDate, newDoses),
+            syncRegeneratedDoses(state.profile.id, active, fromDate, filteredNewDoses),
             {
               kind: 'regeneratedDoses',
-              payload: { userId: state.profile.id, active, fromDate, newDoses },
+              payload: { userId: state.profile.id, active, fromDate, newDoses: filteredNewDoses },
             },
           );
         }
@@ -901,7 +915,7 @@ export const useStore = create<AppState>()(
       // ── Derived ───────────────────────────────────────────────────────
 
       getAdherencePct: (date) => {
-        const doses = get().scheduledDoses.filter(d => d.scheduledDate === date);
+        const doses = get().scheduledDoses.filter(d => d.scheduledDate === date && d.status !== 'snoozed');
         if (!doses.length) return 0;
         const taken = doses.filter(d => d.status === 'taken').length;
         return Math.round((taken / doses.length) * 100);

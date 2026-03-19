@@ -73,8 +73,9 @@ export default function SchedulePage() {
     return blocks;
   }, [visibleDoses]);
 
-  const taken = doses.filter(d => d.status === 'taken').length;
-  const total = doses.length;
+  const metricDoses = doses.filter(d => d.status !== 'snoozed');
+  const taken = metricDoses.filter(d => d.status === 'taken').length;
+  const total = metricDoses.length;
   const pct = total ? Math.round((taken / total) * 100) : 0;
 
   const nextDose = doses

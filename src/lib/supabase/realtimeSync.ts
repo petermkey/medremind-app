@@ -306,7 +306,7 @@ export async function syncRegeneratedDoses(
 
   const { data: existingRows, error: existingErr } = await supabase
     .from('scheduled_doses')
-    .select('id, protocol_item_id, scheduled_date, scheduled_time, status')
+    .select('id, protocol_item_id, scheduled_date, scheduled_time, status, snoozed_until')
     .eq('user_id', userId)
     .eq('active_protocol_id', cActiveId)
     .gte('scheduled_date', fromDate);
@@ -318,6 +318,7 @@ export async function syncRegeneratedDoses(
     scheduled_date: string;
     scheduled_time: string;
     status: ScheduledDose['status'];
+    snoozed_until: string | null;
   }>;
 
   const existingDoseIds = existing.map(row => row.id);
@@ -342,7 +343,8 @@ export async function syncRegeneratedDoses(
 
   for (const row of existing) {
     const hasRecord = protectedByRecord.has(row.id);
-    const isProtected = hasRecord || protectedStatuses.has(row.status);
+    const hasSnoozeLink = Boolean(row.snoozed_until);
+    const isProtected = hasRecord || protectedStatuses.has(row.status) || hasSnoozeLink;
     const slot = `${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
     if (isProtected) {
       protectedSlots.add(slot);
@@ -418,6 +420,7 @@ export async function syncDoseAction(
         replacementDose.protocolItemId,
       );
       const upsertReplacementAt = async (scheduledDate: string, scheduledTime: string) => {
+        const resolvedDateTime = new Date(`${scheduledDate}T${scheduledTime}:00`);
         const row = {
           id: cReplacementDoseId,
           user_id: userId,
@@ -426,7 +429,9 @@ export async function syncDoseAction(
           scheduled_date: scheduledDate,
           scheduled_time: scheduledTime,
           status: 'pending',
-          snoozed_until: null,
+          snoozed_until: Number.isNaN(resolvedDateTime.getTime())
+            ? replacementDose.snoozedUntil ?? patch.snoozedUntil ?? null
+            : resolvedDateTime.toISOString(),
         };
         return supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
       };

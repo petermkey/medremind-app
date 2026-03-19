@@ -98,10 +98,11 @@ export default function ProgressPage() {
   const calendarDays = eachDayOfInterval({ start: subDays(today, pastDays), end: addDays(today, futureDays) });
 
   const stats = useMemo(() => {
-    const total = scheduledDoses.length;
-    const taken = scheduledDoses.filter(d => d.status === 'taken').length;
-    const skipped = scheduledDoses.filter(d => d.status === 'skipped').length;
-    const overdue = scheduledDoses.filter(d => d.status === 'overdue').length;
+    const metricDoses = scheduledDoses.filter(d => d.status !== 'snoozed');
+    const total = metricDoses.length;
+    const taken = metricDoses.filter(d => d.status === 'taken').length;
+    const skipped = metricDoses.filter(d => d.status === 'skipped').length;
+    const overdue = metricDoses.filter(d => d.status === 'overdue').length;
     const pct = total ? Math.round(taken / total * 100) : 0;
     return { total, taken, skipped, overdue, pct };
   }, [scheduledDoses]);
@@ -128,6 +129,7 @@ export default function ProgressPage() {
   const dayProtocolStats = useMemo(() => {
     const map = new Map<string, Map<string, { total: number; taken: number }>>();
     for (const dose of scheduledDoses) {
+      if (dose.status === 'snoozed') continue;
       const dayMap = map.get(dose.scheduledDate) ?? new Map<string, { total: number; taken: number }>();
       const current = dayMap.get(dose.activeProtocolId) ?? { total: 0, taken: 0 };
       current.total += 1;
@@ -167,7 +169,7 @@ export default function ProgressPage() {
 
   const activeCount = activeProtocols.filter(ap => ap.status === 'active').length;
   const todayStatus = useMemo(() => {
-    const todayDoses = scheduledDoses.filter(d => d.scheduledDate === todayStr);
+    const todayDoses = scheduledDoses.filter(d => d.scheduledDate === todayStr && d.status !== 'snoozed');
     return {
       taken: todayDoses.filter(d => d.status === 'taken').length,
       skipped: todayDoses.filter(d => d.status === 'skipped').length,
