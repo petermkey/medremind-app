@@ -266,6 +266,11 @@ interface AppState {
   selectAppActionableDoses: (date: string) => ScheduledDose[];
   selectAppNextDose: (date: string) => ScheduledDose | undefined;
   selectAppSummaryMetrics: (date: string) => { taken: number; total: number; pct: number };
+  selectProgressDayDoses: (date: string) => ScheduledDose[];
+  selectProgressSummaryForDates: (dates: string[]) => { total: number; taken: number; skipped: number; overdue: number; pct: number };
+  selectProgressDayStatus: (date: string) => { taken: number; skipped: number; remaining: number };
+  selectProgressDayProtocolStats: (date: string) => Record<string, { total: number; taken: number }>;
+  selectProgressProtocolWeights: (dates: string[]) => Record<string, number>;
   selectTodayScheduleView: (date: string) => ScheduledDose[];
   getVisibleDoseDates: () => string[];
   takeDose: (doseId: string, note?: string) => void;
@@ -717,6 +722,61 @@ export const useStore = create<AppState>()(
         return { taken, total, pct };
       },
 
+      selectProgressDayDoses: (date) => {
+        const doses = get().getDaySchedule(date);
+        return doses.filter(d => d.status !== 'snoozed');
+      },
+
+      selectProgressSummaryForDates: (dates) => {
+        const uniqueDates = [...new Set(dates)];
+        let total = 0;
+        let taken = 0;
+        let skipped = 0;
+        let overdue = 0;
+        for (const date of uniqueDates) {
+          const doses = get().selectProgressDayDoses(date);
+          total += doses.length;
+          taken += doses.filter(d => d.status === 'taken').length;
+          skipped += doses.filter(d => d.status === 'skipped').length;
+          overdue += doses.filter(d => d.status === 'overdue').length;
+        }
+        const pct = total ? Math.round((taken / total) * 100) : 0;
+        return { total, taken, skipped, overdue, pct };
+      },
+
+      selectProgressDayStatus: (date) => {
+        const doses = get().selectProgressDayDoses(date);
+        return {
+          taken: doses.filter(d => d.status === 'taken').length,
+          skipped: doses.filter(d => d.status === 'skipped').length,
+          remaining: doses.filter(d => d.status !== 'taken' && d.status !== 'skipped').length,
+        };
+      },
+
+      selectProgressDayProtocolStats: (date) => {
+        const doses = get().selectProgressDayDoses(date);
+        const stats: Record<string, { total: number; taken: number }> = {};
+        for (const dose of doses) {
+          const current = stats[dose.activeProtocolId] ?? { total: 0, taken: 0 };
+          current.total += 1;
+          if (dose.status === 'taken') current.taken += 1;
+          stats[dose.activeProtocolId] = current;
+        }
+        return stats;
+      },
+
+      selectProgressProtocolWeights: (dates) => {
+        const uniqueDates = [...new Set(dates)];
+        const weights: Record<string, number> = {};
+        for (const date of uniqueDates) {
+          const doses = get().selectProgressDayDoses(date);
+          for (const dose of doses) {
+            weights[dose.activeProtocolId] = (weights[dose.activeProtocolId] ?? 0) + 1;
+          }
+        }
+        return weights;
+      },
+
       selectTodayScheduleView: (date) => {
         return get().selectAppActionableDoses(date);
       },
@@ -950,7 +1010,7 @@ export const useStore = create<AppState>()(
       // ── Derived ───────────────────────────────────────────────────────
 
       getAdherencePct: (date) => {
-        const doses = get().scheduledDoses.filter(d => d.scheduledDate === date && d.status !== 'snoozed');
+        const doses = get().selectProgressDayDoses(date);
         if (!doses.length) return 0;
         const taken = doses.filter(d => d.status === 'taken').length;
         return Math.round((taken / doses.length) * 100);

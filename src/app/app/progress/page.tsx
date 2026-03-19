@@ -79,7 +79,14 @@ function DayRings({
 }
 
 export default function ProgressPage() {
-  const { scheduledDoses, activeProtocols, getStreak } = useStore();
+  const {
+    activeProtocols,
+    getStreak,
+    selectProgressSummaryForDates,
+    selectProgressDayProtocolStats,
+    selectProgressDayStatus,
+    selectProgressProtocolWeights,
+  } = useStore();
   const [calendarRange, setCalendarRange] = useState<30 | 60 | 90>(30);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -96,21 +103,20 @@ export default function ProgressPage() {
   const futureDays = Math.floor(calendarRange / 3);
   const pastDays = calendarRange - 1 - futureDays;
   const calendarDays = eachDayOfInterval({ start: subDays(today, pastDays), end: addDays(today, futureDays) });
+  const calendarDateStrings = useMemo(
+    () => calendarDays.map(d => format(d, 'yyyy-MM-dd')),
+    [calendarDays],
+  );
 
   const stats = useMemo(() => {
-    const metricDoses = scheduledDoses.filter(d => d.status !== 'snoozed');
-    const total = metricDoses.length;
-    const taken = metricDoses.filter(d => d.status === 'taken').length;
-    const skipped = metricDoses.filter(d => d.status === 'skipped').length;
-    const overdue = metricDoses.filter(d => d.status === 'overdue').length;
-    const pct = total ? Math.round(taken / total * 100) : 0;
-    return { total, taken, skipped, overdue, pct };
-  }, [scheduledDoses]);
+    return selectProgressSummaryForDates(calendarDateStrings);
+  }, [calendarDateStrings, selectProgressSummaryForDates]);
 
   const protocolTracks = useMemo(() => {
+    const protocolWeights = selectProgressProtocolWeights(calendarDateStrings);
     const withWeight = activeProtocols
       .map((ap, idx) => {
-        const total = scheduledDoses.filter(d => d.activeProtocolId === ap.id).length;
+        const total = protocolWeights[ap.id] ?? 0;
         const seedColor = ap.protocol.items.find(i => i.color)?.color;
         const color =
           seedColor === 'blue' ? '#3B82F6' :
@@ -124,27 +130,13 @@ export default function ProgressPage() {
       })
       .sort((a, b) => b.weight - a.weight);
     return withWeight.slice(0, 4);
-  }, [activeProtocols, scheduledDoses]);
-
-  const dayProtocolStats = useMemo(() => {
-    const map = new Map<string, Map<string, { total: number; taken: number }>>();
-    for (const dose of scheduledDoses) {
-      if (dose.status === 'snoozed') continue;
-      const dayMap = map.get(dose.scheduledDate) ?? new Map<string, { total: number; taken: number }>();
-      const current = dayMap.get(dose.activeProtocolId) ?? { total: 0, taken: 0 };
-      current.total += 1;
-      if (dose.status === 'taken') current.taken += 1;
-      dayMap.set(dose.activeProtocolId, current);
-      map.set(dose.scheduledDate, dayMap);
-    }
-    return map;
-  }, [scheduledDoses]);
+  }, [activeProtocols, calendarDateStrings, selectProgressProtocolWeights]);
 
   const buildRingsForDate = (dateStr: string): RingDatum[] => {
-    const dayMap = dayProtocolStats.get(dateStr);
+    const dayStats = selectProgressDayProtocolStats(dateStr);
     const isFuture = dateStr > todayStr;
     return protocolTracks.map(track => {
-      const stat = dayMap?.get(track.id);
+      const stat = dayStats[track.id];
       const total = stat?.total ?? 0;
       const taken = stat?.taken ?? 0;
       const pct = total ? Math.round((taken / total) * 100) : 0;
@@ -166,16 +158,24 @@ export default function ProgressPage() {
   }, [today]);
 
   const streak = getStreak();
+  const protocolBreakdownStats = useMemo(() => {
+    const byProtocol: Record<string, { total: number; taken: number }> = {};
+    for (const date of calendarDateStrings) {
+      const dayStats = selectProgressDayProtocolStats(date);
+      for (const [protocolId, stat] of Object.entries(dayStats)) {
+        const current = byProtocol[protocolId] ?? { total: 0, taken: 0 };
+        current.total += stat.total;
+        current.taken += stat.taken;
+        byProtocol[protocolId] = current;
+      }
+    }
+    return byProtocol;
+  }, [calendarDateStrings, selectProgressDayProtocolStats]);
 
   const activeCount = activeProtocols.filter(ap => ap.status === 'active').length;
   const todayStatus = useMemo(() => {
-    const todayDoses = scheduledDoses.filter(d => d.scheduledDate === todayStr && d.status !== 'snoozed');
-    return {
-      taken: todayDoses.filter(d => d.status === 'taken').length,
-      skipped: todayDoses.filter(d => d.status === 'skipped').length,
-      remaining: todayDoses.filter(d => d.status !== 'taken' && d.status !== 'skipped').length,
-    };
-  }, [scheduledDoses, todayStr]);
+    return selectProgressDayStatus(todayStr);
+  }, [todayStr, selectProgressDayStatus]);
   const weeklyRingSize = isMobile ? 30 : 38;
   const weeklyRingStroke = isMobile ? 3 : 3.5;
   const calendarRingSize = isMobile ? (calendarRange === 90 ? 20 : calendarRange === 60 ? 24 : 28) : (calendarRange === 90 ? 24 : calendarRange === 60 ? 28 : 34);
@@ -287,9 +287,8 @@ export default function ProgressPage() {
           <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
             <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">By Protocol</div>
             {activeProtocols.map(ap => {
-              const doses = scheduledDoses.filter(d => d.activeProtocolId === ap.id);
-              const taken = doses.filter(d => d.status === 'taken').length;
-              const pct = doses.length ? Math.round(taken / doses.length * 100) : 0;
+              const protocolStats = protocolBreakdownStats[ap.id] ?? { total: 0, taken: 0 };
+              const pct = protocolStats.total ? Math.round(protocolStats.taken / protocolStats.total * 100) : 0;
               const barColor = pctToColor(pct);
               return (
                 <div key={ap.id} className="mb-4 last:mb-0">
@@ -300,14 +299,14 @@ export default function ProgressPage() {
                   <div className="h-2 bg-[#1C2333] rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
                   </div>
-                  <div className="text-[11px] text-[#8B949E] mt-1">{taken} of {doses.length} doses taken · {ap.status}</div>
+                  <div className="text-[11px] text-[#8B949E] mt-1">{protocolStats.taken} of {protocolStats.total} doses taken · {ap.status}</div>
                 </div>
               );
             })}
           </div>
         )}
 
-        {scheduledDoses.length === 0 && (
+        {stats.total === 0 && (
           <div className="text-center py-10">
             <div className="text-4xl mb-3">📊</div>
             <div className="text-sm font-bold text-[#F0F6FC] mb-1">No data yet</div>
