@@ -81,6 +81,12 @@ function isDoseSlotConflict(message: string | undefined): boolean {
   return message.includes('scheduled_doses_active_protocol_id_protocol_item_id_schedul_key');
 }
 
+function isUniqueViolation(error: { code?: string; message?: string } | null, constraintName: string): boolean {
+  if (!error) return false;
+  if (error.code === '23505') return true;
+  return Boolean(error.message?.includes(constraintName));
+}
+
 async function findNextAvailableDoseSlot(
   userId: string,
   doseId: string,
@@ -667,10 +673,24 @@ export async function syncTakeDoseCommand(
       source: 'take_command',
       idempotency_key: clientOperationId,
     };
-    const { error: eventErr } = await supabase
+    const { error: eventInsertErr } = await supabase
       .from('execution_events')
-      .upsert(executionEventRow, { onConflict: 'user_id,idempotency_key' });
-    if (eventErr) throw new Error(`Execution event sync failed: ${eventErr.message}`);
+      .insert(executionEventRow);
+    if (eventInsertErr) {
+      if (isUniqueViolation(eventInsertErr, 'uq_execution_events_idempotency')) {
+        const { data: existingEvent, error: existingEventErr } = await supabase
+          .from('execution_events')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('idempotency_key', clientOperationId)
+          .maybeSingle();
+        if (existingEventErr || !existingEvent) {
+          throw new Error(`Execution event idempotency check failed: ${existingEventErr?.message ?? 'existing row not found'}`);
+        }
+      } else {
+        throw new Error(`Execution event sync failed: ${eventInsertErr.message}`);
+      }
+    }
 
     await updateTakeSyncOperationLedger(userId, clientOperationId, 'succeeded');
 
