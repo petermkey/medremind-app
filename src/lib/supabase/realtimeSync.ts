@@ -285,6 +285,37 @@ export async function syncActivation(
     const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
     if (error) throw new Error(`Scheduled doses sync failed: ${error.message}`);
   }
+
+  // C4 additive bridge: write-through future plan rows without switching any reads.
+  const todayDate = toDateString(new Date());
+  const plannedRows = doses
+    .filter(d => d.scheduledDate >= todayDate)
+    .map(d => {
+      const cItemId = cloudProtocolItemId(userId, active.protocolId, d.protocolItemId);
+      const cDoseId = cloudDoseId(userId, d.id);
+      const occurrenceKey = `${cActiveId}|${cItemId}|${d.scheduledDate}|${d.scheduledTime.slice(0, 5)}`;
+      return {
+        id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
+        user_id: userId,
+        active_protocol_id: cActiveId,
+        protocol_id: cProtocolId,
+        protocol_item_id: cItemId,
+        occurrence_date: d.scheduledDate,
+        occurrence_time: d.scheduledTime,
+        occurrence_key: occurrenceKey,
+        revision: 1,
+        status: 'planned',
+        source_generation: 'activation_write_through_c4',
+        legacy_scheduled_dose_id: cDoseId,
+      };
+    });
+
+  for (const part of chunk(plannedRows, 250)) {
+    const { error } = await supabase
+      .from('planned_occurrences')
+      .upsert(part, { onConflict: 'user_id,occurrence_key,revision' });
+    if (error) throw new Error(`Planned occurrences write-through failed: ${error.message}`);
+  }
 }
 
 export async function syncActiveStatus(
