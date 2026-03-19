@@ -24,6 +24,9 @@ What is stable in current codebase:
 - Snooze hardcoded to 15 minutes only
 - Skip leaving item in active queue
 - Paused protocols still visible in active today/future schedule
+- Register flow mismatch when signup required email confirmation but no active session
+- Fixed-duration protocol input/activation boundary issues (now validated + normalized)
+- Limited accessibility labels on secondary row actions (protocol swipe actions, card skip/snooze)
 
 ## 3. Current behavior summary
 

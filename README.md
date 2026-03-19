@@ -14,6 +14,8 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 ## Current Functional Scope
 
 - Authentication: register, login, onboarding
+  - confirmation-aware signup flow (no forced onboarding when email confirmation is pending)
+  - resend confirmation action in register/login confirmation-required states
 - Protocols:
   - seed templates
   - custom protocol creation
@@ -25,6 +27,7 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
   - snooze options: `15 minutes`, `1 hour`, `this evening`, `tomorrow`
 - Protocol lifecycle:
   - activate, pause, resume, complete
+  - fixed-duration protocols use inclusive end dates and validated positive duration input
 - Progress view:
   - adherence summary, weekly bars, 30-day heatmap
 - Recovery and sync operations in Settings:

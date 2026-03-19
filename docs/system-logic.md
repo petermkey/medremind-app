@@ -29,6 +29,12 @@ App shell boot (`src/app/app/layout.tsx`) performs:
 
 If cloud pull fails, app remains usable with local state.
 
+Register/login confirmation behavior (`src/app/(auth)/register/page.tsx`, `src/app/(auth)/login/page.tsx`, `src/lib/supabase/auth.ts`):
+
+- register distinguishes immediate session vs confirmation-required signup
+- confirmation-required state stays on auth UI (no forced onboarding), offers resend confirmation action
+- auth/resend Supabase errors are normalized for clearer user-facing messages
+
 ## 3. Supabase mapping
 
 - `profiles` (`id`) <-> `profile`
@@ -112,6 +118,11 @@ Protocol detail (`/app/protocols/[id]`):
   - icon/color
 
 If protocol instance is active, item composition changes trigger dose regeneration.
+
+Fixed-duration normalization (`src/lib/store/store.ts`):
+
+- store protocol creation/update defensively normalizes `durationDays` to a positive integer
+- invalid/non-positive duration values are treated as `undefined` (ongoing), preventing malformed fixed-duration state
 
 ## 8. Dose action logic
 
