@@ -34,7 +34,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     async function boot() {
-      const user = await getCurrentUser();
+      let user: Awaited<ReturnType<typeof getCurrentUser>>;
+      try {
+        user = await getCurrentUser();
+      } catch (error) {
+        if (cancelled) return;
+        console.error('[auth-boot-failed]', error);
+        const localProfile = useStore.getState().profile;
+        if (localProfile?.onboarded) {
+          setChecking(false);
+          return;
+        }
+        resetUserData();
+        router.replace('/login');
+        setChecking(false);
+        return;
+      }
       if (cancelled) return;
       if (!user) {
         resetUserData();
@@ -68,9 +83,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  if (checking || !profile?.onboarded) return (
+  if (checking) return (
     <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!profile?.onboarded) return (
+    <div className="min-h-screen bg-[#0D1117] flex items-center justify-center p-6 text-center">
+      <div className="max-w-xs text-[#8B949E] text-sm">
+        <p>Unable to establish session. Redirecting to login…</p>
+        <button onClick={() => router.replace('/login')} className="mt-3 text-[#3B82F6] hover:underline">
+          Go to login
+        </button>
+      </div>
     </div>
   );
 
