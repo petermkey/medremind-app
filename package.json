@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "tool:backfill:execution-history": "node scripts/backfill-execution-history.mjs",
+    "tool:validate:lifecycle-parity": "node scripts/validate-lifecycle-parity.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:install": "playwright install chromium"
