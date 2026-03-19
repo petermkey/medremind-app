@@ -9,7 +9,7 @@ export async function supabaseSignUp(
   password: string,
   name: string,
   timezone: string,
-): Promise<{ profile: UserProfile | null; error: string | null }> {
+): Promise<{ profile: UserProfile | null; error: string | null; hasSession: boolean }> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase.auth.signUp({
@@ -20,8 +20,8 @@ export async function supabaseSignUp(
     },
   });
 
-  if (error) return { profile: null, error: error.message };
-  if (!data.user) return { profile: null, error: 'No user returned' };
+  if (error) return { profile: null, error: error.message, hasSession: false };
+  if (!data.user) return { profile: null, error: 'No user returned', hasSession: false };
 
   const profile: UserProfile = {
     id: data.user.id,
@@ -32,7 +32,7 @@ export async function supabaseSignUp(
     createdAt: data.user.created_at,
   };
 
-  return { profile, error: null };
+  return { profile, error: null, hasSession: Boolean(data.session) };
 }
 
 // ─── Sign in ───────────────────────────────────────────────────────────────

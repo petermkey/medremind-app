@@ -25,22 +25,31 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setInfo('');
     const err = validate(name, email, password, confirm);
     if (err) { setError(err); return; }
     if (!agreed) { setError('Please accept the terms to continue.'); return; }
 
     setLoading(true);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const { profile, error: authError } = await supabaseSignUp(email, password, name.trim(), timezone);
+    const { profile, error: authError, hasSession } = await supabaseSignUp(email, password, name.trim(), timezone);
     setLoading(false);
 
     if (authError || !profile) {
       setError(authError ?? 'Registration failed. Please try again.');
+      return;
+    }
+
+    if (!hasSession) {
+      setInfo('Account created. Please check your email and confirm your account, then sign in.');
+      setPassword('');
+      setConfirm('');
       return;
     }
 
@@ -70,6 +79,14 @@ export default function RegisterPage() {
             </span>
           </label>
           {error && <p className="text-sm text-[#EF4444] bg-[rgba(239,68,68,0.1)] px-4 py-3 rounded-xl">{error}</p>}
+          {info && (
+            <div className="text-sm bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] text-[#C9D1D9] px-4 py-3 rounded-xl">
+              <p>{info}</p>
+              <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline">
+                Go to sign in
+              </button>
+            </div>
+          )}
           <Button type="submit" size="lg" fullWidth loading={loading} className="mt-2">Create account</Button>
         </form>
         <p className="text-center text-sm text-[#8B949E] mt-6">
