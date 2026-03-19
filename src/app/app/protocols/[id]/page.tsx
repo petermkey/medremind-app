@@ -94,7 +94,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   const searchParams = useSearchParams();
   const {
     protocols,
-    activeProtocols,
+    selectProtocolDetailReadModel,
     activateProtocol,
     pauseProtocol,
     resumeProtocol,
@@ -105,9 +105,11 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     regenerateDoses,
   } = useStore();
   const { show } = useToast();
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   const protocol = protocols.find(p => p.id === id);
-  const instance = activeProtocols.find(ap => ap.protocolId === id);
+  const detailReadModel = selectProtocolDetailReadModel(id, todayStr);
+  const instance = detailReadModel.instance;
   const protocolId = protocol?.id;
 
   const [metaName, setMetaName] = useState('');
@@ -245,6 +247,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           <div>
             <h1 className="text-lg font-extrabold text-[#F0F6FC]">{protocol.name}</h1>
             {protocol.description && <p className="text-xs text-[#8B949E] mt-1">{protocol.description}</p>}
+            {detailReadModel.isArchived && <p className="text-[11px] text-[#FBBF24] mt-1 uppercase tracking-wide font-bold">Archived</p>}
           </div>
           {instance && (
             <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-full flex-shrink-0" style={{ background: `${statusColor}20`, color: statusColor }}>
@@ -254,16 +257,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         </div>
 
         <div className="flex gap-2 mt-4">
-          {!instance && (
+          {detailReadModel.canActivate && (
             <Button size="sm" onClick={handleActivate}>▶ Activate</Button>
           )}
-          {instance?.status === 'active' && (
+          {detailReadModel.canPause && instance && (
             <Button size="sm" variant="secondary" onClick={() => { pauseProtocol(instance.id); show('Paused', 'warning'); }}>⏸ Pause</Button>
           )}
-          {instance?.status === 'paused' && (
+          {detailReadModel.canResume && instance && (
             <Button size="sm" onClick={() => { resumeProtocol(instance.id); show('Resumed'); }}>▶ Resume</Button>
           )}
-          {instance?.status === 'active' && (
+          {detailReadModel.canComplete && instance && (
             <Button size="sm" variant="danger" onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }}>✓ Complete</Button>
           )}
         </div>
@@ -304,6 +307,40 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
               <div className="text-[11px] text-[#8B949E] mt-0.5">{label}</div>
             </div>
           ))}
+        </div>
+        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
+          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Future plan</div>
+          <div className="text-[12px] text-[#8B949E] mb-2">
+            {detailReadModel.futureBoundaryDate
+              ? `Fixed boundary: ${detailReadModel.futureBoundaryDate}`
+              : 'Ongoing protocol (no fixed end boundary)'}
+          </div>
+          {detailReadModel.actionableFutureRows.length === 0 ? (
+            <div className="text-sm text-[#8B949E]">No actionable future rows.</div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {detailReadModel.actionableFutureRows.slice(0, 5).map(dose => (
+                <div key={dose.id} className="text-sm text-[#F0F6FC]">
+                  {dose.scheduledDate} · {dose.scheduledTime} · {dose.protocolItem.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
+          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Handled history</div>
+          {detailReadModel.handledHistoryRows.length === 0 ? (
+            <div className="text-sm text-[#8B949E]">No handled history yet.</div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {detailReadModel.handledHistoryRows.slice(0, 5).map(dose => (
+                <div key={dose.id} className="text-sm text-[#F0F6FC]">
+                  {dose.scheduledDate} · {dose.scheduledTime} · {dose.protocolItem.name} · {dose.status}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-[#161B22] border border-[rgba(59,130,246,0.25)] rounded-2xl p-4 flex flex-col gap-3 mb-5">
