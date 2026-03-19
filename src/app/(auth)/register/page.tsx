@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
-import { supabaseSignUp } from '@/lib/supabase/auth';
+import { resendSignupConfirmationEmail, supabaseSignUp } from '@/lib/supabase/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -26,12 +26,17 @@ export default function RegisterPage() {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setInfo('');
+    setConfirmationPending(false);
+    setResendMessage('');
     const err = validate(name, email, password, confirm);
     if (err) { setError(err); return; }
     if (!agreed) { setError('Please accept the terms to continue.'); return; }
@@ -48,6 +53,7 @@ export default function RegisterPage() {
 
     if (!hasSession) {
       setInfo('Account created. Please check your email and confirm your account, then sign in.');
+      setConfirmationPending(true);
       setPassword('');
       setConfirm('');
       return;
@@ -56,6 +62,22 @@ export default function RegisterPage() {
     store.resetUserData();
     store.setProfile(profile);
     router.push('/onboarding');
+  }
+
+  async function handleResendConfirmation() {
+    if (!email.trim()) {
+      setResendMessage('Enter your email first.');
+      return;
+    }
+    setResendLoading(true);
+    setResendMessage('');
+    const resendError = await resendSignupConfirmationEmail(email.trim());
+    setResendLoading(false);
+    if (resendError) {
+      setResendMessage(resendError);
+      return;
+    }
+    setResendMessage('Confirmation email sent. Please check your inbox.');
   }
 
   return (
@@ -82,6 +104,19 @@ export default function RegisterPage() {
           {info && (
             <div className="text-sm bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] text-[#C9D1D9] px-4 py-3 rounded-xl">
               <p>{info}</p>
+              {confirmationPending && (
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendLoading}
+                  className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline disabled:opacity-60"
+                >
+                  {resendLoading ? 'Sending…' : 'Resend confirmation email'}
+                </button>
+              )}
+              {resendMessage && (
+                <p className="text-xs mt-2 text-[#8B949E]">{resendMessage}</p>
+              )}
               <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline">
                 Go to sign in
               </button>
