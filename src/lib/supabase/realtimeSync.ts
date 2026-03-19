@@ -53,6 +53,10 @@ function cloudRecordId(userId: string, recordId: string): string {
   return isUuid(recordId) ? recordId : stableUuid(`record:${userId}`, recordId);
 }
 
+function cloudOperationId(userId: string, operationId: string): string {
+  return isUuid(operationId) ? operationId : stableUuid(`sync-operation:${userId}`, operationId);
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -532,5 +536,126 @@ export async function syncDoseAction(
     };
     const { error: rErr } = await supabase.from('dose_records').upsert(row, { onConflict: 'id' });
     if (rErr) throw new Error(`Dose record sync failed: ${rErr.message}`);
+  }
+}
+
+type TakeCommandResult = {
+  clientOperationId: string;
+  status: ScheduledDose['status'];
+  scheduledDate: string;
+  scheduledTime: string;
+  recordId: string | null;
+};
+
+async function upsertTakeSyncOperationLedger(
+  userId: string,
+  clientOperationId: string,
+  dose: ScheduledDose,
+  payload: Record<string, unknown>,
+) {
+  const supabase = getSupabaseClient();
+  const row = {
+    id: cloudOperationId(userId, clientOperationId),
+    user_id: userId,
+    operation_kind: 'take_command',
+    entity_type: 'scheduled_dose',
+    entity_id: cloudDoseId(userId, dose.id),
+    idempotency_key: clientOperationId,
+    payload,
+    status: 'inflight',
+    attempt_count: 1,
+    source: 'client',
+    next_attempt_at: null,
+    last_error: null,
+    completed_at: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from('sync_operations').upsert(row, {
+    onConflict: 'user_id,idempotency_key',
+  });
+  if (error) {
+    console.warn('[sync-operations-ledger]', error.message);
+  }
+}
+
+async function updateTakeSyncOperationLedger(
+  userId: string,
+  clientOperationId: string,
+  status: 'succeeded' | 'failed',
+  lastError?: string,
+) {
+  const supabase = getSupabaseClient();
+  const patch = {
+    status,
+    last_error: lastError ?? null,
+    completed_at: status === 'succeeded' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+    next_attempt_at: null,
+  };
+  const { error } = await supabase
+    .from('sync_operations')
+    .update(patch)
+    .eq('user_id', userId)
+    .eq('idempotency_key', clientOperationId);
+  if (error) {
+    console.warn('[sync-operations-ledger]', error.message);
+  }
+}
+
+export async function syncTakeDoseCommand(
+  userId: string,
+  dose: ScheduledDose,
+  record: DoseRecord,
+  clientOperationId: string,
+): Promise<TakeCommandResult> {
+  const supabase = getSupabaseClient();
+  const cDoseId = cloudDoseId(userId, dose.id);
+  const cRecordId = cloudRecordId(userId, record.id);
+  const commandPayload = {
+    doseId: dose.id,
+    cloudDoseId: cDoseId,
+    scheduledDate: dose.scheduledDate,
+    scheduledTime: dose.scheduledTime,
+    action: 'taken',
+    recordId: record.id,
+    cloudRecordId: cRecordId,
+    recordedAt: record.recordedAt,
+  };
+  await upsertTakeSyncOperationLedger(userId, clientOperationId, dose, commandPayload);
+
+  try {
+    const { error: doseErr } = await supabase
+      .from('scheduled_doses')
+      .update({
+        status: 'taken',
+      })
+      .eq('id', cDoseId)
+      .eq('user_id', userId);
+    if (doseErr) throw new Error(`Dose status sync failed: ${doseErr.message}`);
+
+    const recordRow = {
+      id: cRecordId,
+      user_id: userId,
+      scheduled_dose_id: cDoseId,
+      action: 'taken',
+      recorded_at: record.recordedAt,
+      note: record.note ?? null,
+    };
+    const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
+    if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
+
+    await updateTakeSyncOperationLedger(userId, clientOperationId, 'succeeded');
+
+    return {
+      clientOperationId,
+      status: 'taken',
+      scheduledDate: dose.scheduledDate,
+      scheduledTime: dose.scheduledTime,
+      recordId: cRecordId,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateTakeSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
   }
 }

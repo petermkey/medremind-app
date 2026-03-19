@@ -14,6 +14,7 @@ import {
   syncActivation,
   syncActiveStatus,
   syncDoseAction,
+  syncTakeDoseCommand,
   syncProtocolDelete,
   syncProtocolItemDelete,
   syncProtocolUpsert,
@@ -812,6 +813,7 @@ export const useStore = create<AppState>()(
           recordedAt: new Date().toISOString(),
           note,
         };
+        const clientOperationId = `take:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateStatus = dose.status !== 'taken';
         if (shouldAppendRecord || shouldUpdateStatus) {
@@ -824,8 +826,11 @@ export const useStore = create<AppState>()(
         }
         if (state.profile?.id) {
           syncFireAndForget(
-            syncDoseAction(state.profile.id, dose, { status: 'taken' }, record),
-            { kind: 'doseAction', payload: { userId: state.profile.id, dose, patch: { status: 'taken' }, record } },
+            syncTakeDoseCommand(state.profile.id, dose, record, clientOperationId),
+            {
+              kind: 'takeCommand',
+              payload: { userId: state.profile.id, dose, record, clientOperationId },
+            },
           );
         }
       },

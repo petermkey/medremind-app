@@ -5,6 +5,7 @@ import {
   syncActivation,
   syncActiveStatus,
   syncDoseAction,
+  syncTakeDoseCommand,
   syncProtocolDelete,
   syncProtocolItemDelete,
   syncProtocolUpsert,
@@ -18,7 +19,8 @@ type SyncKind =
   | 'activation'
   | 'activeStatus'
   | 'regeneratedDoses'
-  | 'doseAction';
+  | 'doseAction'
+  | 'takeCommand';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -43,6 +45,12 @@ type SyncPayloadMap = {
     };
     record?: DoseRecord;
   };
+  takeCommand: {
+    userId: string;
+    dose: ScheduledDose;
+    record: DoseRecord;
+    clientOperationId: string;
+  };
 };
 
 export type SyncOperation =
@@ -52,7 +60,8 @@ export type SyncOperation =
   | { kind: 'activation'; payload: SyncPayloadMap['activation'] }
   | { kind: 'activeStatus'; payload: SyncPayloadMap['activeStatus'] }
   | { kind: 'regeneratedDoses'; payload: SyncPayloadMap['regeneratedDoses'] }
-  | { kind: 'doseAction'; payload: SyncPayloadMap['doseAction'] };
+  | { kind: 'doseAction'; payload: SyncPayloadMap['doseAction'] }
+  | { kind: 'takeCommand'; payload: SyncPayloadMap['takeCommand'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -152,6 +161,13 @@ async function executeOperation(op: SyncOperation) {
       return syncRegeneratedDoses(op.payload.userId, op.payload.active, op.payload.fromDate, op.payload.newDoses);
     case 'doseAction':
       return syncDoseAction(op.payload.userId, op.payload.dose, op.payload.patch, op.payload.record);
+    case 'takeCommand':
+      return syncTakeDoseCommand(
+        op.payload.userId,
+        op.payload.dose,
+        op.payload.record,
+        op.payload.clientOperationId,
+      );
     default:
       return Promise.resolve();
   }
