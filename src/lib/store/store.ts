@@ -263,6 +263,9 @@ interface AppState {
 
   // Actions — Schedule
   getDaySchedule: (date: string) => ScheduledDose[];
+  selectAppActionableDoses: (date: string) => ScheduledDose[];
+  selectAppNextDose: (date: string) => ScheduledDose | undefined;
+  selectAppSummaryMetrics: (date: string) => { taken: number; total: number; pct: number };
   selectTodayScheduleView: (date: string) => ScheduledDose[];
   getVisibleDoseDates: () => string[];
   takeDose: (doseId: string, note?: string) => void;
@@ -694,9 +697,28 @@ export const useStore = create<AppState>()(
         return doses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
       },
 
-      selectTodayScheduleView: (date) => {
+      selectAppActionableDoses: (date) => {
         const doses = get().getDaySchedule(date);
         return doses.filter(d => d.status !== 'skipped' && d.status !== 'snoozed');
+      },
+
+      selectAppNextDose: (date) => {
+        const actionable = get().selectAppActionableDoses(date);
+        return actionable
+          .filter(d => d.status === 'pending' || (d.status as string) === 'upcoming')
+          .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
+      },
+
+      selectAppSummaryMetrics: (date) => {
+        const actionable = get().selectAppActionableDoses(date);
+        const taken = actionable.filter(d => d.status === 'taken').length;
+        const total = actionable.length;
+        const pct = total ? Math.round((taken / total) * 100) : 0;
+        return { taken, total, pct };
+      },
+
+      selectTodayScheduleView: (date) => {
+        return get().selectAppActionableDoses(date);
       },
 
       getVisibleDoseDates: () => {

@@ -25,8 +25,9 @@ export default function SchedulePage() {
   const {
     profile,
     activeProtocols,
-    getDaySchedule,
-    selectTodayScheduleView,
+    selectAppActionableDoses,
+    selectAppNextDose,
+    selectAppSummaryMetrics,
     getVisibleDoseDates,
     takeDose,
     skipDose,
@@ -48,10 +49,9 @@ export default function SchedulePage() {
     return () => clearInterval(t);
   }, []);
 
-  const doses = useMemo(() => getDaySchedule(selectedDate), [selectedDate, scheduledDoses]);
   const actionableDoses = useMemo(
-    () => selectTodayScheduleView(selectedDate),
-    [selectedDate, scheduledDoses, activeProtocols, selectTodayScheduleView],
+    () => selectAppActionableDoses(selectedDate),
+    [selectedDate, scheduledDoses, activeProtocols, selectAppActionableDoses],
   );
 
   // Dates that have at least one dose (for week strip dots)
@@ -74,14 +74,15 @@ export default function SchedulePage() {
     return blocks;
   }, [actionableDoses]);
 
-  const metricDoses = actionableDoses;
-  const taken = metricDoses.filter(d => d.status === 'taken').length;
-  const total = metricDoses.length;
-  const pct = total ? Math.round((taken / total) * 100) : 0;
+  const { taken, total, pct } = useMemo(
+    () => selectAppSummaryMetrics(selectedDate),
+    [selectedDate, scheduledDoses, activeProtocols, selectAppSummaryMetrics],
+  );
 
-  const nextDose = doses
-    .filter(d => d.status === 'pending' || (d.status as string) === 'upcoming')
-    .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
+  const nextDose = useMemo(
+    () => selectAppNextDose(selectedDate),
+    [selectedDate, scheduledDoses, activeProtocols, selectAppNextDose],
+  );
 
   function toDateTime(dateStr: string, timeStr: string) {
     return parseISO(`${dateStr}T${timeStr}:00`);
