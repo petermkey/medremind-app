@@ -14,7 +14,7 @@ Status: planning-ready
 
 ### Today / Schedule (`/app`)
 
-Primary file: [`src/app/app/page.tsx`](/Volumes/DATA/GRAVITY%20REPO/worktrees/medremind-sprint2b/src/app/app/page.tsx)  
+Primary file: `src/app/app/page.tsx`  
 Current selectors:
 
 1. `getDaySchedule(selectedDate)` from store:
@@ -26,15 +26,15 @@ Current selectors:
 - Includes today/future only for active protocol instances.
 
 3. UI-only semantic filtering in page:
-- `visibleDoses = doses.filter(status !== 'skipped')` (hides skipped rows on Schedule surface).
-- `nextDose` is from statuses `pending|snoozed|upcoming`.
+- `visibleDoses = doses.filter(status !== 'skipped' && status !== 'snoozed')` (hides skipped and snoozed rows on primary Schedule surface).
+- `nextDose` is from statuses `pending|upcoming` (`snoozed` is not treated as actionable next dose).
 
 ### Calendar (`/app/progress`, calendar and 7-day rings)
 
-Primary file: [`src/app/app/progress/page.tsx`](/Volumes/DATA/GRAVITY%20REPO/worktrees/medremind-sprint2b/src/app/app/progress/page.tsx)  
+Primary file: `src/app/app/progress/page.tsx`  
 Current source:
 
-- Direct raw scans over `scheduledDoses` by date/protocol/status.
+- Aggregates are still derived from `scheduledDoses` in page-level logic, but key metrics explicitly exclude `snoozed` rows.
 - Uses `activeProtocols` for track selection and protocol labels/colors.
 - Future days are displayed with zeroed progress rings (`isFuture ? 0 : pct`) in component logic.
 
@@ -43,12 +43,12 @@ Current source:
 Current behavior is split:
 
 1. Schedule page past-date view (`getDaySchedule(date < today)`) shows all dose rows including non-active instances.
-2. Progress page aggregates all historical `scheduledDoses` statuses directly.
+2. Progress page aggregates from `scheduledDoses` directly, with `snoozed` excluded from key metric paths.
 3. `doseRecords` is not used as the primary history read model in UI; history semantics are inferred from mutable `scheduledDoses.status`.
 
 ### Protocol detail (`/app/protocols/[id]`)
 
-Primary file: [`src/app/app/protocols/[id]/page.tsx`](/Volumes/DATA/GRAVITY%20REPO/worktrees/medremind-sprint2b/src/app/app/protocols/%5Bid%5D/page.tsx)  
+Primary file: `src/app/app/protocols/[id]/page.tsx`  
 Current source:
 
 - Reads protocol metadata from `protocols`.
@@ -161,12 +161,12 @@ Visibility/lifecycle rules:
 ## 4. Where current main is most fragile
 
 1. Business meaning is encoded in UI filters instead of dedicated views:
-- `status !== 'skipped'` in schedule page.
+- `status !== 'skipped' && status !== 'snoozed'` in schedule page.
 - Past/future + active-instance branching inside store selectors.
 
 2. Historical truth depends heavily on mutable `scheduledDoses.status`, while immutable `doseRecords` is not the primary read source.
 
-3. Progress/calendar aggregates scan all raw rows and can mix planned-vs-history semantics.
+3. Progress/calendar aggregates remain page-level scans over `scheduledDoses` and can still mix planned-vs-history semantics despite status-specific exclusions.
 
 4. Protocol detail lacks lifecycle timeline and depends on local inferred instance state only.
 
@@ -178,6 +178,6 @@ Visibility/lifecycle rules:
 4. Verify parity on:
 - skipped hidden behavior
 - paused protocol visibility rule
-- snoozed ordering and next-dose banner
+- next-dose banner behavior where snoozed rows are not treated as actionable next dose
 
 This yields immediate read-model centralization with minimal blast radius and no schema dependency.
