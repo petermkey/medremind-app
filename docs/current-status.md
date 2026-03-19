@@ -20,8 +20,10 @@ Overall: beta, with focused hardening already landed across auth, protocol/sched
 - Sync outbox retry lifecycle + guarded sign-out flow
 - Improved swipe targeting and action accessibility labels in key schedule/protocol rows
 - Progress screen lifecycle-aware selector path (avoids raw `scheduledDoses` scans)
+- Protocol Detail lifecycle-aware read path (`selectProtocolDetailReadModel`)
 - Take action command path with client operation id/idempotency (`syncTakeDoseCommand`)
 - Skip action command path with client operation id/idempotency (`syncSkipDoseCommand`)
+- Snooze action command path with client operation id/idempotency (`syncSnoozeDoseCommand`)
 - Take command path write-through into additive `execution_events`
 
 ## 3. Partially hardened / still fragile areas

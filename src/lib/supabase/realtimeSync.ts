@@ -558,7 +558,7 @@ async function upsertDoseSyncOperationLedger(
   clientOperationId: string,
   dose: ScheduledDose,
   payload: Record<string, unknown>,
-  operationKind: 'take_command' | 'skip_command',
+  operationKind: 'take_command' | 'skip_command' | 'snooze_command',
 ) {
   const supabase = getSupabaseClient();
   const row = {
@@ -585,7 +585,7 @@ async function upsertDoseSyncOperationLedger(
   }
 }
 
-async function updateTakeSyncOperationLedger(
+async function updateDoseSyncOperationLedger(
   userId: string,
   clientOperationId: string,
   status: 'succeeded' | 'failed',
@@ -692,7 +692,7 @@ export async function syncTakeDoseCommand(
       }
     }
 
-    await updateTakeSyncOperationLedger(userId, clientOperationId, 'succeeded');
+    await updateDoseSyncOperationLedger(userId, clientOperationId, 'succeeded');
 
     return {
       clientOperationId,
@@ -703,7 +703,7 @@ export async function syncTakeDoseCommand(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await updateTakeSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    await updateDoseSyncOperationLedger(userId, clientOperationId, 'failed', message);
     throw error;
   }
 }
@@ -756,7 +756,7 @@ export async function syncSkipDoseCommand(
     const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
     if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
 
-    await updateTakeSyncOperationLedger(userId, clientOperationId, 'succeeded');
+    await updateDoseSyncOperationLedger(userId, clientOperationId, 'succeeded');
 
     return {
       clientOperationId,
@@ -767,7 +767,136 @@ export async function syncSkipDoseCommand(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await updateTakeSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    await updateDoseSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
+  }
+}
+
+export async function syncSnoozeDoseCommand(
+  userId: string,
+  dose: ScheduledDose,
+  replacementDose: ScheduledDose,
+  record: DoseRecord,
+  clientOperationId: string,
+): Promise<TakeCommandResult> {
+  const supabase = getSupabaseClient();
+  const cDoseId = cloudDoseId(userId, dose.id);
+  const cRecordId = cloudRecordId(userId, record.id);
+  const cReplacementDoseId = cloudDoseId(userId, replacementDose.id);
+  const cReplacementActiveId = cloudActiveId(userId, replacementDose.activeProtocolId);
+  const cReplacementItemId = cloudProtocolItemId(
+    userId,
+    replacementDose.activeProtocol.protocolId,
+    replacementDose.protocolItemId,
+  );
+  const commandPayload = {
+    doseId: dose.id,
+    cloudDoseId: cDoseId,
+    replacementDoseId: replacementDose.id,
+    cloudReplacementDoseId: cReplacementDoseId,
+    scheduledDate: replacementDose.scheduledDate,
+    scheduledTime: replacementDose.scheduledTime,
+    action: 'snoozed',
+    recordId: record.id,
+    cloudRecordId: cRecordId,
+    recordedAt: record.recordedAt,
+  };
+  await upsertDoseSyncOperationLedger(
+    userId,
+    clientOperationId,
+    dose,
+    commandPayload,
+    'snooze_command',
+  );
+
+  const upsertReplacementAt = async (scheduledDate: string, scheduledTime: string) => {
+    const resolvedDateTime = new Date(`${scheduledDate}T${scheduledTime}:00`);
+    const row = {
+      id: cReplacementDoseId,
+      user_id: userId,
+      active_protocol_id: cReplacementActiveId,
+      protocol_item_id: cReplacementItemId,
+      scheduled_date: scheduledDate,
+      scheduled_time: scheduledTime,
+      status: 'pending',
+      snoozed_until: Number.isNaN(resolvedDateTime.getTime())
+        ? replacementDose.snoozedUntil ?? null
+        : resolvedDateTime.toISOString(),
+    };
+    return supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
+  };
+
+  try {
+    const { error: originalErr } = await supabase
+      .from('scheduled_doses')
+      .update({
+        status: 'snoozed',
+        snoozed_until: replacementDose.snoozedUntil ?? null,
+      })
+      .eq('id', cDoseId)
+      .eq('user_id', userId);
+    if (originalErr) throw new Error(`Dose status sync failed: ${originalErr.message}`);
+
+    let targetDate = replacementDose.scheduledDate;
+    let targetTime = replacementDose.scheduledTime;
+    let { error: replacementErr } = await upsertReplacementAt(targetDate, targetTime);
+
+    if (replacementErr && isDoseSlotConflict(replacementErr.message)) {
+      const resolvedSlot = await findNextAvailableDoseSlot(
+        userId,
+        replacementDose.id,
+        replacementDose.activeProtocolId,
+        replacementDose.activeProtocol.protocolId,
+        replacementDose.protocolItemId,
+        targetDate,
+        targetTime,
+      );
+      if (resolvedSlot) {
+        targetDate = resolvedSlot.scheduledDate;
+        targetTime = resolvedSlot.scheduledTime;
+        const { error: retryErr } = await upsertReplacementAt(targetDate, targetTime);
+        replacementErr = retryErr;
+        if (!replacementErr) {
+          const resolvedDateTime = new Date(`${targetDate}T${targetTime}:00`);
+          const { error: updateOriginalErr } = await supabase
+            .from('scheduled_doses')
+            .update({
+              snoozed_until: Number.isNaN(resolvedDateTime.getTime())
+                ? replacementDose.snoozedUntil ?? null
+                : resolvedDateTime.toISOString(),
+            })
+            .eq('id', cDoseId)
+            .eq('user_id', userId);
+          if (updateOriginalErr) replacementErr = updateOriginalErr;
+        }
+      }
+    }
+
+    if (replacementErr) throw new Error(`Dose status sync failed: ${replacementErr.message}`);
+
+    const recordRow = {
+      id: cRecordId,
+      user_id: userId,
+      scheduled_dose_id: cDoseId,
+      action: 'snoozed',
+      recorded_at: record.recordedAt,
+      note: record.note ?? null,
+    };
+    const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
+    if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
+
+    await updateDoseSyncOperationLedger(userId, clientOperationId, 'succeeded');
+
+    return {
+      clientOperationId,
+      status: 'snoozed',
+      scheduledDate: targetDate,
+      scheduledTime: targetTime,
+      recordId: cRecordId,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateDoseSyncOperationLedger(userId, clientOperationId, 'failed', message);
     throw error;
   }
 }

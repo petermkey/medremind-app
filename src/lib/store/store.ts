@@ -13,7 +13,7 @@ import type { Drug } from '@/types';
 import {
   syncActivation,
   syncActiveStatus,
-  syncDoseAction,
+  syncSnoozeDoseCommand,
   syncSkipDoseCommand,
   syncTakeDoseCommand,
   syncProtocolDelete,
@@ -268,6 +268,17 @@ interface AppState {
   selectAppActionableDoses: (date: string) => ScheduledDose[];
   selectAppNextDose: (date: string) => ScheduledDose | undefined;
   selectAppSummaryMetrics: (date: string) => { taken: number; total: number; pct: number };
+  selectProtocolDetailReadModel: (protocolId: string, date: string) => {
+    instance: ActiveProtocol | undefined;
+    actionableFutureRows: ScheduledDose[];
+    handledHistoryRows: ScheduledDose[];
+    futureBoundaryDate: string | undefined;
+    canActivate: boolean;
+    canPause: boolean;
+    canResume: boolean;
+    canComplete: boolean;
+    isArchived: boolean;
+  };
   selectProgressDayDoses: (date: string) => ScheduledDose[];
   selectProgressSummaryForDates: (dates: string[]) => { total: number; taken: number; skipped: number; overdue: number; pct: number };
   selectProgressDayStatus: (date: string) => { taken: number; skipped: number; remaining: number };
@@ -724,6 +735,57 @@ export const useStore = create<AppState>()(
         return { taken, total, pct };
       },
 
+      selectProtocolDetailReadModel: (protocolId, date) => {
+        const state = get();
+        const protocol = state.protocols.find(p => p.id === protocolId);
+        const instance = state.activeProtocols.find(ap => ap.protocolId === protocolId);
+        const instanceIds = new Set(
+          state.activeProtocols
+            .filter(ap => ap.protocolId === protocolId)
+            .map(ap => ap.id),
+        );
+        const recordLinkedDoseIds = new Set(
+          state.doseRecords
+            .filter(record => Boolean(record.scheduledDoseId))
+            .map(record => record.scheduledDoseId),
+        );
+        const actionableFutureRows = instance
+          ? state.scheduledDoses
+            .filter(d =>
+              d.activeProtocolId === instance.id
+              && d.scheduledDate >= date
+              && d.status !== 'taken'
+              && d.status !== 'skipped'
+              && d.status !== 'snoozed',
+            )
+            .sort((a, b) => {
+              if (a.scheduledDate === b.scheduledDate) return a.scheduledTime.localeCompare(b.scheduledTime);
+              return a.scheduledDate.localeCompare(b.scheduledDate);
+            })
+          : [];
+        const handledHistoryRows = state.scheduledDoses
+          .filter(d => {
+            if (!instanceIds.has(d.activeProtocolId)) return false;
+            const isHandledStatus = d.status === 'taken' || d.status === 'skipped';
+            return isHandledStatus || recordLinkedDoseIds.has(d.id);
+          })
+          .sort((a, b) => {
+            if (a.scheduledDate === b.scheduledDate) return b.scheduledTime.localeCompare(a.scheduledTime);
+            return b.scheduledDate.localeCompare(a.scheduledDate);
+          });
+        return {
+          instance,
+          actionableFutureRows,
+          handledHistoryRows,
+          futureBoundaryDate: instance?.endDate,
+          canActivate: !instance,
+          canPause: instance?.status === 'active',
+          canResume: instance?.status === 'paused',
+          canComplete: instance?.status === 'active',
+          isArchived: Boolean(protocol?.isArchived),
+        };
+      },
+
       selectProgressDayDoses: (date) => {
         const doses = get().getDaySchedule(date);
         return doses.filter(d => d.status !== 'snoozed');
@@ -904,6 +966,7 @@ export const useStore = create<AppState>()(
           recordedAt: new Date().toISOString(),
           note: recordNote,
         };
+        const clientOperationId = `snooze:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateRecordNote = Boolean(existingRecord && existingRecord.note !== recordNote);
         const originalNeedsUpdate = dose.status !== 'snoozed' || dose.snoozedUntil !== snoozedUntil;
@@ -941,19 +1004,21 @@ export const useStore = create<AppState>()(
         }
         if (state.profile?.id) {
           syncFireAndForget(
-            syncDoseAction(
+            syncSnoozeDoseCommand(
               state.profile.id,
               dose,
-              { status: 'snoozed', snoozedUntil, replacementDose },
+              replacementDose,
               shouldAppendRecord ? record : (shouldUpdateRecordNote ? { ...record, note: recordNote } : record),
+              clientOperationId,
             ),
             {
-              kind: 'doseAction',
+              kind: 'snoozeCommand',
               payload: {
                 userId: state.profile.id,
                 dose,
-                patch: { status: 'snoozed', snoozedUntil, replacementDose },
+                replacementDose,
                 record: shouldAppendRecord ? record : (shouldUpdateRecordNote ? { ...record, note: recordNote } : record),
+                clientOperationId,
               },
             },
           );

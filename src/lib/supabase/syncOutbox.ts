@@ -5,6 +5,7 @@ import {
   syncActivation,
   syncActiveStatus,
   syncDoseAction,
+  syncSnoozeDoseCommand,
   syncSkipDoseCommand,
   syncTakeDoseCommand,
   syncProtocolDelete,
@@ -22,7 +23,8 @@ type SyncKind =
   | 'regeneratedDoses'
   | 'doseAction'
   | 'takeCommand'
-  | 'skipCommand';
+  | 'skipCommand'
+  | 'snoozeCommand';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -59,6 +61,13 @@ type SyncPayloadMap = {
     record: DoseRecord;
     clientOperationId: string;
   };
+  snoozeCommand: {
+    userId: string;
+    dose: ScheduledDose;
+    replacementDose: ScheduledDose;
+    record: DoseRecord;
+    clientOperationId: string;
+  };
 };
 
 export type SyncOperation =
@@ -70,7 +79,8 @@ export type SyncOperation =
   | { kind: 'regeneratedDoses'; payload: SyncPayloadMap['regeneratedDoses'] }
   | { kind: 'doseAction'; payload: SyncPayloadMap['doseAction'] }
   | { kind: 'takeCommand'; payload: SyncPayloadMap['takeCommand'] }
-  | { kind: 'skipCommand'; payload: SyncPayloadMap['skipCommand'] };
+  | { kind: 'skipCommand'; payload: SyncPayloadMap['skipCommand'] }
+  | { kind: 'snoozeCommand'; payload: SyncPayloadMap['snoozeCommand'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -181,6 +191,14 @@ async function executeOperation(op: SyncOperation) {
       return syncSkipDoseCommand(
         op.payload.userId,
         op.payload.dose,
+        op.payload.record,
+        op.payload.clientOperationId,
+      );
+    case 'snoozeCommand':
+      return syncSnoozeDoseCommand(
+        op.payload.userId,
+        op.payload.dose,
+        op.payload.replacementDose,
         op.payload.record,
         op.payload.clientOperationId,
       );
