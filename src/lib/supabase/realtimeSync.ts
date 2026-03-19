@@ -756,6 +756,41 @@ export async function syncSkipDoseCommand(
     const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
     if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
 
+    const executionEventRow = {
+      id: stableUuid(`execution-event:${userId}`, clientOperationId),
+      user_id: userId,
+      planned_occurrence_id: null,
+      legacy_scheduled_dose_id: cDoseId,
+      legacy_dose_record_id: cRecordId,
+      active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
+      protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
+      event_type: 'skipped',
+      event_at: record.recordedAt,
+      effective_date: dose.scheduledDate,
+      effective_time: dose.scheduledTime,
+      note: record.note ?? null,
+      source: 'skip_command',
+      idempotency_key: clientOperationId,
+    };
+    const { error: eventInsertErr } = await supabase
+      .from('execution_events')
+      .insert(executionEventRow);
+    if (eventInsertErr) {
+      if (isUniqueViolation(eventInsertErr, 'uq_execution_events_idempotency')) {
+        const { data: existingEvent, error: existingEventErr } = await supabase
+          .from('execution_events')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('idempotency_key', clientOperationId)
+          .maybeSingle();
+        if (existingEventErr || !existingEvent) {
+          throw new Error(`Execution event idempotency check failed: ${existingEventErr?.message ?? 'existing row not found'}`);
+        }
+      } else {
+        throw new Error(`Execution event sync failed: ${eventInsertErr.message}`);
+      }
+    }
+
     await updateDoseSyncOperationLedger(userId, clientOperationId, 'succeeded');
 
     return {

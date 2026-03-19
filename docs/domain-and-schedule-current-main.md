@@ -125,7 +125,7 @@ Behavior:
 - Snooze stores transitional traceability in the snooze `DoseRecord.note` (`original`, `replacement`, `target`).
 - Take sync path uses command-style idempotency (`clientOperationId`) and writes to `sync_operations` ledger when available.
 - Skip sync path uses the same command/idempotency contract as take (`clientOperationId` + ledger when available).
-- Take command path dual-writes durable history into additive `execution_events` (idempotent by `idempotency_key`).
+- Take and skip command paths dual-write durable history into additive `execution_events` (idempotent by `idempotency_key`).
 
 Schedule UI (`src/app/app/page.tsx`) provides snooze options:
 

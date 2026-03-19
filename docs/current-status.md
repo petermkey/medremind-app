@@ -24,7 +24,7 @@ Overall: beta, with focused hardening already landed across auth, protocol/sched
 - Take action command path with client operation id/idempotency (`syncTakeDoseCommand`)
 - Skip action command path with client operation id/idempotency (`syncSkipDoseCommand`)
 - Snooze action command path with client operation id/idempotency (`syncSnoozeDoseCommand`)
-- Take command path write-through into additive `execution_events`
+- Take/skip command paths write-through into additive `execution_events`
 
 ## 3. Partially hardened / still fragile areas
 
