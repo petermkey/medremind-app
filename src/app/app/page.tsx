@@ -25,6 +25,7 @@ export default function SchedulePage() {
   const {
     profile,
     selectAppActionableDoses,
+    selectHistoryDayRows,
     selectAppNextDose,
     selectAppSummaryMetrics,
     selectCalendarVisibleDoseDates,
@@ -40,6 +41,7 @@ export default function SchedulePage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [clock, setClock] = useState('');
   const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
+  const isHistoryDate = selectedDate < todayStr;
 
   useEffect(() => {
     const update = () => setClock(format(new Date(), 'HH:mm'));
@@ -49,8 +51,8 @@ export default function SchedulePage() {
   }, []);
 
   const actionableDoses = useMemo(
-    () => selectAppActionableDoses(selectedDate),
-    [selectedDate, scheduledDoses, selectAppActionableDoses],
+    () => (isHistoryDate ? selectHistoryDayRows(selectedDate) : selectAppActionableDoses(selectedDate)),
+    [selectedDate, isHistoryDate, scheduledDoses, selectHistoryDayRows, selectAppActionableDoses],
   );
 
   // Dates that have at least one dose (for week strip dots)
@@ -74,13 +76,19 @@ export default function SchedulePage() {
   }, [actionableDoses]);
 
   const { taken, total, pct } = useMemo(
-    () => selectAppSummaryMetrics(selectedDate),
-    [selectedDate, scheduledDoses, selectAppSummaryMetrics],
+    () => {
+      if (!isHistoryDate) return selectAppSummaryMetrics(selectedDate);
+      const historyTotal = actionableDoses.length;
+      const historyTaken = actionableDoses.filter(d => d.status === 'taken').length;
+      const historyPct = historyTotal ? Math.round((historyTaken / historyTotal) * 100) : 0;
+      return { taken: historyTaken, total: historyTotal, pct: historyPct };
+    },
+    [selectedDate, isHistoryDate, scheduledDoses, actionableDoses, selectAppSummaryMetrics],
   );
 
   const nextDose = useMemo(
-    () => selectAppNextDose(selectedDate),
-    [selectedDate, scheduledDoses, selectAppNextDose],
+    () => (isHistoryDate ? undefined : selectAppNextDose(selectedDate)),
+    [selectedDate, isHistoryDate, scheduledDoses, selectAppNextDose],
   );
 
   function toDateTime(dateStr: string, timeStr: string) {

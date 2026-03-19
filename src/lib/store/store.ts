@@ -286,6 +286,7 @@ interface AppState {
   selectProgressProtocolWeights: (dates: string[]) => Record<string, number>;
   selectTodayScheduleView: (date: string) => ScheduledDose[];
   selectCalendarVisibleDoseDates: (anchorDate: string, lookbackDays?: number, lookaheadDays?: number) => string[];
+  selectHistoryDayRows: (date: string) => ScheduledDose[];
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
@@ -872,6 +873,34 @@ export const useStore = create<AppState>()(
         }
 
         return [...dates].sort();
+      },
+
+      selectHistoryDayRows: (date) => {
+        const state = get();
+        const todayDate = today();
+        if (date >= todayDate) return [];
+
+        const recordByDoseId = new Map<string, DoseRecord[]>();
+        for (const record of state.doseRecords) {
+          const list = recordByDoseId.get(record.scheduledDoseId) ?? [];
+          list.push(record);
+          recordByDoseId.set(record.scheduledDoseId, list);
+        }
+
+        return state.scheduledDoses
+          .filter(dose => {
+            if (dose.scheduledDate !== date) return false;
+
+            const records = recordByDoseId.get(dose.id) ?? [];
+            const hasDurableHistory = records.length > 0;
+            const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
+            const isSnoozedOrigin = dose.status === 'snoozed';
+            const hasSnoozeEvent = records.some(r => r.action === 'snoozed');
+
+            // History surface intentionally excludes pure actionable pending rows.
+            return isHandledStatus || isSnoozedOrigin || hasDurableHistory || hasSnoozeEvent;
+          })
+          .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
       },
 
       takeDose: (doseId, note) => {

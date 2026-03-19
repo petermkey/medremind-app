@@ -22,6 +22,7 @@ Overall: beta, with focused hardening already landed across auth, protocol/sched
 - Progress screen lifecycle-aware selector path (avoids raw `scheduledDoses` scans)
 - Schedule calendar date projection uses lifecycle-aware selector path (`selectCalendarVisibleDoseDates`)
 - Protocol Detail lifecycle-aware read path (`selectProtocolDetailReadModel`)
+- History (past-date `/app` path) now uses lifecycle-aware selector path (`selectHistoryDayRows`)
 - Take action command path with client operation id/idempotency (`syncTakeDoseCommand`)
 - Skip action command path with client operation id/idempotency (`syncSkipDoseCommand`)
 - Snooze action command path with client operation id/idempotency (`syncSnoozeDoseCommand`)
