@@ -553,6 +553,68 @@ type TakeCommandResult = {
   recordId: string | null;
 };
 
+type ActiveCommandResult = {
+  clientOperationId: string;
+  status: ActiveProtocol['status'];
+  pausedAt: string | null;
+};
+
+async function upsertActiveSyncOperationLedger(
+  userId: string,
+  activeId: string,
+  clientOperationId: string,
+  payload: Record<string, unknown>,
+  operationKind: 'pause_command' | 'resume_command',
+) {
+  const supabase = getSupabaseClient();
+  const row = {
+    id: cloudOperationId(userId, clientOperationId),
+    user_id: userId,
+    operation_kind: operationKind,
+    entity_type: 'active_protocol',
+    entity_id: cloudActiveId(userId, activeId),
+    idempotency_key: clientOperationId,
+    payload,
+    status: 'inflight',
+    attempt_count: 1,
+    source: 'client',
+    next_attempt_at: null,
+    last_error: null,
+    completed_at: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from('sync_operations').upsert(row, {
+    onConflict: 'user_id,idempotency_key',
+  });
+  if (error) {
+    console.warn('[sync-operations-ledger]', error.message);
+  }
+}
+
+async function updateActiveSyncOperationLedger(
+  userId: string,
+  clientOperationId: string,
+  status: 'succeeded' | 'failed',
+  lastError?: string,
+) {
+  const supabase = getSupabaseClient();
+  const patch = {
+    status,
+    last_error: lastError ?? null,
+    completed_at: status === 'succeeded' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+    next_attempt_at: null,
+  };
+  const { error } = await supabase
+    .from('sync_operations')
+    .update(patch)
+    .eq('user_id', userId)
+    .eq('idempotency_key', clientOperationId);
+  if (error) {
+    console.warn('[sync-operations-ledger]', error.message);
+  }
+}
+
 async function upsertDoseSyncOperationLedger(
   userId: string,
   clientOperationId: string,
@@ -967,6 +1029,97 @@ export async function syncSnoozeDoseCommand(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await updateDoseSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
+  }
+}
+
+export async function syncPauseProtocolCommand(
+  userId: string,
+  activeId: string,
+  pausedAt: string,
+  clientOperationId: string,
+): Promise<ActiveCommandResult> {
+  const supabase = getSupabaseClient();
+  const cActiveId = cloudActiveId(userId, activeId);
+  await upsertActiveSyncOperationLedger(
+    userId,
+    activeId,
+    clientOperationId,
+    {
+      activeId,
+      cloudActiveId: cActiveId,
+      status: 'paused',
+      pausedAt,
+    },
+    'pause_command',
+  );
+
+  try {
+    const { error } = await supabase
+      .from('active_protocols')
+      .update({
+        status: 'paused',
+        paused_at: pausedAt,
+      })
+      .eq('id', cActiveId)
+      .eq('user_id', userId);
+    if (error) throw new Error(`Pause command sync failed: ${error.message}`);
+
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'succeeded');
+
+    return {
+      clientOperationId,
+      status: 'paused',
+      pausedAt,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'failed', message);
+    throw error;
+  }
+}
+
+export async function syncResumeProtocolCommand(
+  userId: string,
+  activeId: string,
+  clientOperationId: string,
+): Promise<ActiveCommandResult> {
+  const supabase = getSupabaseClient();
+  const cActiveId = cloudActiveId(userId, activeId);
+  await upsertActiveSyncOperationLedger(
+    userId,
+    activeId,
+    clientOperationId,
+    {
+      activeId,
+      cloudActiveId: cActiveId,
+      status: 'active',
+      pausedAt: null,
+    },
+    'resume_command',
+  );
+
+  try {
+    const { error } = await supabase
+      .from('active_protocols')
+      .update({
+        status: 'active',
+        paused_at: null,
+      })
+      .eq('id', cActiveId)
+      .eq('user_id', userId);
+    if (error) throw new Error(`Resume command sync failed: ${error.message}`);
+
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'succeeded');
+
+    return {
+      clientOperationId,
+      status: 'active',
+      pausedAt: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateActiveSyncOperationLedger(userId, clientOperationId, 'failed', message);
     throw error;
   }
 }

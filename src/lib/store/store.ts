@@ -13,6 +13,8 @@ import type { Drug } from '@/types';
 import {
   syncActivation,
   syncActiveStatus,
+  syncPauseProtocolCommand,
+  syncResumeProtocolCommand,
   syncSnoozeDoseCommand,
   syncSkipDoseCommand,
   syncTakeDoseCommand,
@@ -132,6 +134,10 @@ function computeInclusiveEndDate(startDate: string, durationDays: number | undef
 
 function doseSlotKey(protocolItemId: string, scheduledDate: string, scheduledTime: string): string {
   return `${protocolItemId}|${scheduledDate}|${scheduledTime.slice(0, 5)}`;
+}
+
+function buildLifecycleCommandOperationId(kind: 'pause' | 'resume', activeId: string, at: string): string {
+  return `${kind}:${activeId}:${at}`;
 }
 
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
@@ -460,6 +466,7 @@ export const useStore = create<AppState>()(
       pauseProtocol: (activeId) => {
         const pausedAt = new Date().toISOString();
         const profileId = get().profile?.id;
+        const clientOperationId = buildLifecycleCommandOperationId('pause', activeId, pausedAt);
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
             ap.id === activeId ? { ...ap, status: 'paused' as ProtocolStatus, pausedAt } : ap
@@ -467,14 +474,16 @@ export const useStore = create<AppState>()(
         }));
         if (profileId) {
           syncFireAndForget(
-            syncActiveStatus(profileId, activeId, { status: 'paused', pausedAt }),
-            { kind: 'activeStatus', payload: { userId: profileId, activeId, patch: { status: 'paused', pausedAt } } },
+            syncPauseProtocolCommand(profileId, activeId, pausedAt, clientOperationId),
+            { kind: 'pauseCommand', payload: { userId: profileId, activeId, pausedAt, clientOperationId } },
           );
         }
       },
 
       resumeProtocol: (activeId) => {
         const profileId = get().profile?.id;
+        const resumedAt = new Date().toISOString();
+        const clientOperationId = buildLifecycleCommandOperationId('resume', activeId, resumedAt);
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
             ap.id === activeId ? { ...ap, status: 'active' as ProtocolStatus, pausedAt: undefined } : ap
@@ -482,8 +491,8 @@ export const useStore = create<AppState>()(
         }));
         if (profileId) {
           syncFireAndForget(
-            syncActiveStatus(profileId, activeId, { status: 'active' }),
-            { kind: 'activeStatus', payload: { userId: profileId, activeId, patch: { status: 'active' } } },
+            syncResumeProtocolCommand(profileId, activeId, clientOperationId),
+            { kind: 'resumeCommand', payload: { userId: profileId, activeId, clientOperationId } },
           );
         }
       },

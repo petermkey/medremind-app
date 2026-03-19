@@ -4,6 +4,8 @@ import type { ActiveProtocol, DoseRecord, Protocol, ScheduledDose } from '@/type
 import {
   syncActivation,
   syncActiveStatus,
+  syncPauseProtocolCommand,
+  syncResumeProtocolCommand,
   syncDoseAction,
   syncSnoozeDoseCommand,
   syncSkipDoseCommand,
@@ -24,7 +26,9 @@ type SyncKind =
   | 'doseAction'
   | 'takeCommand'
   | 'skipCommand'
-  | 'snoozeCommand';
+  | 'snoozeCommand'
+  | 'pauseCommand'
+  | 'resumeCommand';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -68,6 +72,17 @@ type SyncPayloadMap = {
     record: DoseRecord;
     clientOperationId: string;
   };
+  pauseCommand: {
+    userId: string;
+    activeId: string;
+    pausedAt: string;
+    clientOperationId: string;
+  };
+  resumeCommand: {
+    userId: string;
+    activeId: string;
+    clientOperationId: string;
+  };
 };
 
 export type SyncOperation =
@@ -80,7 +95,9 @@ export type SyncOperation =
   | { kind: 'doseAction'; payload: SyncPayloadMap['doseAction'] }
   | { kind: 'takeCommand'; payload: SyncPayloadMap['takeCommand'] }
   | { kind: 'skipCommand'; payload: SyncPayloadMap['skipCommand'] }
-  | { kind: 'snoozeCommand'; payload: SyncPayloadMap['snoozeCommand'] };
+  | { kind: 'snoozeCommand'; payload: SyncPayloadMap['snoozeCommand'] }
+  | { kind: 'pauseCommand'; payload: SyncPayloadMap['pauseCommand'] }
+  | { kind: 'resumeCommand'; payload: SyncPayloadMap['resumeCommand'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -200,6 +217,19 @@ async function executeOperation(op: SyncOperation) {
         op.payload.dose,
         op.payload.replacementDose,
         op.payload.record,
+        op.payload.clientOperationId,
+      );
+    case 'pauseCommand':
+      return syncPauseProtocolCommand(
+        op.payload.userId,
+        op.payload.activeId,
+        op.payload.pausedAt,
+        op.payload.clientOperationId,
+      );
+    case 'resumeCommand':
+      return syncResumeProtocolCommand(
+        op.payload.userId,
+        op.payload.activeId,
         op.payload.clientOperationId,
       );
     default:
