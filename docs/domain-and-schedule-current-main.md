@@ -102,12 +102,11 @@ Current behavior:
 
 - Uses live protocol reference from current store:
 - `state.protocols.find(...) ?? active.protocol`
-- Deletes future doses (`scheduledDate >= today`) for target active protocol.
-- Rebuilds future doses from today over 90-day horizon.
+- Deletes only future pending doses (`scheduledDate >= today`, `status === pending`) for target active protocol.
+- Preserves future handled rows and any row with durable execution history (`doseRecords` linkage).
+- Rebuilds future doses from today over 90-day horizon and skips insertion for occupied retained slots.
 - `expandItemToDoses` still enforces active `endDate` cap.
-- Sync path (`syncRegeneratedDoses`) preserves protected slots:
-- statuses `taken`, `skipped`, `snoozed`
-- doses that already have records
+- Sync path (`syncRegeneratedDoses`) follows the same pending-only reconciliation rule and slot protection for retained rows.
 
 ## 7. Dose actions
 
