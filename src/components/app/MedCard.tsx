@@ -159,6 +159,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
 
         {/* Check button */}
         <button
+          aria-label={dose.status === 'taken' ? 'Marked as taken' : 'Mark as taken'}
           onClick={e => { e.stopPropagation(); dose.status !== 'taken' ? onTake() : onSkip(); }}
           className={[
             'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',

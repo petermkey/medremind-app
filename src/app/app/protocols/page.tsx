@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
@@ -248,6 +249,12 @@ function ProtocolRow({
   const [swiped, setSwiped] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const mouseStartX = useRef<number | null>(null);
+  const handleCardKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (!swiped) onOpen();
+    }
+  };
 
   return (
     <div
@@ -274,6 +281,9 @@ function ProtocolRow({
       }}
     >
       <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={handleCardKeyDown}
         className={[
           'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200',
           swiped ? '-translate-x-[132px]' : '',
