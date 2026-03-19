@@ -24,11 +24,10 @@ function greeting() {
 export default function SchedulePage() {
   const {
     profile,
-    activeProtocols,
     selectAppActionableDoses,
     selectAppNextDose,
     selectAppSummaryMetrics,
-    getVisibleDoseDates,
+    selectCalendarVisibleDoseDates,
     takeDose,
     skipDose,
     snoozeDose,
@@ -51,13 +50,13 @@ export default function SchedulePage() {
 
   const actionableDoses = useMemo(
     () => selectAppActionableDoses(selectedDate),
-    [selectedDate, scheduledDoses, activeProtocols, selectAppActionableDoses],
+    [selectedDate, scheduledDoses, selectAppActionableDoses],
   );
 
   // Dates that have at least one dose (for week strip dots)
   const doseDateSet = useMemo(() => {
-    return new Set<string>(getVisibleDoseDates());
-  }, [scheduledDoses, activeProtocols, getVisibleDoseDates]);
+    return new Set<string>(selectCalendarVisibleDoseDates(selectedDate));
+  }, [selectedDate, scheduledDoses, selectCalendarVisibleDoseDates]);
 
   // Group by time block
   const grouped = useMemo(() => {
@@ -76,12 +75,12 @@ export default function SchedulePage() {
 
   const { taken, total, pct } = useMemo(
     () => selectAppSummaryMetrics(selectedDate),
-    [selectedDate, scheduledDoses, activeProtocols, selectAppSummaryMetrics],
+    [selectedDate, scheduledDoses, selectAppSummaryMetrics],
   );
 
   const nextDose = useMemo(
     () => selectAppNextDose(selectedDate),
-    [selectedDate, scheduledDoses, activeProtocols, selectAppNextDose],
+    [selectedDate, scheduledDoses, selectAppNextDose],
   );
 
   function toDateTime(dateStr: string, timeStr: string) {

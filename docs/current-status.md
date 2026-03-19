@@ -20,6 +20,7 @@ Overall: beta, with focused hardening already landed across auth, protocol/sched
 - Sync outbox retry lifecycle + guarded sign-out flow
 - Improved swipe targeting and action accessibility labels in key schedule/protocol rows
 - Progress screen lifecycle-aware selector path (avoids raw `scheduledDoses` scans)
+- Schedule calendar date projection uses lifecycle-aware selector path (`selectCalendarVisibleDoseDates`)
 - Protocol Detail lifecycle-aware read path (`selectProtocolDetailReadModel`)
 - Take action command path with client operation id/idempotency (`syncTakeDoseCommand`)
 - Skip action command path with client operation id/idempotency (`syncSkipDoseCommand`)

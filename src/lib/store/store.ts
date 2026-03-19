@@ -285,7 +285,7 @@ interface AppState {
   selectProgressDayProtocolStats: (date: string) => Record<string, { total: number; taken: number }>;
   selectProgressProtocolWeights: (dates: string[]) => Record<string, number>;
   selectTodayScheduleView: (date: string) => ScheduledDose[];
-  getVisibleDoseDates: () => string[];
+  selectCalendarVisibleDoseDates: (anchorDate: string, lookbackDays?: number, lookaheadDays?: number) => string[];
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
@@ -845,20 +845,33 @@ export const useStore = create<AppState>()(
         return get().selectAppActionableDoses(date);
       },
 
-      getVisibleDoseDates: () => {
+      selectCalendarVisibleDoseDates: (anchorDate, lookbackDays = 60, lookaheadDays = 60) => {
+        const state = get();
+        const parsedAnchor = parseISO(anchorDate);
+        const resolvedAnchor = Number.isNaN(parsedAnchor.getTime()) ? new Date() : parsedAnchor;
+        const fromDate = format(addDays(resolvedAnchor, -lookbackDays), 'yyyy-MM-dd');
+        const toDate = format(addDays(resolvedAnchor, lookaheadDays), 'yyyy-MM-dd');
         const todayDate = today();
-        const activeIds = new Set(
-          get().activeProtocols
-            .filter(ap => ap.status === 'active')
-            .map(ap => ap.id),
-        );
+        const activeById = new Map(state.activeProtocols.map(ap => [ap.id, ap]));
         const dates = new Set<string>();
-        get().scheduledDoses.forEach(d => {
-          if (d.scheduledDate < todayDate || activeIds.has(d.activeProtocolId)) {
-            dates.add(d.scheduledDate);
+
+        for (const dose of state.scheduledDoses) {
+          if (dose.scheduledDate < fromDate || dose.scheduledDate > toDate) continue;
+
+          if (dose.scheduledDate < todayDate) {
+            dates.add(dose.scheduledDate);
+            continue;
           }
-        });
-        return [...dates];
+
+          const active = activeById.get(dose.activeProtocolId);
+          if (!active || active.status !== 'active') continue;
+          if (active.endDate && dose.scheduledDate > active.endDate) continue;
+          if (dose.status === 'skipped' || dose.status === 'snoozed') continue;
+
+          dates.add(dose.scheduledDate);
+        }
+
+        return [...dates].sort();
       },
 
       takeDose: (doseId, note) => {
