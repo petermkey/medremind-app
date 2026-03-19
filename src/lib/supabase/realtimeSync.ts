@@ -920,6 +920,41 @@ export async function syncSnoozeDoseCommand(
     const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
     if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
 
+    const executionEventRow = {
+      id: stableUuid(`execution-event:${userId}`, clientOperationId),
+      user_id: userId,
+      planned_occurrence_id: null,
+      legacy_scheduled_dose_id: cDoseId,
+      legacy_dose_record_id: cRecordId,
+      active_protocol_id: cReplacementActiveId,
+      protocol_item_id: cReplacementItemId,
+      event_type: 'snoozed',
+      event_at: record.recordedAt,
+      effective_date: targetDate,
+      effective_time: targetTime,
+      note: record.note ?? null,
+      source: 'snooze_command',
+      idempotency_key: clientOperationId,
+    };
+    const { error: eventInsertErr } = await supabase
+      .from('execution_events')
+      .insert(executionEventRow);
+    if (eventInsertErr) {
+      if (isUniqueViolation(eventInsertErr, 'uq_execution_events_idempotency')) {
+        const { data: existingEvent, error: existingEventErr } = await supabase
+          .from('execution_events')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('idempotency_key', clientOperationId)
+          .maybeSingle();
+        if (existingEventErr || !existingEvent) {
+          throw new Error(`Execution event idempotency check failed: ${existingEventErr?.message ?? 'existing row not found'}`);
+        }
+      } else {
+        throw new Error(`Execution event sync failed: ${eventInsertErr.message}`);
+      }
+    }
+
     await updateDoseSyncOperationLedger(userId, clientOperationId, 'succeeded');
 
     return {
