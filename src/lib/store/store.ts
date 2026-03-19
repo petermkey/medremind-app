@@ -70,6 +70,11 @@ function normalizeDurationDays(value: unknown): number | undefined {
   return days > 0 ? days : undefined;
 }
 
+function computeInclusiveEndDate(startDate: string, durationDays: number | undefined): string | undefined {
+  if (!durationDays) return undefined;
+  return format(addDays(parseISO(startDate), durationDays - 1), 'yyyy-MM-dd');
+}
+
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
   const tracked = trackRealtimeSync(task);
   void tracked
@@ -330,10 +335,7 @@ export const useStore = create<AppState>()(
         const protocol = state.protocols.find(p => p.id === protocolId);
         if (!protocol || !state.profile) throw new Error('Protocol or profile not found');
         const fixedDurationDays = normalizeDurationDays(protocol.durationDays);
-        const endDate =
-          fixedDurationDays && fixedDurationDays > 0
-            ? format(addDays(parseISO(startDate), fixedDurationDays - 1), 'yyyy-MM-dd')
-            : undefined;
+        const endDate = computeInclusiveEndDate(startDate, fixedDurationDays);
 
         const active: ActiveProtocol = {
           id: generateId('active'),
@@ -444,6 +446,8 @@ export const useStore = create<AppState>()(
 
       updateProtocol: (id, patch) => {
         const profileId = get().profile?.id;
+        const currentProtocol = get().protocols.find(p => p.id === id);
+        const currentDurationDays = normalizeDurationDays(currentProtocol?.durationDays);
         let nextProtocol: Protocol | null = null;
         const normalizedPatch: Partial<Protocol> = {
           ...patch,
@@ -451,15 +455,31 @@ export const useStore = create<AppState>()(
             ? { durationDays: normalizeDurationDays(patch.durationDays) }
             : {}),
         };
+        const nextDurationDays = normalizeDurationDays(
+          Object.prototype.hasOwnProperty.call(normalizedPatch, 'durationDays')
+            ? normalizedPatch.durationDays
+            : currentDurationDays,
+        );
+        const durationChanged =
+          Object.prototype.hasOwnProperty.call(normalizedPatch, 'durationDays') &&
+          currentDurationDays !== nextDurationDays;
+        const activeToRegenerate = new Set<string>();
         set(s => {
           const protocols = s.protocols.map(p => {
             if (p.id !== id) return p;
             nextProtocol = { ...p, ...normalizedPatch };
             return nextProtocol;
           });
-          const activeProtocols = s.activeProtocols.map(ap =>
-            ap.protocolId === id && nextProtocol ? { ...ap, protocol: nextProtocol } : ap
-          );
+          const activeProtocols = s.activeProtocols.map(ap => {
+            if (ap.protocolId !== id || !nextProtocol) return ap;
+            const nextActive = { ...ap, protocol: nextProtocol };
+            if (!durationChanged || ap.status === 'completed') return nextActive;
+            activeToRegenerate.add(ap.id);
+            return {
+              ...nextActive,
+              endDate: computeInclusiveEndDate(ap.startDate, nextDurationDays),
+            };
+          });
           return { protocols, activeProtocols };
         });
         if (profileId && nextProtocol) {
@@ -467,6 +487,11 @@ export const useStore = create<AppState>()(
             syncProtocolUpsert(profileId, nextProtocol),
             { kind: 'protocolUpsert', payload: { userId: profileId, protocol: nextProtocol } },
           );
+        }
+        if (durationChanged && activeToRegenerate.size > 0) {
+          for (const activeId of activeToRegenerate) {
+            get().regenerateDoses(activeId);
+          }
         }
       },
 
