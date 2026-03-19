@@ -210,6 +210,14 @@ export default function ProtocolsPage() {
                 </div>
 
                 <button
+                  type="button"
+                  aria-label={
+                    instance?.status === 'active'
+                      ? `Pause protocol ${p.name}`
+                      : instance?.status === 'paused'
+                      ? `Resume protocol ${p.name}`
+                      : `Activate protocol ${p.name}`
+                  }
                   onClick={e => {
                     e.stopPropagation();
                     if (instance) handleAction(p.id, instance.status, instance.id);
@@ -302,6 +310,8 @@ function ProtocolRow({
         ].join(' ')}
       >
         <button
+          type="button"
+          aria-label="Edit protocol"
           onClick={e => {
             e.stopPropagation();
             onEdit();
@@ -312,6 +322,8 @@ function ProtocolRow({
           ✏️<br />Edit
         </button>
         <button
+          type="button"
+          aria-label="Delete protocol"
           onClick={e => {
             e.stopPropagation();
             onDelete();

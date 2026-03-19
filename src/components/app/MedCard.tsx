@@ -159,6 +159,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
 
         {/* Check button */}
         <button
+          type="button"
           aria-label={dose.status === 'taken' ? 'Marked as taken' : 'Mark as taken'}
           onClick={e => { e.stopPropagation(); dose.status !== 'taken' ? onTake() : onSkip(); }}
           className={[
@@ -182,12 +183,16 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
         ].join(' ')}
       >
         <button
+          type="button"
+          aria-label={`Snooze ${item.name}`}
           onClick={() => { onSnooze(); setSwiped(false); }}
           className="px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1"
         >
           ⏰<br />Snooze
         </button>
         <button
+          type="button"
+          aria-label={`Skip ${item.name}`}
           onClick={() => { onSkip(); setSwiped(false); }}
           className="px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
         >
