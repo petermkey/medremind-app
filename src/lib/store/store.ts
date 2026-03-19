@@ -263,6 +263,7 @@ interface AppState {
 
   // Actions — Schedule
   getDaySchedule: (date: string) => ScheduledDose[];
+  selectTodayScheduleView: (date: string) => ScheduledDose[];
   getVisibleDoseDates: () => string[];
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
@@ -691,6 +692,11 @@ export const useStore = create<AppState>()(
           d => d.scheduledDate === date && activeIds.has(d.activeProtocolId),
         );
         return doses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+      },
+
+      selectTodayScheduleView: (date) => {
+        const doses = get().getDaySchedule(date);
+        return doses.filter(d => d.status !== 'skipped' && d.status !== 'snoozed');
       },
 
       getVisibleDoseDates: () => {

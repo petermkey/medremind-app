@@ -26,6 +26,7 @@ export default function SchedulePage() {
     profile,
     activeProtocols,
     getDaySchedule,
+    selectTodayScheduleView,
     getVisibleDoseDates,
     takeDose,
     skipDose,
@@ -48,9 +49,9 @@ export default function SchedulePage() {
   }, []);
 
   const doses = useMemo(() => getDaySchedule(selectedDate), [selectedDate, scheduledDoses]);
-  const visibleDoses = useMemo(
-    () => doses.filter(d => d.status !== 'skipped' && d.status !== 'snoozed'),
-    [doses],
+  const actionableDoses = useMemo(
+    () => selectTodayScheduleView(selectedDate),
+    [selectedDate, scheduledDoses, activeProtocols, selectTodayScheduleView],
   );
 
   // Dates that have at least one dose (for week strip dots)
@@ -60,9 +61,9 @@ export default function SchedulePage() {
 
   // Group by time block
   const grouped = useMemo(() => {
-    const blocks: { label: string; doses: typeof visibleDoses }[] = [];
+    const blocks: { label: string; doses: typeof actionableDoses }[] = [];
     const seen: Record<string, number> = {};
-    for (const dose of visibleDoses) {
+    for (const dose of actionableDoses) {
       const [h] = dose.scheduledTime.split(':').map(Number);
       const label = h < 12 ? `Morning · ${fmtTime(dose.scheduledTime)}` :
                     h < 17 ? `Afternoon · ${fmtTime(dose.scheduledTime)}` :
@@ -71,9 +72,9 @@ export default function SchedulePage() {
       blocks[seen[label]].doses.push(dose);
     }
     return blocks;
-  }, [visibleDoses]);
+  }, [actionableDoses]);
 
-  const metricDoses = doses.filter(d => d.status !== 'snoozed');
+  const metricDoses = actionableDoses;
   const taken = metricDoses.filter(d => d.status === 'taken').length;
   const total = metricDoses.length;
   const pct = total ? Math.round((taken / total) * 100) : 0;
