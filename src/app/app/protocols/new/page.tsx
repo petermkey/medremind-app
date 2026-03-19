@@ -42,6 +42,16 @@ function generateDraftItemId() {
   return `protocol-item-${Date.now()}-${rand}`;
 }
 
+function parseFixedDurationDays(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return null;
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed <= 0) return null;
+  return parsed;
+}
+
 export default function NewProtocolPage() {
   const router = useRouter();
   const { profile, createCustomProtocol, activateProtocol } = useStore();
@@ -66,6 +76,10 @@ export default function NewProtocolPage() {
 
   function handleStep1() {
     if (!name.trim()) { show('Protocol name is required', 'warning'); return; }
+    if (duration === 'fixed' && parseFixedDurationDays(durationDays) === null) {
+      show('Fixed duration must be a positive whole number of days', 'warning');
+      return;
+    }
     setStep(2);
   }
 
@@ -86,6 +100,12 @@ export default function NewProtocolPage() {
 
   function handleFinish() {
     if (isSubmitting) return;
+    const parsedFixedDurationDays = duration === 'fixed' ? parseFixedDurationDays(durationDays) : null;
+    if (duration === 'fixed' && parsedFixedDurationDays === null) {
+      show('Fixed duration must be a positive whole number of days', 'warning');
+      return;
+    }
+    const validatedDurationDays = duration === 'fixed' ? parsedFixedDurationDays ?? undefined : undefined;
     if (!items.length) {
       show('Add at least one item before finalizing', 'warning');
       return;
@@ -103,7 +123,7 @@ export default function NewProtocolPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         category,
-        durationDays: duration === 'fixed' ? parseInt(durationDays) : undefined,
+        durationDays: validatedDurationDays,
         items: items.map((it, i) => ({ ...it, id: generateDraftItemId(), protocolId: '_temp_', sortOrder: i })),
         isArchived: false,
       });
