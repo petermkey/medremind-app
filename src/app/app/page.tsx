@@ -204,7 +204,12 @@ export default function SchedulePage() {
               <Link href="/app/protocols" className="text-sm font-semibold text-[#3B82F6] border border-[rgba(59,130,246,0.3)] px-4 py-2.5 rounded-xl hover:bg-[rgba(59,130,246,0.1)]">
                 Browse Protocols
               </Link>
-              <button onClick={() => setSheetOpen(true)} className="text-sm font-semibold text-white bg-[#3B82F6] px-4 py-2.5 rounded-xl hover:bg-[#2563EB]">
+              <button
+                type="button"
+                aria-label="Add dose manually"
+                onClick={() => setSheetOpen(true)}
+                className="text-sm font-semibold text-white bg-[#3B82F6] px-4 py-2.5 rounded-xl hover:bg-[#2563EB]"
+              >
                 + Add Manually
               </button>
             </div>
@@ -233,6 +238,8 @@ export default function SchedulePage() {
 
       {/* FAB */}
       <button
+        type="button"
+        aria-label="Open add dose sheet"
         onClick={() => setSheetOpen(true)}
         className="absolute bottom-24 right-5 w-12 h-12 bg-[#3B82F6] hover:bg-[#2563EB] rounded-[16px] shadow-[0_4px_20px_rgba(59,130,246,0.5)] flex items-center justify-center text-2xl text-white transition-all duration-200 z-10"
       >
@@ -248,12 +255,12 @@ export default function SchedulePage() {
               {snoozeTargetDose.protocolItem.name}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => applySnooze('1h')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">1 hour</button>
-              <button onClick={() => applySnooze('evening')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">This evening</button>
-              <button onClick={() => applySnooze('tomorrow')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Tomorrow</button>
-              <button onClick={() => applySnooze('next_week')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Next week</button>
+              <button type="button" aria-label="Snooze by one hour" onClick={() => applySnooze('1h')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">1 hour</button>
+              <button type="button" aria-label="Snooze until this evening" onClick={() => applySnooze('evening')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">This evening</button>
+              <button type="button" aria-label="Snooze until tomorrow" onClick={() => applySnooze('tomorrow')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Tomorrow</button>
+              <button type="button" aria-label="Snooze until next week" onClick={() => applySnooze('next_week')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Next week</button>
             </div>
-            <button onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#8B949E]">Cancel</button>
+            <button type="button" aria-label="Cancel snooze selection" onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#8B949E]">Cancel</button>
           </div>
         </div>
       )}
