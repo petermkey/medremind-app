@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "tool:backfill:planned-future": "node scripts/backfill-planned-future-occurrences.mjs",
     "tool:backfill:execution-history": "node scripts/backfill-execution-history.mjs",
     "tool:validate:lifecycle-parity": "node scripts/validate-lifecycle-parity.mjs",
     "test:e2e": "playwright test",
