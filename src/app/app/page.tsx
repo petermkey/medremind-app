@@ -63,7 +63,9 @@ export default function SchedulePage() {
   const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
   const isHistoryDate = selectedDate < todayStr;
   const isFutureDate = selectedDate > todayStr;
-  const futureActionMessage = 'Future doses can only be handled on the active day or later as history';
+  const futureActionMessage = 'You can change a dose only on its scheduled day or later from History.';
+  const pausedHistoryActionMessage = 'For past dates, you can move only active doses from active protocols. To change doses in a paused protocol, please resume that protocol first.';
+  const pausedProtocolActionMessage = 'This protocol is paused. Please resume it first to change dose actions.';
 
   useEffect(() => {
     const update = () => setClock(format(new Date(), 'HH:mm'));
@@ -275,7 +277,7 @@ export default function SchedulePage() {
                 const protocolLocked = dose.activeProtocol.status !== 'active';
                 const actionsDisabled = isFutureDate || protocolLocked;
                 const disabledMessage = protocolLocked
-                  ? 'This protocol is paused. Resume it to change dose actions.'
+                  ? (isHistoryDate ? pausedHistoryActionMessage : pausedProtocolActionMessage)
                   : futureActionMessage;
 
                 return (
