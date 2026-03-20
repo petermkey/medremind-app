@@ -160,12 +160,15 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
         {/* Check button */}
         <button
           type="button"
-          aria-label={dose.status === 'taken' ? 'Marked as taken' : 'Mark as taken'}
-          onClick={e => { e.stopPropagation(); dose.status !== 'taken' ? onTake() : onSkip(); }}
+          aria-label={dose.status === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
+          onClick={e => {
+            e.stopPropagation();
+            if (dose.status !== 'taken') onTake();
+          }}
           className={[
             'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
             dose.status === 'taken'
-              ? 'bg-[#10B981] border-[#10B981] text-white'
+              ? 'bg-[#10B981] border-[#10B981] text-white cursor-default'
               : dose.status === 'overdue'
               ? 'border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white'
               : 'border-[rgba(255,255,255,0.15)] text-[#8B949E] hover:border-[#10B981] hover:text-[#10B981]',
