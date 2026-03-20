@@ -271,34 +271,44 @@ export default function SchedulePage() {
               <div className="flex-1 h-px bg-[rgba(255,255,255,0.05)]" />
             </div>
             {group.map(dose => (
-              <MedCard
-                key={dose.id}
-                dose={dose}
-                actionsDisabled={isFutureDate}
-                onTake={() => {
-                  if (isFutureDate) {
-                    show(futureActionMessage, 'warning');
-                    return;
-                  }
-                  takeDose(dose.id);
-                  show(`✓ ${dose.protocolItem.name} taken`);
-                }}
-                onSkip={() => {
-                  if (isFutureDate) {
-                    show(futureActionMessage, 'warning');
-                    return;
-                  }
-                  skipDose(dose.id);
-                  show(`Skipped ${dose.protocolItem.name}`, 'warning');
-                }}
-                onSnooze={() => {
-                  if (isFutureDate) {
-                    show(futureActionMessage, 'warning');
-                    return;
-                  }
-                  setSnoozeTargetDose(dose);
-                }}
-              />
+              (() => {
+                const protocolLocked = dose.activeProtocol.status !== 'active';
+                const actionsDisabled = isFutureDate || protocolLocked;
+                const disabledMessage = protocolLocked
+                  ? 'This protocol is paused. Resume it to change dose actions.'
+                  : futureActionMessage;
+
+                return (
+                  <MedCard
+                    key={dose.id}
+                    dose={dose}
+                    actionsDisabled={actionsDisabled}
+                    onTake={() => {
+                      if (actionsDisabled) {
+                        show(disabledMessage, 'warning');
+                        return;
+                      }
+                      takeDose(dose.id);
+                      show(`✓ ${dose.protocolItem.name} taken`);
+                    }}
+                    onSkip={() => {
+                      if (actionsDisabled) {
+                        show(disabledMessage, 'warning');
+                        return;
+                      }
+                      skipDose(dose.id);
+                      show(`Skipped ${dose.protocolItem.name}`, 'warning');
+                    }}
+                    onSnooze={() => {
+                      if (actionsDisabled) {
+                        show(disabledMessage, 'warning');
+                        return;
+                      }
+                      setSnoozeTargetDose(dose);
+                    }}
+                  />
+                );
+              })()
             ))}
           </div>
         ))}

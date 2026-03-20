@@ -130,7 +130,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
           'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
           'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
           swiped ? '-translate-x-[130px]' : '',
-          dose.status === 'taken' ? 'opacity-60' : '',
+          actionsDisabled ? 'opacity-70' : dose.status === 'taken' ? 'opacity-60' : '',
         ].join(' ')}
         style={{ borderRadius: swiped ? '18px 0 0 18px' : undefined }}
       >
