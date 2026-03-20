@@ -938,10 +938,21 @@ export const useStore = create<AppState>()(
             if (dose.scheduledDate !== date) return false;
 
             const records = recordByDoseId.get(dose.id) ?? [];
+            let latestAction: DoseRecord['action'] | null = null;
+            let latestRecordedAt = '';
+            for (const record of records) {
+              if (record.recordedAt >= latestRecordedAt) {
+                latestRecordedAt = record.recordedAt;
+                latestAction = record.action;
+              }
+            }
             const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
             const hasHandledRecord = records.some(
               record => record.action === 'taken' || record.action === 'skipped',
             );
+            const wasMovedBySnooze = dose.status === 'snoozed' || latestAction === 'snoozed';
+
+            if (wasMovedBySnooze) return false;
 
             // A snoozed origin dose is logically moved to a new slot and should not remain
             // visible on the original day; only handled history stays on the day surface.
