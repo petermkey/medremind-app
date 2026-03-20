@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState, useEffect } from 'react';
-import { addDays, addMinutes, format } from 'date-fns';
+import { addDays, addMinutes, format, parseISO } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { WeekStrip } from '@/components/app/WeekStrip';
 import { MedCard } from '@/components/app/MedCard';
@@ -115,6 +115,7 @@ export default function SchedulePage() {
 
   function getSnoozeUntil(dose: ScheduledDose, option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
     const now = new Date();
+    const isHistoricalDose = dose.scheduledDate < todayStr;
     const intendedTime = dose.protocolItem.times[0] ?? dose.scheduledTime;
     const [intendedHours, intendedMinutes] = intendedTime.split(':').map(Number);
 
@@ -130,12 +131,16 @@ export default function SchedulePage() {
     }
 
     if (option === 'tomorrow') {
-      const target = addDays(now, 1);
+      const target = isHistoricalDose
+        ? addDays(parseISO(dose.scheduledDate), 1)
+        : addDays(now, 1);
       target.setHours(intendedHours, intendedMinutes, 0, 0);
       return target;
     }
 
-    const nextWeek = addDays(now, 7);
+    const nextWeek = isHistoricalDose
+      ? addDays(parseISO(dose.scheduledDate), 7)
+      : addDays(now, 7);
     nextWeek.setHours(intendedHours, intendedMinutes, 0, 0);
     return nextWeek;
   }
