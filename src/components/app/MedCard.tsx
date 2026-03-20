@@ -35,6 +35,7 @@ interface Props {
   onTake: () => void;
   onSkip: () => void;
   onSnooze: () => void;
+  actionsDisabled?: boolean;
 }
 
 function fmt(t: string) {
@@ -42,7 +43,7 @@ function fmt(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
+export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = false }: Props) {
   const item = dose.protocolItem;
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const statusColor = STATUS_COLOR[dose.status] ?? '#8B949E';
@@ -80,6 +81,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
   }, [dose.id]);
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (actionsDisabled) return;
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
     gesture.current.pointerId = e.pointerId;
     gesture.current.startX = e.clientX;
@@ -87,6 +89,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
   };
 
   const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (actionsDisabled) return;
     if (gesture.current.pointerId !== e.pointerId) return;
     const dx = gesture.current.startX - e.clientX;
     const dy = Math.abs(gesture.current.startY - e.clientY);
@@ -163,10 +166,12 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
           aria-label={dose.status === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
           onClick={e => {
             e.stopPropagation();
-            if (dose.status !== 'taken') onTake();
+            if (!actionsDisabled && dose.status !== 'taken') onTake();
           }}
+          disabled={actionsDisabled}
           className={[
             'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
+            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
             dose.status === 'taken'
               ? 'bg-[#10B981] border-[#10B981] text-white cursor-default'
               : dose.status === 'overdue'
@@ -188,16 +193,24 @@ export function MedCard({ dose, onTake, onSkip, onSnooze }: Props) {
         <button
           type="button"
           aria-label={`Snooze ${item.name}`}
+          disabled={actionsDisabled}
           onClick={() => { onSnooze(); setSwiped(false); }}
-          className="px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+          className={[
+            'px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1',
+            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+          ].join(' ')}
         >
           ⏰<br />Snooze
         </button>
         <button
           type="button"
           aria-label={`Skip ${item.name}`}
+          disabled={actionsDisabled}
           onClick={() => { onSkip(); setSwiped(false); }}
-          className="px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
+          className={[
+            'px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]',
+            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+          ].join(' ')}
         >
           ✕<br />Skip
         </button>

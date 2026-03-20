@@ -42,6 +42,7 @@ export default function SchedulePage() {
   const [clock, setClock] = useState('');
   const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
   const isHistoryDate = selectedDate < todayStr;
+  const isFutureDate = selectedDate > todayStr;
 
   useEffect(() => {
     const update = () => setClock(format(new Date(), 'HH:mm'));
@@ -237,9 +238,30 @@ export default function SchedulePage() {
               <MedCard
                 key={dose.id}
                 dose={dose}
-                onTake={() => { takeDose(dose.id); show(`✓ ${dose.protocolItem.name} taken`); }}
-                onSkip={() => { skipDose(dose.id); show(`Skipped ${dose.protocolItem.name}`, 'warning'); }}
-                onSnooze={() => { setSnoozeTargetDose(dose); }}
+                actionsDisabled={isFutureDate}
+                onTake={() => {
+                  if (isFutureDate) {
+                    show('Future doses can only be handled on the active day or later as history', 'warning');
+                    return;
+                  }
+                  takeDose(dose.id);
+                  show(`✓ ${dose.protocolItem.name} taken`);
+                }}
+                onSkip={() => {
+                  if (isFutureDate) {
+                    show('Future doses can only be handled on the active day or later as history', 'warning');
+                    return;
+                  }
+                  skipDose(dose.id);
+                  show(`Skipped ${dose.protocolItem.name}`, 'warning');
+                }}
+                onSnooze={() => {
+                  if (isFutureDate) {
+                    show('Future doses can only be handled on the active day or later as history', 'warning');
+                    return;
+                  }
+                  setSnoozeTargetDose(dose);
+                }}
               />
             ))}
           </div>

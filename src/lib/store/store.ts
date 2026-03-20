@@ -54,8 +54,44 @@ export async function waitForRealtimeSyncIdle(timeoutMs = 8_000): Promise<{ ok: 
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
-const today = () => format(new Date(), 'yyyy-MM-dd');
+function nowDateTimeForTimezone(timezone?: string): { date: string; time: string } {
+  const now = new Date();
+  const resolvedTimezone = timezone && timezone.trim().length > 0
+    ? timezone
+    : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: resolvedTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(now);
+    const lookup = new Map(parts.map(p => [p.type, p.value]));
+    const date = `${lookup.get('year')}-${lookup.get('month')}-${lookup.get('day')}`;
+    const time = `${lookup.get('hour')}:${lookup.get('minute')}`;
+    if (date.length === 10 && time.length === 5) return { date, time };
+  } catch (error) {
+    console.warn('[timezone-now-fallback]', error);
+  }
+  return {
+    date: format(now, 'yyyy-MM-dd'),
+    time: format(now, 'HH:mm'),
+  };
+}
+
+const today = () => nowDateTimeForTimezone().date;
 const nowTime = () => format(new Date(), 'HH:mm');
+
+function isFutureDoseByDate(
+  dose: ScheduledDose,
+  profile?: UserProfile | null,
+): boolean {
+  const { date: todayDate } = nowDateTimeForTimezone(profile?.timezone);
+  return dose.scheduledDate > todayDate;
+}
 
 function generateId(prefix: string): string {
   try {
@@ -917,6 +953,7 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
+        if (isFutureDoseByDate(dose, state.profile)) return;
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'taken',
         );
@@ -954,6 +991,7 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
+        if (isFutureDoseByDate(dose, state.profile)) return;
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'skipped',
         );
@@ -991,6 +1029,7 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
+        if (isFutureDoseByDate(dose, state.profile)) return;
         const targetDate = typeof option === 'number'
           ? new Date(Date.now() + option * 60000)
           : new Date(option.until);

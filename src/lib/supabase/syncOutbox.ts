@@ -199,7 +199,28 @@ function scheduleNextPump(queue: StoredSyncOperation[]) {
   }, delay);
 }
 
+function todayDateLocal() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isFutureDoseOperation(op: SyncOperation): boolean {
+  const today = todayDateLocal();
+  if (op.kind === 'doseAction') return op.payload.dose.scheduledDate > today;
+  if (op.kind === 'takeCommand') return op.payload.dose.scheduledDate > today;
+  if (op.kind === 'skipCommand') return op.payload.dose.scheduledDate > today;
+  if (op.kind === 'snoozeCommand') return op.payload.dose.scheduledDate > today;
+  return false;
+}
+
 async function executeOperation(op: SyncOperation) {
+  if (isFutureDoseOperation(op)) {
+    console.warn('[sync-outbox] dropped future dose operation', op.kind);
+    return;
+  }
   switch (op.kind) {
     case 'protocolUpsert':
       return syncProtocolUpsert(op.payload.userId, op.payload.protocol);
