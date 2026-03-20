@@ -228,6 +228,14 @@ export default function SchedulePage() {
             </div>
           </div>
         )}
+        {isHistoryDate && (
+          <div className="mb-4 rounded-2xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.1)] px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[#FBBF24]">Past Date</div>
+            <div className="mt-1 text-sm text-[#F0F6FC]">
+              You can edit past doses only for active protocols. Resume paused protocols first.
+            </div>
+          </div>
+        )}
 
         {/* Next dose banner */}
         {nextDose && (
