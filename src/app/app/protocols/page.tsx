@@ -15,10 +15,10 @@ const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
 };
 
 const FILTERS = [
-  { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'templates', label: 'Templates' },
   { value: 'custom', label: 'My Protocols' },
+  { value: 'all', label: 'All' },
 ];
 
 export default function ProtocolsPage() {
@@ -32,7 +32,7 @@ export default function ProtocolsPage() {
     deleteProtocol,
   } = useStore();
   const { show } = useToast();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('active');
   const [search, setSearch] = useState('');
 
   const seedTemplateKeySet = new Set(
