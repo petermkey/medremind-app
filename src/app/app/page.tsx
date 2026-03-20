@@ -21,6 +21,26 @@ function greeting() {
   return 'Good evening';
 }
 
+function currentDateForTimezone(timezone?: string) {
+  const resolvedTimezone = timezone && timezone.trim().length > 0
+    ? timezone
+    : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: resolvedTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const map = new Map(parts.map(p => [p.type, p.value]));
+    const date = `${map.get('year')}-${map.get('month')}-${map.get('day')}`;
+    if (date.length === 10) return date;
+  } catch (error) {
+    console.warn('[schedule-page-timezone-fallback]', error);
+  }
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
 export default function SchedulePage() {
   const {
     profile,
@@ -36,13 +56,14 @@ export default function SchedulePage() {
   } = useStore();
   const { show } = useToast();
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayStr = useMemo(() => currentDateForTimezone(profile?.timezone), [profile?.timezone]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [clock, setClock] = useState('');
   const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
   const isHistoryDate = selectedDate < todayStr;
   const isFutureDate = selectedDate > todayStr;
+  const futureActionMessage = 'Future doses can only be handled on the active day or later as history';
 
   useEffect(() => {
     const update = () => setClock(format(new Date(), 'HH:mm'));
@@ -190,6 +211,14 @@ export default function SchedulePage() {
 
       {/* Scroll area */}
       <div className="flex-1 overflow-y-auto px-5 pb-4">
+        {isFutureDate && (
+          <div className="mb-4 rounded-2xl border border-[rgba(251,191,36,0.35)] bg-[rgba(251,191,36,0.1)] px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[#FBBF24]">Future Date</div>
+            <div className="mt-1 text-sm text-[#F0F6FC]">
+              Taking, skipping, and snoozing are disabled for future doses.
+            </div>
+          </div>
+        )}
 
         {/* Next dose banner */}
         {nextDose && (
@@ -241,7 +270,7 @@ export default function SchedulePage() {
                 actionsDisabled={isFutureDate}
                 onTake={() => {
                   if (isFutureDate) {
-                    show('Future doses can only be handled on the active day or later as history', 'warning');
+                    show(futureActionMessage, 'warning');
                     return;
                   }
                   takeDose(dose.id);
@@ -249,7 +278,7 @@ export default function SchedulePage() {
                 }}
                 onSkip={() => {
                   if (isFutureDate) {
-                    show('Future doses can only be handled on the active day or later as history', 'warning');
+                    show(futureActionMessage, 'warning');
                     return;
                   }
                   skipDose(dose.id);
@@ -257,7 +286,7 @@ export default function SchedulePage() {
                 }}
                 onSnooze={() => {
                   if (isFutureDate) {
-                    show('Future doses can only be handled on the active day or later as history', 'warning');
+                    show(futureActionMessage, 'warning');
                     return;
                   }
                   setSnoozeTargetDose(dose);

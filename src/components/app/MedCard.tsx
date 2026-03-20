@@ -70,6 +70,10 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
   }, [dose.id]);
 
   useEffect(() => {
+    if (actionsDisabled) setSwiped(false);
+  }, [actionsDisabled]);
+
+  useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ doseId?: string }>).detail;
       if (detail?.doseId && detail.doseId !== dose.id) {
@@ -194,7 +198,11 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
           type="button"
           aria-label={`Snooze ${item.name}`}
           disabled={actionsDisabled}
-          onClick={() => { onSnooze(); setSwiped(false); }}
+          onClick={() => {
+            if (actionsDisabled) return;
+            onSnooze();
+            setSwiped(false);
+          }}
           className={[
             'px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
@@ -206,7 +214,11 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
           type="button"
           aria-label={`Skip ${item.name}`}
           disabled={actionsDisabled}
-          onClick={() => { onSkip(); setSwiped(false); }}
+          onClick={() => {
+            if (actionsDisabled) return;
+            onSkip();
+            setSwiped(false);
+          }}
           className={[
             'px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
