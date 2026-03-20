@@ -85,7 +85,6 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
   }, [dose.id]);
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (actionsDisabled) return;
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
     gesture.current.pointerId = e.pointerId;
     gesture.current.startX = e.clientX;
@@ -93,7 +92,6 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
   };
 
   const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (actionsDisabled) return;
     if (gesture.current.pointerId !== e.pointerId) return;
     const dx = gesture.current.startX - e.clientX;
     const dy = Math.abs(gesture.current.startY - e.clientY);
@@ -101,6 +99,10 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
 
     // Let vertical scroll gestures pass through without opening swipe actions.
     if (dy > 24 && dy > Math.abs(dx)) return;
+    if (actionsDisabled) {
+      if (Math.abs(dx) > 30) onSnooze();
+      return;
+    }
     if (dx > 50) {
       setSwiped(true);
       window.dispatchEvent(new CustomEvent('med-card-open', { detail: { doseId: dose.id } }));
@@ -170,9 +172,9 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
           aria-label={dose.status === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
           onClick={e => {
             e.stopPropagation();
-            if (!actionsDisabled && dose.status !== 'taken') onTake();
+            if (dose.status !== 'taken') onTake();
           }}
-          disabled={actionsDisabled}
+          aria-disabled={actionsDisabled}
           className={[
             'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
@@ -197,9 +199,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
         <button
           type="button"
           aria-label={`Snooze ${item.name}`}
-          disabled={actionsDisabled}
+          aria-disabled={actionsDisabled}
           onClick={() => {
-            if (actionsDisabled) return;
             onSnooze();
             setSwiped(false);
           }}
@@ -213,9 +214,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
         <button
           type="button"
           aria-label={`Skip ${item.name}`}
-          disabled={actionsDisabled}
+          aria-disabled={actionsDisabled}
           onClick={() => {
-            if (actionsDisabled) return;
             onSkip();
             setSwiped(false);
           }}
