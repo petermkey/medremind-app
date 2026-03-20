@@ -938,13 +938,14 @@ export const useStore = create<AppState>()(
             if (dose.scheduledDate !== date) return false;
 
             const records = recordByDoseId.get(dose.id) ?? [];
-            const hasDurableHistory = records.length > 0;
             const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
-            const isSnoozedOrigin = dose.status === 'snoozed';
-            const hasSnoozeEvent = records.some(r => r.action === 'snoozed');
+            const hasHandledRecord = records.some(
+              record => record.action === 'taken' || record.action === 'skipped',
+            );
 
-            // History surface intentionally excludes pure actionable pending rows.
-            return isHandledStatus || isSnoozedOrigin || hasDurableHistory || hasSnoozeEvent;
+            // A snoozed origin dose is logically moved to a new slot and should not remain
+            // visible on the original day; only handled history stays on the day surface.
+            return isHandledStatus || hasHandledRecord;
           })
           .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
       },
