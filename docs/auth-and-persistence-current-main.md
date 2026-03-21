@@ -112,9 +112,16 @@ Purpose: ensures OAuth PKCE session cookies propagate correctly to server-side r
 
 ### Relationship to `src/proxy.ts`
 
-`proxy.ts` is the server-side route guard (committed). It also calls `supabase.auth.getUser()` and has redirect logic. `middleware.ts` and `proxy.ts` both run on requests — this creates two separate middleware-equivalent server clients per request. No deduplication is present. This is a documented risk (see Section 10).
+`middleware.ts` delegates entirely to `proxy()`:
 
-**IMPORTANT:** It is not known from client-side code alone whether `proxy.ts` is actually invoked as middleware or as a utility called from a separate `middleware.ts`-style entry. The repo root `middleware.ts` (the OAuth one) would shadow any other middleware. Check the actual Next.js entrypoint to confirm which is active.
+```ts
+import { proxy } from '@/proxy';
+export async function middleware(request: NextRequest) {
+  return proxy(request);
+}
+```
+
+`proxy.ts` handles both session refresh (`getUser()`) and route protection in a single Supabase client per request. There is no duplication — one client, one `getUser()` call, one response. Route protection is active end-to-end.
 
 ### Production config requirements for OAuth
 
@@ -192,10 +199,10 @@ Two layers:
 - Handles auth boot failure without infinite lock
 
 **`middleware.ts`** (repo root, uncommitted):
-- Session refresh only — no redirect logic
+- Thin entry point — delegates entirely to `proxy()` from `src/proxy.ts`
+- `proxy()` handles both session refresh and route protection in one pass
 - Matcher: all routes except Next.js internals and static images
-
-Note: `proxy.ts` exports a `proxy` function and a `config` object with a matcher but it is not a Next.js middleware file itself (Next.js only auto-loads `middleware.ts` at the repo root). Whether `proxy.ts` is invoked and how depends on the actual `middleware.ts` implementation. With the OAuth `middleware.ts` in place at root, it is the active Next.js middleware — and it only does session refresh, not route protection. Route protection from `proxy.ts` is only active if `proxy.ts` is explicitly imported and called from the active middleware. **This relationship must be verified in code before assuming route protection is active end-to-end.**
+- One Supabase client per request; no duplication with `proxy.ts`
 
 ---
 
@@ -277,7 +284,7 @@ The following auth behaviors are NOT implemented:
 
 ## 14. Current risks requiring awareness
 
-- Auth policy is split across `proxy.ts` (server-side route protection) and `layout.tsx` (client-side boot gate). Whether `proxy.ts` is active depends on the relationship with the root `middleware.ts`. This is not self-documenting in the current code structure.
+- Auth policy is split across two layers: `proxy.ts` (server-side route protection, invoked by `middleware.ts`) and `layout.tsx` (client-side boot gate with onboarding enforcement). `middleware.ts` explicitly delegates to `proxy()` — the relationship is self-documenting and the server-side route guard is active end-to-end.
 - OAuth changes are uncommitted — risk of loss if working tree is reset.
 - No account linking logic exists. Cross-provider same-email behavior depends entirely on undocumented Supabase project config.
 - DB trigger creating `profiles` row on OAuth signup is asserted in a code comment but not independently verifiable from client code.
