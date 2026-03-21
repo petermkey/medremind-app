@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "tool:backfill:planned-future": "node scripts/backfill-planned-future-occurrences.mjs",
     "tool:backfill:execution-history": "node scripts/backfill-execution-history.mjs",
