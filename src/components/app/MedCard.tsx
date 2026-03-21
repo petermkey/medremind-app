@@ -36,6 +36,7 @@ interface Props {
   onSkip: () => void;
   onSnooze: () => void;
   actionsDisabled?: boolean;
+  takenAt?: string; // ISO timestamp of actual intake
 }
 
 function fmt(t: string) {
@@ -43,7 +44,7 @@ function fmt(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = false }: Props) {
+export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = false, takenAt }: Props) {
   const item = dose.protocolItem;
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const statusColor = STATUS_COLOR[dose.status] ?? '#8B949E';
@@ -153,7 +154,9 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
             {item.name} {item.doseAmount ? `${item.doseAmount}${item.doseUnit}` : ''}
           </div>
           <div className="text-xs mt-0.5" style={{ color: statusColor }}>
-            {STATUS_LABEL[dose.status]} · {fmt(dose.scheduledTime)}
+            {dose.status === 'taken' && takenAt
+              ? `✓ Taken at ${fmt(new Date(takenAt).toTimeString().slice(0, 5))}`
+              : `${STATUS_LABEL[dose.status]} · ${fmt(dose.scheduledTime)}`}
           </div>
           {tags.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
