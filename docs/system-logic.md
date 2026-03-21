@@ -1,6 +1,6 @@
 # MedRemind System Logic (Current)
 
-Date: 2026-03-19
+Date: 2026-03-21
 Status: top-level source-of-truth index for current `main`
 
 ## 1. Source-of-truth map
@@ -8,13 +8,14 @@ Status: top-level source-of-truth index for current `main`
 Use this order for current behavior and process truth:
 
 1. `docs/project-rules-and-current-operating-model.md`
-2. `docs/architecture-current-main.md`
-3. `docs/auth-and-persistence-current-main.md`
-4. `docs/domain-and-schedule-current-main.md`
-5. `docs/current-status.md`
-6. `docs/current-status-and-next-phase.md`
-7. `docs/agent-handoff-current-main.md`
-8. `README.md`
+2. `docs/agent-handoff-current-main.md` — read this FIRST for working-tree state awareness
+3. `docs/future-agent-guide.md` — feature map, risk boundaries, persistence model
+4. `docs/architecture-current-main.md`
+5. `docs/auth-and-persistence-current-main.md`
+6. `docs/domain-and-schedule-current-main.md`
+7. `docs/current-status.md`
+8. `docs/current-status-and-next-phase.md`
+9. `README.md`
 
 If any statement conflicts with code, code on current `main` wins.
 
