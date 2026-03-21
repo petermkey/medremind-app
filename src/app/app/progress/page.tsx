@@ -258,7 +258,7 @@ export default function ProgressPage() {
 
   // ── Sort protocols: weakest adherence first ───────────────────────────
   const sortedActiveProtocols = useMemo(() => {
-    return [...activeProtocols].sort((a, b) => {
+    return [...activeProtocols].filter(ap => ap.status === 'active').sort((a, b) => {
       const sa = protocolBreakdownStats[a.id] ?? { total: 0, taken: 0 };
       const sb = protocolBreakdownStats[b.id] ?? { total: 0, taken: 0 };
       if (sa.total === 0 && sb.total === 0) return 0;
@@ -454,7 +454,7 @@ export default function ProgressPage() {
         </div>
 
         {/* ── 6. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
-        {activeProtocols.length > 0 && (
+        {sortedActiveProtocols.length > 0 && (
           <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
             <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">By Protocol</div>
             {sortedActiveProtocols.map(ap => {
