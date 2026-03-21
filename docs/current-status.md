@@ -1,41 +1,92 @@
 # MedRemind Current Status
 
-Date: 2026-03-19
+Date: 2026-03-21
 Owner: engineering runtime status on current `main`
 
 ## 1. Current maturity
 
-Overall: beta with hardened auth/session flows, lifecycle command paths, additive write-through paths, read-model selector migration, and migration tooling landed.
+Overall: beta with hardened auth/session flows, lifecycle command paths, additive write-through paths, read-model selector migration, migration tooling landed, and recent UX improvements to dose cards and progress screen.
 
 ## 2. Landed behavior on main
 
-## Auth and onboarding
+### Auth and onboarding
 
-- Confirmation-aware register flow (`hasSession`-aware).
-- Register/login confirmation resend actions with cooldown.
+**Committed (on main):**
+- Email/password signup with confirmation-aware gate (`hasSession`-based).
+- Email confirmation resend with 30s cooldown (login + register pages).
+- Email login with unconfirmed-email detection and inline resend.
+- Onboarding routing from login (`profile.onboarded ? '/app' : '/onboarding'`).
 - Non-blocking profile saves in onboarding and settings.
 - App-layout bootstrap hardening (no indefinite lock on auth bootstrap failure).
 - Cross-account local-state reset guard on user identity changes.
+- Sign-out guard sequence (waits for in-flight sync + outbox flush before sign-out).
+- Server-side route guard (`src/proxy.ts`): unauthenticated `/app*` → `/login`; authenticated `/login`/`/register` → `/app`.
 
-## Lifecycle and schedule
+**Committed on `codex/oauth-google-apple` (PR #5, staging-verified, pending merge):**
+- Google OAuth — `/login` and `/register` pages have a Google button calling `signInWithOAuth('google')`.
+- `signInWithOAuth` in `auth.ts` — initiates `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`. Provider type narrowed to `'google'` only.
+- `/auth/callback/route.ts` — server-side PKCE code exchange; queries `profiles.onboarded`; redirects to `/app` or `/onboarding`; falls back to `/login?error=oauth`.
+- `middleware.ts` (repo root) — delegates to `proxy()` for session refresh + route guard.
+- Build: `next build --webpack` (Turbopack removed — incompatible with Vercel CLI v50+ middleware packaging).
+- CI: source-based Vercel deploy (no `--prebuilt` flag).
+- **Apple sign-in removed permanently** — button deleted from both pages; not deferred.
+
+**OAuth readiness classification:**
+- Build: passes with `--webpack` flag. All routes compile. TypeScript clean.
+- Staging: **VERIFIED WORKING** — Google OAuth verified end-to-end in real browser.
+- **Not production-ready:** account-linking behavior unverified; production Supabase config not confirmed.
+- Full verification state and production prerequisites: `docs/auth-and-persistence-current-main.md` §15.
+
+**NOT implemented (deferred):**
+- Account linking / cross-provider same-email conflict handling.
+- Password reset flow.
+- Provider-specific OAuth error messages.
+- Deep-link forwarding after OAuth redirect.
+- Full auth/email-confirmation architecture redesign (noted as deferred larger track).
+
+### Dose card UX (landed 2026-03-21)
+
+- Taken dose cards show **actual intake time** ("Taken at 2:30 PM") instead of scheduled time.
+- Time display uses `getHours()/getMinutes()` — locale-safe across iOS/Android browsers.
+- `MedCard` accepts `takenAt?: string` (ISO timestamp from `DoseRecord.recordedAt`).
+- Schedule page builds a `doseId → recordedAt` map from `doseRecords` store and passes it per card.
+
+### Progress screen UX wave 1 (landed 2026-03-21)
+
+- **Primary adherence status block** at top: "On track" / "Needs attention" / "Off track" derived from 7-day adherence, with colored background signal and percentage.
+- **Week-over-week trend signal**: ↑/↓/→ points vs previous week; hidden when prior-week data is absent.
+- **Today summary pills**: taken / left / skipped displayed near the top.
+- **Calendar heatmap** (30/60/90d toggle): colored cells (green ≥80%, yellow 50-79%, red <50%) replace month-view DayRings. DayRings retained for weekly block only.
+- **Per-protocol breakdown**: sorted weakest-first; filters to `status === 'active'` protocols only.
+- **Time-scoped metric labels**: "last 30d" / "days in a row" on summary grid.
+
+### Lifecycle and schedule
 
 - Fixed-duration validation and inclusive activation `endDate` behavior.
 - Duration-change reconciliation regenerates future rows safely.
 - Regeneration uses live protocol reference and preserves handled history.
-- Snooze uses replacement-row semantics (original -> `snoozed`, replacement -> `pending`).
+- Snooze uses replacement-row semantics (original → `snoozed`, replacement → `pending`).
 - Archive path is lifecycle-aware (`deleteProtocol` archives when history exists).
 
-## Command-based sync and additive write-through
+### Protocols screen UX
+
+- Default filter is "Active"; "All" moved to end.
+- Swipe-to-reveal Edit/Delete actions on protocol rows.
+- Dose actions disabled for paused protocol rows.
+- Guidance toasts for blocked past-day or paused-protocol dose actions.
+- Future-date lock banner and history-date info banner in schedule view.
+
+### Command-based sync and additive write-through
 
 - Dose commands: `syncTakeDoseCommand`, `syncSkipDoseCommand`, `syncSnoozeDoseCommand`.
 - Lifecycle commands: `syncPauseProtocolCommand`, `syncResumeProtocolCommand`, `syncCompleteProtocolCommand`, `syncArchiveProtocolCommand`.
 - Additive execution write-through is active for take/skip/snooze into `execution_events`.
 - Activation write-through is active for future rows into `planned_occurrences` (`source_generation = activation_write_through_c4`).
 
-## Read-model selector migration (landed)
+### Read-model selector migration (landed)
 
 - `/app` actionable list, next-dose, and summary metrics use selector-based paths.
-- Progress uses lifecycle-aware selectors.
+- Progress uses lifecycle-aware selectors (`selectProgressSummaryForDates`, `selectProgressDayProtocolStats`, `selectProgressDayStatus`, `selectProgressProtocolWeights`).
 - Protocol Detail uses `selectProtocolDetailReadModel`.
 - Calendar date projection uses `selectCalendarVisibleDoseDates`.
 - Past-date history surface uses `selectHistoryDayRows`.
@@ -52,14 +103,19 @@ Landed implementation slices on `main`:
 
 ## 4. Remaining work categories
 
-## Operational (live environment execution)
+### Work on `codex/oauth-google-apple` (committed, staging-verified, pending merge to main)
+
+- Google OAuth integration: `middleware.ts`, `src/app/auth/callback/route.ts`, login/register page updates, `signInWithOAuth` in `auth.ts`.
+- Merge gate: account-linking verification required before production deploy. See `docs/auth-and-persistence-current-main.md` §15.
+
+### Operational (live environment execution)
 
 - D2 dry-run/apply/rerun validation on real data.
 - D3 dry-run/apply/rerun validation on real data.
 - C5 parity validation runs and anomaly triage.
 - D4 consistency checks and severity triage.
 
-## Deferred larger tracks (not current behavior)
+### Deferred larger tracks (not current behavior)
 
 1. Auth and email-confirmation architecture redesign.
 2. Domain/schedule engine redesign and test deepening.
@@ -67,9 +123,10 @@ Landed implementation slices on `main`:
 
 ## 5. Risks still requiring discipline
 
-- Auth policy remains split across proxy and client bootstrap.
-- Store domain and sync concerns remain tightly coupled in `store.ts`.
+- Auth policy remains split across `src/proxy.ts` (server routing, `middleware.ts` delegates to it) and client bootstrap (`layout.tsx`).
+- Store domain and sync concerns remain tightly coupled in `store.ts` (1234 lines).
 - Outbox remains device-local and can accumulate under prolonged failures.
+- **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled on project `hagypgvfkjkncznoctoq`, a user who created an email/password account and later signs in via Google with the same address lands in a duplicate empty account — medication data invisible. Do not merge PR #5 to production before this is confirmed enabled and tested live.
 
 ## 6. Quality gate expectation for future slices
 

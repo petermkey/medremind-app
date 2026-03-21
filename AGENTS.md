@@ -11,10 +11,12 @@
 When picking up this project, read in this order:
 
 1. `docs/project-rules-and-current-operating-model.md`
-2. `docs/system-logic.md`
-3. `docs/current-status.md`
-4. `docs/agent-handover.md`
-5. `README.md`
+2. `docs/agent-handoff-current-main.md` — current state including uncommitted working-tree changes
+3. `docs/future-agent-guide.md` — reading order, risk boundaries, feature map, persistence model
+4. `docs/current-status.md`
+5. `docs/architecture-current-main.md`
+6. `docs/system-logic.md`
+7. `README.md`
 
 Historical incident/persistence/design reports in `docs/` are point-in-time artifacts and must not override the current source-of-truth documents above.
 
