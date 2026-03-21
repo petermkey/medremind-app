@@ -155,7 +155,12 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
           </div>
           <div className="text-xs mt-0.5" style={{ color: statusColor }}>
             {dose.status === 'taken' && takenAt
-              ? `✓ Taken at ${fmt(new Date(takenAt).toTimeString().slice(0, 5))}`
+              ? (() => {
+                  const d = new Date(takenAt);
+                  const hh = String(d.getHours()).padStart(2, '0');
+                  const mm = String(d.getMinutes()).padStart(2, '0');
+                  return `✓ Taken at ${fmt(`${hh}:${mm}`)}`;
+                })()
               : `${STATUS_LABEL[dose.status]} · ${fmt(dose.scheduledTime)}`}
           </div>
           {tags.length > 0 && (
