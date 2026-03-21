@@ -53,6 +53,7 @@ export default function SchedulePage() {
     skipDose,
     snoozeDose,
     scheduledDoses,
+    doseRecords,
   } = useStore();
   const { show } = useToast();
 
@@ -114,6 +115,15 @@ export default function SchedulePage() {
     () => (isHistoryDate ? undefined : selectAppNextDose(selectedDate)),
     [selectedDate, isHistoryDate, scheduledDoses, selectAppNextDose],
   );
+
+  // Map doseId → recordedAt for taken records (to display actual intake time)
+  const takenAtMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of doseRecords) {
+      if (r.action === 'taken') map.set(r.scheduledDoseId, r.recordedAt);
+    }
+    return map;
+  }, [doseRecords]);
 
   function getSnoozeUntil(dose: ScheduledDose, option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
     const now = new Date();
@@ -293,6 +303,7 @@ export default function SchedulePage() {
                     key={dose.id}
                     dose={dose}
                     actionsDisabled={actionsDisabled}
+                    takenAt={takenAtMap.get(dose.id)}
                     onTake={() => {
                       if (actionsDisabled) {
                         show(disabledMessage, 'warning');
