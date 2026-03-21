@@ -1,7 +1,7 @@
 # Architecture (Current Main)
 
-Date: 2026-03-21
-Source of truth: current `main` (plus untracked working-tree files noted below)
+Date: 2026-03-21 (updated post-OAuth staging verification)
+Source of truth: current `main` + branch `codex/oauth-google-apple` (PR #5 open, staging-verified)
 
 ## 1. Runtime stack and boundaries
 
@@ -15,9 +15,9 @@ Runtime boundaries:
 
 - App routes: `src/app/app/*`
 - Auth routes: `src/app/(auth)/*`
-- OAuth callback: `src/app/auth/callback/route.ts` (**untracked**, not on main yet)
+- OAuth callback: `src/app/auth/callback/route.ts` (committed on `codex/oauth-google-apple`)
 - Route guard: `src/proxy.ts` (redirects `/app*` → `/login` when unauthenticated; redirects `/login`/`/register` → `/app` when authenticated)
-- Session refresh middleware: `middleware.ts` at repo root (**untracked**, refreshes Supabase SSR session cookies on every request for OAuth PKCE)
+- Session refresh + route guard entry point: `middleware.ts` at repo root (committed on `codex/oauth-google-apple`, delegates entirely to `proxy()`)
 - App bootstrap/auth gate: `src/app/app/layout.tsx`
 - Sync/write model: `src/lib/supabase/realtimeSync.ts`
 - Retry/outbox: `src/lib/supabase/syncOutbox.ts`
@@ -30,7 +30,7 @@ Public/auth:
 - `/register`
 - `/login`
 - `/onboarding`
-- `/auth/callback` (OAuth PKCE exchange — untracked, exists in working tree)
+- `/auth/callback` (OAuth PKCE exchange — committed on `codex/oauth-google-apple`)
 
 Guarded app:
 
@@ -51,12 +51,13 @@ Two auth paths are implemented:
 - Login: `supabaseSignIn` → confirmation-required state or profile load → cloud pull → route by `onboarded`
 - Confirmation-aware: unconfirmed signups do not force onboarding; login surfaces resend with 30s cooldown
 
-**OAuth — Google and Apple** (working-tree only, not committed):
-- Login and register pages both have Google + Apple buttons wired to `signInWithOAuth(provider)`
+**OAuth — Google only** (committed on `codex/oauth-google-apple`, staging-verified):
+- Login and register pages have a Google button wired to `signInWithOAuth('google')`. Apple sign-in removed permanently.
 - `signInWithOAuth` calls `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`
-- `middleware.ts` refreshes session cookies on every request (required for PKCE cookie propagation)
+- `middleware.ts` delegates to `proxy()`, which handles both session refresh (PKCE cookie propagation) and route protection
 - `/auth/callback/route.ts` exchanges code for session, checks `profiles.onboarded`, redirects to `/app` or `/onboarding`
 - On OAuth failure: redirects to `/login?error=oauth`
+- Google OAuth verified end-to-end in real browser against staging. Account-linking unverified — production gate remains open.
 
 ## 4. Boot and auth gate architecture
 

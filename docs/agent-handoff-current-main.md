@@ -10,64 +10,59 @@ Audience: agents continuing work from current `main`
 - Behavior source: `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`, `docs/current-status.md`.
 - Historical snapshots in `docs/` are context only.
 
-## 2. CRITICAL: Uncommitted working-tree changes on main (as of 2026-03-21)
+## 2. OAuth state — branch `codex/oauth-google-apple` (PR #5 open against main)
 
-The following files are modified or untracked but NOT yet committed:
+OAuth changes are committed and CI is green. This section documents the current state of that branch.
 
-| File | Status | What it is |
-|------|--------|-----------|
-| `middleware.ts` (root) | Untracked | Supabase SSR session-refresh middleware — runs on every request, refreshes session cookies for OAuth PKCE propagation. No redirect logic. |
-| `src/app/auth/callback/route.ts` | Untracked (new dir `src/app/auth/`) | OAuth PKCE server-side code-exchange handler. Exchanges one-time code, queries `profiles.onboarded`, redirects to `/app` or `/onboarding`. On failure: `/login?error=oauth`. |
-| `src/app/(auth)/login/page.tsx` | Modified | Added Google + Apple OAuth buttons (both call `signInWithOAuth(provider)`). Added email-unconfirmed resend flow with 30s cooldown. |
-| `src/app/(auth)/register/page.tsx` | Modified | Added Google + Apple OAuth buttons. Added confirmation-pending resend flow with 30s cooldown. |
-| `src/lib/supabase/auth.ts` | Modified | Added `signInWithOAuth(provider)` — calls `supabase.auth.signInWithOAuth` with `redirectTo: ${window.location.origin}/auth/callback`. Returns error string or null. |
+### What is committed on `codex/oauth-google-apple`
 
-These changes implement OAuth (Google + Apple) sign-in. They are **not on any branch** and not committed. Any agent doing work must be aware of these changes and must not overwrite them without explicit instruction.
+| File | Change |
+|------|--------|
+| `middleware.ts` (root) | Delegates to `proxy()` — SSR session refresh + route guard entry point |
+| `src/app/auth/callback/route.ts` | OAuth PKCE code-exchange handler |
+| `src/app/(auth)/login/page.tsx` | Google OAuth button added; email-unconfirmed resend flow with 30s cooldown |
+| `src/app/(auth)/register/page.tsx` | Google OAuth button added; confirmation-pending resend flow |
+| `src/lib/supabase/auth.ts` | `signInWithOAuth('google')` added; provider type narrowed to `'google'` |
 
-If asked to commit/PR these changes, use branch `codex/oauth-google-apple`.
+**Apple sign-in: removed.** Apple button deleted from login/register pages. Not deferred — permanently removed.
 
 ### OAuth build and verification state
 
 | Status | Detail |
 |--------|--------|
-| Production build | **Passes.** `npm run build` exits 0. All 14 routes compile. TypeScript clean. |
+| Build (`next build --webpack`) | **Passes.** All routes compile. TypeScript clean. |
+| CI (GitHub Actions) | **Green.** Source-based Vercel deploy confirmed working. |
 | `/login` render | Verified (HTTP 200) |
 | `/register` render | Verified (HTTP 200) |
 | Callback fallback | Verified — `/auth/callback` with no `?code` redirects to `/login?error=oauth` |
+| **Google OAuth end-to-end** | **VERIFIED LIVE — real browser, staging environment** |
 | Email auth | Verified intact and unchanged |
-| **Readiness** | **Staging-ready. NOT production-ready.** |
+| **Staging readiness** | **CONFIRMED WORKING** |
+| **Production readiness** | **Not ready — account-linking unverified** |
 
-### What is NOT yet verified live
+### What is NOT yet verified
 
-None of the following have been exercised with a real browser and configured providers:
-- Google OAuth end-to-end
-- Apple OAuth end-to-end
-- Session exchange with a real provider code
-- Middleware cookie propagation after OAuth callback
-- Onboarding redirect for new OAuth user
-- Returning OAuth user landing in `/app`
-- Logout and re-login via OAuth
-- **Account-linking behavior across any provider combination**
+- Account-linking behavior when a Google sign-in uses the same email as an existing email/password account
+- Onboarding redirect for a genuinely new OAuth user (no prior profile)
+- Logout and re-login via Google OAuth
 
 ### Account-linking — do not assume safe
 
-Account linking is governed entirely by a Supabase dashboard setting ("Allow automatic linking"). It is not configured or verified for this project. Until confirmed enabled and tested live, a user who has an email/password account and signs in via Google or Apple with the same address will land in a **duplicate empty account** — their medication data is invisible. This is a real production risk. Do not enable OAuth in production before this is resolved.
+Account linking is governed entirely by a Supabase dashboard setting ("Allow automatic linking") on project `hagypgvfkjkncznoctoq`. It is not confirmed enabled or tested live. A user who has an email/password account and signs in via Google with the same address may land in a **duplicate empty account** — medication data invisible. This is the primary production gate.
 
 Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 
 ### Production prerequisites before OAuth goes live
 
-1. Google provider enabled in Supabase (Client ID + Secret)
-2. Apple provider enabled in Supabase (Service ID, Team ID, Key ID, private key)
-3. Supabase redirect URL allowlist includes `http://localhost:3000/auth/callback` and `https://your-domain/auth/callback`
-4. Provider OAuth apps list `https://<project-ref>.supabase.co/auth/v1/callback` as authorized redirect URI
-5. **"Allow automatic linking" confirmed enabled** in Supabase Auth → Configuration
-6. Live browser-based OAuth verification completed (all flows, all linking scenarios)
+1. Google provider confirmed enabled in Supabase production project (Client ID + Secret)
+2. Production Supabase redirect URL allowlist includes `https://medremind-app-two.vercel.app/auth/callback`
+3. Google Cloud Console OAuth app lists `https://<project-ref>.supabase.co/auth/v1/callback` as authorized redirect URI
+4. **"Allow automatic linking" confirmed enabled** in Supabase Auth → Configuration
+5. Live browser-based verification of account-linking scenario (existing email/password user signs in via Google)
 
-### What NOT implemented in OAuth
+### What is NOT implemented in OAuth
 
-- Account linking / conflict detection (Supabase config governs; not verified)
-- Apple private relay email handling
+- Account linking / conflict detection (Supabase config governs; unverified)
 - Provider-specific error messages (all failures → generic message)
 - Deep-link forwarding after OAuth (always lands at `/app` or `/onboarding`)
 - Password reset flow
@@ -78,17 +73,17 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Local-first store with cloud sync and outbox retry.
 - Command-based lifecycle/dose sync with additive write-through coverage.
 - Selector-based lifecycle-aware read paths on key screens.
-- Auth: email/password + Google OAuth + Apple OAuth (OAuth portion uncommitted).
+- Auth: email/password + Google OAuth. Apple sign-in removed. Google OAuth committed on `codex/oauth-google-apple`, staging-verified.
 
-## 4. Recent landed features (last 5 commits)
+## 4. Recent landed features (last 5 commits on `codex/oauth-google-apple`)
 
 | Commit | What landed |
 |--------|------------|
+| `71f4975` | fix(build): force webpack bundler — generates `middleware.js.nft.json`, fixes Vercel CLI v50+ packaging |
+| `f1d0cce` | fix(ci): deploy from source (removes `--prebuilt`), fixes `middleware.js.nft.json` packaging failure |
+| `49bdb64` | docs(auth): remove stale middleware/proxy duplication note |
+| `e053921` | feat(auth): Google and Apple OAuth with callback route and route protection fix (Apple subsequently removed) |
 | `963aea1` | CI: production environment for main branch Vercel build |
-| `808b1f8` / `f97505d` | fix: "Taken at HH:MM AM/PM" on dose cards uses `getHours/getMinutes` (locale-safe) |
-| `90466ca` / `1e3cfbd` | feat: display actual intake time (from `DoseRecord.recordedAt`) on dose cards instead of scheduled time |
-| `5c7745b` / `ddf24f6` | feat(progress): UX wave 1 — adherence status block, week trend, today summary pills, heatmap cells for 30/60/90d, weakest-first protocol sort |
-| `4927f57` | fix: show only `status === 'active'` protocols in progress breakdown |
 
 ## 5. Most important code surfaces
 
@@ -97,8 +92,8 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Outbox: `src/lib/supabase/syncOutbox.ts`
 - Auth functions: `src/lib/supabase/auth.ts`
 - App layout/boot gate: `src/app/app/layout.tsx`
-- Route guard: `src/proxy.ts` (server-side routing) + `middleware.ts` (session refresh, untracked)
-- OAuth callback: `src/app/auth/callback/route.ts` (untracked)
+- Route guard: `src/proxy.ts` (server-side routing, committed on main) + `middleware.ts` (entry point, committed on `codex/oauth-google-apple`)
+- OAuth callback: `src/app/auth/callback/route.ts` (committed on `codex/oauth-google-apple`)
 - Cloud pull/import/backup: `src/lib/supabase/cloudStore.ts`, `src/lib/supabase/importStore.ts`
 
 ## 6. Landed migration/tooling summary

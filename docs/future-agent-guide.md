@@ -8,8 +8,8 @@ Audience: agents starting work on this repository for the first time
 Read in this order before touching any file:
 
 1. `docs/project-rules-and-current-operating-model.md` — governance, branch naming, preflight rules
-2. `docs/agent-handoff-current-main.md` — where things stand TODAY, including uncommitted working-tree state
-3. `docs/current-status.md` — what is implemented, what is deferred, what is uncommitted
+2. `docs/agent-handoff-current-main.md` — where things stand TODAY, including branch and PR state
+3. `docs/current-status.md` — what is implemented, what is deferred, what is pending merge
 4. `docs/architecture-current-main.md` — full stack, routing, persistence, auth model
 5. `docs/auth-and-persistence-current-main.md` — auth flows, outbox, sign-out guard
 6. `docs/domain-and-schedule-current-main.md` — protocol/dose lifecycle, selectors, snooze semantics
@@ -32,21 +32,22 @@ Stop and report if:
 - branch context from a prior task is still present
 - required environment variables are missing for operational tasks
 
-## 3. Known working-tree state (as of 2026-03-21)
+## 3. Known branch state (as of 2026-03-21)
 
-There are **uncommitted changes** on `main` that represent OAuth work in progress:
+Branch `codex/oauth-google-apple` is open as PR #5 against `main`. It is **committed and CI-green**. The main working tree is clean.
 
-| File | Change |
-|------|--------|
-| `middleware.ts` (root) | New: SSR session-refresh middleware for OAuth PKCE |
-| `src/app/auth/callback/route.ts` | New: OAuth PKCE code-exchange handler |
-| `src/app/(auth)/login/page.tsx` | Modified: Google + Apple OAuth buttons added |
-| `src/app/(auth)/register/page.tsx` | Modified: Google + Apple OAuth buttons added |
-| `src/lib/supabase/auth.ts` | Modified: `signInWithOAuth(provider)` function added |
+| What | State |
+|------|-------|
+| Google OAuth (login + register + callback + middleware) | Committed on `codex/oauth-google-apple` |
+| Apple sign-in | **Removed permanently** — not on any branch, not deferred |
+| Build command | `next build --webpack` (Turbopack removed) |
+| CI | Green — source-based Vercel deploy |
+| Staging | Google OAuth verified end-to-end in real browser |
+| Merge gate | Account-linking verification required before production |
 
-If your task is to commit/PR these: branch as `codex/oauth-google-apple`, stage these files, commit, push, PR.
+If your task is unrelated to OAuth: the main branch is clean; create a new branch from `main` as normal.
 
-If your task is unrelated: do not stage or modify these files. They are intentional pending work.
+If your task is to verify account-linking or merge PR #5: see `docs/auth-and-persistence-current-main.md` §15.
 
 ## 4. Risk boundaries — what requires extra care
 
@@ -74,9 +75,10 @@ If your task is unrelated: do not stage or modify these files. They are intentio
 ### Auth
 - Email/password register with email confirmation gate
 - Login with email-unconfirmed detection and resend
-- Google OAuth and Apple OAuth (UI present but uncommitted to main)
-- OAuth PKCE callback route at `/auth/callback` (uncommitted)
-- Session refresh middleware (uncommitted)
+- Google OAuth (committed on `codex/oauth-google-apple`, staging-verified, PR #5 open)
+- OAuth PKCE callback route at `/auth/callback` (committed on `codex/oauth-google-apple`)
+- Session refresh + route guard entry via `middleware.ts` (committed on `codex/oauth-google-apple`, delegates to `proxy()`)
+- Apple sign-in: removed permanently
 
 ### Dose actions
 - Take, Skip, Snooze (swipe-to-reveal on MedCard)
@@ -166,7 +168,7 @@ Run order: D2 → D3 → C5 → D4. Stop if severe anomalies appear.
 Use: `codex/<sprint-id>-<slice-name>`
 
 Examples:
-- `codex/oauth-google-apple` (for committing current OAuth working-tree changes)
+- `codex/oauth-google-apple` (Google OAuth branch — committed, PR #5 open)
 - `codex/e2-progress-week2`
 - `codex/fix-snooze-edge-case`
 

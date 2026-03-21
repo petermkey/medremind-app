@@ -22,21 +22,23 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Sign-out guard sequence (waits for in-flight sync + outbox flush before sign-out).
 - Server-side route guard (`src/proxy.ts`): unauthenticated `/app*` → `/login`; authenticated `/login`/`/register` → `/app`.
 
-**Implemented in working tree, NOT yet committed:**
-- Google OAuth and Apple OAuth — both `/login` and `/register` pages have buttons calling `signInWithOAuth(provider)`.
-- `signInWithOAuth` in `auth.ts` — initiates `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`.
+**Committed on `codex/oauth-google-apple` (PR #5, staging-verified, pending merge):**
+- Google OAuth — `/login` and `/register` pages have a Google button calling `signInWithOAuth('google')`.
+- `signInWithOAuth` in `auth.ts` — initiates `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`. Provider type narrowed to `'google'` only.
 - `/auth/callback/route.ts` — server-side PKCE code exchange; queries `profiles.onboarded`; redirects to `/app` or `/onboarding`; falls back to `/login?error=oauth`.
-- `middleware.ts` (repo root) — session-refresh middleware, required for PKCE cookie propagation; no route-guard logic.
+- `middleware.ts` (repo root) — delegates to `proxy()` for session refresh + route guard.
+- Build: `next build --webpack` (Turbopack removed — incompatible with Vercel CLI v50+ middleware packaging).
+- CI: source-based Vercel deploy (no `--prebuilt` flag).
+- **Apple sign-in removed permanently** — button deleted from both pages; not deferred.
 
 **OAuth readiness classification:**
-- Build-safe: production build passes, TypeScript clean, all routes compile.
-- Staging-ready: can be committed and deployed to staging pending Supabase provider configuration.
-- **Not production-ready:** providers not configured, account-linking across providers unverified, live OAuth flows not exercised.
+- Build: passes with `--webpack` flag. All routes compile. TypeScript clean.
+- Staging: **VERIFIED WORKING** — Google OAuth verified end-to-end in real browser.
+- **Not production-ready:** account-linking behavior unverified; production Supabase config not confirmed.
 - Full verification state and production prerequisites: `docs/auth-and-persistence-current-main.md` §15.
 
 **NOT implemented (deferred):**
 - Account linking / cross-provider same-email conflict handling.
-- Apple private relay email handling.
 - Password reset flow.
 - Provider-specific OAuth error messages.
 - Deep-link forwarding after OAuth redirect.
@@ -101,9 +103,10 @@ Landed implementation slices on `main`:
 
 ## 4. Remaining work categories
 
-### Uncommitted working-tree work (must be committed before considered done)
+### Work on `codex/oauth-google-apple` (committed, staging-verified, pending merge to main)
 
-- OAuth (Google + Apple) integration: `middleware.ts`, `src/app/auth/callback/route.ts`, login/register page updates, `signInWithOAuth` in `auth.ts`.
+- Google OAuth integration: `middleware.ts`, `src/app/auth/callback/route.ts`, login/register page updates, `signInWithOAuth` in `auth.ts`.
+- Merge gate: account-linking verification required before production deploy. See `docs/auth-and-persistence-current-main.md` §15.
 
 ### Operational (live environment execution)
 
@@ -120,11 +123,10 @@ Landed implementation slices on `main`:
 
 ## 5. Risks still requiring discipline
 
-- Auth policy remains split across `src/proxy.ts` (server routing) and client bootstrap (`layout.tsx`).
+- Auth policy remains split across `src/proxy.ts` (server routing, `middleware.ts` delegates to it) and client bootstrap (`layout.tsx`).
 - Store domain and sync concerns remain tightly coupled in `store.ts` (1234 lines).
 - Outbox remains device-local and can accumulate under prolonged failures.
-- OAuth changes are uncommitted — risk of loss if working tree is reset.
-- **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled, a user who created an email/password account and later signs in via Google or Apple with the same address lands in a duplicate empty account — medication data invisible. Do not enable OAuth in production before this is confirmed enabled and tested live.
+- **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled on project `hagypgvfkjkncznoctoq`, a user who created an email/password account and later signs in via Google with the same address lands in a duplicate empty account — medication data invisible. Do not merge PR #5 to production before this is confirmed enabled and tested live.
 
 ## 6. Quality gate expectation for future slices
 

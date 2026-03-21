@@ -9,11 +9,11 @@ Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/r
 
 | File | Status | Role |
 |------|--------|------|
-| `src/lib/supabase/auth.ts` | Modified, uncommitted | All auth functions: sign-up, sign-in, sign-out, OAuth, resend, profile load |
-| `src/app/(auth)/login/page.tsx` | Modified, uncommitted | Login UI with email/password + Google + Apple OAuth buttons |
-| `src/app/(auth)/register/page.tsx` | Modified, uncommitted | Register UI with email/password + Google + Apple OAuth buttons |
-| `src/app/auth/callback/route.ts` | Untracked, uncommitted | OAuth PKCE code-exchange route handler |
-| `middleware.ts` (repo root) | Untracked, uncommitted | Supabase SSR session-refresh middleware (required for OAuth PKCE) |
+| `src/lib/supabase/auth.ts` | Committed (`codex/oauth-google-apple`) | All auth functions: sign-up, sign-in, sign-out, OAuth (Google only), resend, profile load |
+| `src/app/(auth)/login/page.tsx` | Committed (`codex/oauth-google-apple`) | Login UI with email/password + Google OAuth button |
+| `src/app/(auth)/register/page.tsx` | Committed (`codex/oauth-google-apple`) | Register UI with email/password + Google OAuth button |
+| `src/app/auth/callback/route.ts` | Committed (`codex/oauth-google-apple`) | OAuth PKCE code-exchange route handler |
+| `middleware.ts` (repo root) | Committed (`codex/oauth-google-apple`) | Delegates to `proxy()` — session refresh + route guard entry point |
 | `src/proxy.ts` | Committed | Server-side route guard (protects `/app*`, redirects authenticated users away from `/login`/`/register`) |
 | `src/app/app/layout.tsx` | Committed | Client-side app bootstrap gate (auth check, cloud pull, onboarding redirect) |
 | `src/lib/supabase/server.ts` | Committed | Server-side Supabase client factory (used by callback route) |
@@ -60,18 +60,21 @@ Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/r
 
 ---
 
-## 3. OAuth auth — Google and Apple (implemented, uncommitted)
+## 3. OAuth auth — Google only (committed, staging-verified)
 
-**Status:** Code is complete and correct in working tree. Not committed to any branch. Not on `main`. At risk of loss if working tree is reset.
+**Status:** Google OAuth is committed on branch `codex/oauth-google-apple` (PR #5 open against main). Google sign-in has been verified end-to-end in a real browser against the staging environment. Apple sign-in has been **removed** — no Apple button exists in the UI and the provider type is narrowed to `'google'` only in `auth.ts`.
+
+Branch: `codex/oauth-google-apple` | PR #5 | Supabase project ref: `hagypgvfkjkncznoctoq`
+Staging URL: `https://medremind-6m0wqxa7w-peter-7822s-projects.vercel.app`
 
 ### What is implemented
 
-Both `/login` and `/register` pages have Google and Apple buttons. Both call `signInWithOAuth(provider)` defined in `auth.ts`.
+`/login` and `/register` pages have a Google button. It calls `signInWithOAuth('google')` defined in `auth.ts`.
 
 `signInWithOAuth`:
 ```
 supabase.auth.signInWithOAuth({
-  provider,
+  provider,   // 'google' only — Apple removed
   options: { redirectTo: `${window.location.origin}/auth/callback` }
 })
 ```
@@ -101,11 +104,10 @@ Runs on every request matching the pattern:
 /((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)
 ```
 
-Action: creates a Supabase SSR client and calls `supabase.auth.getUser()`. This call triggers cookie refresh on the response. The refreshed cookies are set on `supabaseResponse`.
+Action: delegates entirely to `proxy()` from `src/proxy.ts`. `proxy()` creates a Supabase SSR client and calls `supabase.auth.getUser()`, which triggers cookie refresh on the response. Route protection also lives in `proxy()`.
 
 What it does NOT do:
-- Does not enforce auth (no redirect logic).
-- Does not protect any routes.
+- Does not contain its own redirect logic.
 - Does not forward query params or deep links.
 
 Purpose: ensures OAuth PKCE session cookies propagate correctly to server-side renders after the callback redirect. Without this, the SSR session can be stale immediately after OAuth.
@@ -128,9 +130,8 @@ export async function middleware(request: NextRequest) {
 The following must be configured in the Supabase dashboard for OAuth to work. These are not set or verified by any code in this repository:
 
 1. **Google provider**: Client ID and Client Secret from Google Cloud Console.
-2. **Apple provider**: Service ID, Team ID, Key ID, and private key from Apple Developer account.
-3. **Redirect URL allowlist**: `https://<your-domain>/auth/callback` must be added to the allowed redirect URLs in Supabase Auth settings.
-4. **OAuth redirect URL at provider**: Google OAuth app and Apple Service ID must each list `https://<your-supabase-project>.supabase.co/auth/v1/callback` as an authorized redirect URI.
+2. **Redirect URL allowlist**: `https://<your-domain>/auth/callback` must be added to the allowed redirect URLs in Supabase Auth settings.
+3. **OAuth redirect URL at provider**: Google OAuth app must list `https://<your-supabase-project>.supabase.co/auth/v1/callback` as an authorized redirect URI.
 
 Failing to configure any of these will result in a silent OAuth redirect failure landing on `/login?error=oauth`.
 
@@ -198,7 +199,7 @@ Two layers:
 - Secondary auth gate; enforces onboarding redirect
 - Handles auth boot failure without infinite lock
 
-**`middleware.ts`** (repo root, uncommitted):
+**`middleware.ts`** (repo root, committed on `codex/oauth-google-apple`):
 - Thin entry point — delegates entirely to `proxy()` from `src/proxy.ts`
 - `proxy()` handles both session refresh and route protection in one pass
 - Matcher: all routes except Next.js internals and static images
@@ -216,7 +217,7 @@ Supabase's behavior when the same email is used across providers depends on Supa
 
 This configuration is not set or verified by any code in this repository. **The application does not handle, detect, or communicate account-linking outcomes to the user.** An agent must not document account linking as safe or handled.
 
-Apple private relay emails (randomized `@privaterelay.appleid.com` addresses): not handled. No code detects or accommodates these. A user signing in with Apple using a private relay email will always get a separate account — regardless of whether "Link accounts" is enabled — because the relay address is a different email from the user's real address.
+Apple Sign-In has been removed from the application. Apple private relay email handling is not a concern.
 
 ---
 
@@ -272,9 +273,9 @@ The following auth behaviors are NOT implemented:
 | Capability | Status |
 |-----------|--------|
 | Deep-link forwarding after OAuth | Not implemented. Callback always goes to `/app` or `/onboarding`. |
-| Apple private relay email handling | Not implemented. |
+| Apple Sign-In | **Removed permanently.** Apple button deleted from login/register pages. Provider type narrowed to `'google'` only. No Apple re-integration planned. |
 | Provider-specific OAuth error messages | Not implemented. All OAuth failures → generic `'Sign-in failed. Please try again.'` |
-| Account linking / conflict detection | Not implemented. Supabase auto-link behavior depends on dashboard config (unknown). |
+| Account linking / conflict detection | Not implemented. Supabase auto-link behavior depends on dashboard config (unverified). |
 | Password reset flow | Not implemented. No code for `resetPasswordForEmail` or update-password page. |
 | Session expiry handling in-app | Not implemented. Expired sessions fall through to app layout boot → redirect to login. |
 | Server-side onboarding enforcement | Not implemented. Onboarding redirect is client-side only in `layout.tsx` and `callback/route.ts`. |
@@ -285,46 +286,44 @@ The following auth behaviors are NOT implemented:
 ## 14. Current risks requiring awareness
 
 - Auth policy is split across two layers: `proxy.ts` (server-side route protection, invoked by `middleware.ts`) and `layout.tsx` (client-side boot gate with onboarding enforcement). `middleware.ts` explicitly delegates to `proxy()` — the relationship is self-documenting and the server-side route guard is active end-to-end.
-- OAuth changes are uncommitted — risk of loss if working tree is reset.
-- No account linking logic exists. Cross-provider same-email behavior depends entirely on undocumented Supabase project config.
+- No account linking logic exists. Cross-provider same-email behavior depends entirely on undocumented Supabase project config. This is the primary unresolved risk for production readiness.
 - DB trigger creating `profiles` row on OAuth signup is asserted in a code comment but not independently verifiable from client code.
 - `profiles` row absence for OAuth users does not hard-block access but silently degrades name/timezone data.
 
 ---
 
-## 15. OAuth verification state and readiness classification (2026-03-21)
+## 15. OAuth verification state and readiness classification (2026-03-21, updated post-staging-verification)
 
 ### Verified
 
 | Item | Method | Result |
 |------|--------|--------|
-| Production build (`npm run build`) | Build run | Passes. 14 routes. Zero TypeScript errors. |
+| Production build (`next build --webpack`) | Build run | Passes. All routes compile. Zero TypeScript errors. |
 | `/login` page | HTTP GET | 200, renders sign-in form |
 | `/register` page | HTTP GET | 200, renders registration form |
 | `/auth/callback` missing-code fallback | HTTP GET (no `?code`) | Redirects to `/login?error=oauth` as designed |
 | Email auth code path | Static code review | Intact and unchanged |
+| **Google OAuth end-to-end** | **Real browser, staging** | **VERIFIED LIVE. Button → Google → callback → session → app routing working correctly.** |
+| CI (webpack build + Vercel source deploy) | GitHub Actions | Green. Source-based deploy confirmed working. |
 
 ### Not verified live
 
-The following require a configured Supabase OAuth provider and a real browser session. None have been exercised:
+- Account-linking behavior for cross-provider same-email scenarios (Google OAuth user vs existing email/password account)
+- Onboarding redirect for a first-time OAuth user (new Google account, no prior profile)
+- Logout and re-login via Google OAuth
+- `exchangeCodeForSession` failure modes with real provider codes
 
-- Google OAuth end-to-end (button → redirect → provider → callback → session → app)
-- Apple OAuth end-to-end
-- `exchangeCodeForSession` with a real provider-issued code
-- Session cookie propagation via middleware after a real OAuth callback
-- Onboarding redirect for a first-time OAuth user
-- Returning OAuth user landing correctly in `/app`
-- Logout and re-login via OAuth
-- Account-linking behavior for any cross-provider combination
+### Apple Sign-In
+
+**Removed.** Apple button has been deleted from `/login` and `/register`. The `signInWithOAuth` provider type is narrowed to `'google'` only. Apple sign-in is not deferred — it is not present and not planned.
 
 ### Account-linking status
 
 **Unverified. Potentially unsafe in production.**
 
-Whether "Allow automatic linking" is enabled in the Supabase project for this app is unknown. Until this is confirmed enabled and tested live with a real browser:
+Whether "Allow automatic linking" is enabled in the Supabase project (`hagypgvfkjkncznoctoq`) is unknown. Until this is confirmed enabled and tested live with a real browser:
 
-- A user with an existing email/password account who signs in via Google or Apple with the same address may land in a duplicate empty account with no medication data.
-- Apple private relay users always receive a distinct account regardless of linking configuration — this is an Apple platform constraint, not a defect.
+- A user with an existing email/password account who signs in via Google with the same address may land in a duplicate empty account with no medication data.
 
 Do not assume account linking is safe. Do not deploy OAuth to production before this is confirmed.
 
@@ -332,19 +331,18 @@ Do not assume account linking is safe. Do not deploy OAuth to production before 
 
 All of the following must be completed before OAuth can go to production:
 
-1. Google provider enabled in Supabase (Auth → Providers → Google) with Client ID + Secret from Google Cloud Console.
-2. Apple provider enabled in Supabase with Service ID, Team ID, Key ID, and `.p8` private key from Apple Developer Portal.
-3. `https://<project-ref>.supabase.co/auth/v1/callback` added to the redirect URI allowlist in both Google Cloud Console and Apple Developer.
-4. Supabase Auth → URL Configuration → Redirect URLs includes `http://localhost:3000/auth/callback` and `https://your-production-domain.com/auth/callback`.
-5. Supabase Auth → URL Configuration → Site URL set to production domain.
-6. **"Allow automatic linking" enabled in Supabase Auth → Configuration** — confirmed on, not just assumed.
-7. Live browser-based verification of Google sign-in, Apple sign-in, new-user onboarding, returning-user routing, and cross-provider same-email behavior.
+1. Google provider enabled in Supabase (Auth → Providers → Google) with Client ID + Secret from Google Cloud Console — **already configured for staging; production config must be verified separately**.
+2. `https://<project-ref>.supabase.co/auth/v1/callback` added to the redirect URI allowlist in Google Cloud Console for the production OAuth app.
+3. Supabase Auth → URL Configuration → Redirect URLs includes `https://medremind-app-two.vercel.app/auth/callback`.
+4. Supabase Auth → URL Configuration → Site URL set to production domain.
+5. **"Allow automatic linking" confirmed enabled in Supabase Auth → Configuration** — confirmed on, not just assumed.
+6. Live browser-based verification of Google sign-in with an account that already has an email/password identity (account-linking scenario).
 
 ### Current recommendation
 
 | Environment | Readiness |
 |-------------|-----------|
-| Staging | Ready — pending provider configuration in the staging Supabase project |
-| Production | **Not ready** — provider config absent, account-linking unverified |
+| Staging | **VERIFIED WORKING** — Google OAuth verified end-to-end in browser |
+| Production | **Not ready** — account-linking unverified; production Supabase config not confirmed |
 
-The next required action is a real browser-based OAuth verification pass in a configured staging environment. This cannot be done without live provider credentials and a browser.
+PR #5 (`codex/oauth-google-apple` → `main`) is ready to merge pending account-linking verification. Merging without account-linking confirmation risks silent data loss for users who already have email/password accounts and attempt Google sign-in with the same address.
