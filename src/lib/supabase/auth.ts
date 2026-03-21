@@ -126,7 +126,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 // redirect could not be initiated, null otherwise.
 
 export async function signInWithOAuth(
-  provider: 'google' | 'apple',
+  provider: 'google',
 ): Promise<string | null> {
   const supabase = getSupabaseClient();
   const { error } = await supabase.auth.signInWithOAuth({
