@@ -77,29 +77,34 @@ export default function SettingsPage() {
   }
 
   async function saveNotifications() {
-    updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime });
+    try {
+      updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime });
 
-    if (pushEnabled) {
-      const result = await subscribeToPush();
-      if (!result.ok) {
-        if (result.reason === 'not-installed') {
-          setPushEnabled(false);
-          updateNotificationSettings({ pushEnabled: false });
-          show('Add MedRemind to your Home Screen first, then enable push.', 'warning');
-        } else if (result.reason === 'permission-denied') {
-          setPushEnabled(false);
-          updateNotificationSettings({ pushEnabled: false });
-          show('Notification permission denied.', 'warning');
-        } else {
-          show('Push setup failed. Try again.', 'warning');
+      if (pushEnabled) {
+        const result = await subscribeToPush();
+        if (!result.ok) {
+          if (result.reason === 'not-installed') {
+            setPushEnabled(false);
+            updateNotificationSettings({ pushEnabled: false });
+            show('Add MedRemind to your Home Screen first, then enable push.', 'warning');
+          } else if (result.reason === 'permission-denied') {
+            setPushEnabled(false);
+            updateNotificationSettings({ pushEnabled: false });
+            show('Notification permission denied.', 'warning');
+          } else {
+            show(`Push setup failed: ${result.message ?? result.reason}`, 'warning');
+          }
+          return;
         }
-        return;
+        show('✓ Push notifications enabled');
+      } else {
+        // User turned push off — unsubscribe this device.
+        await unsubscribeFromPush();
+        show('✓ Preferences saved');
       }
-      show('✓ Push notifications enabled');
-    } else {
-      // User turned push off — unsubscribe this device.
-      await unsubscribeFromPush();
-      show('✓ Preferences saved');
+    } catch (err) {
+      console.error('[settings] saveNotifications error', err);
+      show(`Error: ${String(err)}`, 'warning');
     }
   }
 
@@ -404,6 +409,7 @@ function Toggle({ label, sub, checked, onChange }: { label: string; sub: string;
         <div className="text-xs text-[#8B949E]">{sub}</div>
       </div>
       <button
+        type="button"
         onClick={() => onChange(!checked)}
         className={`w-12 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 ${checked ? 'bg-[#3B82F6]' : 'bg-[#1C2333]'}`}
       >
