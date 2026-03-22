@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { saveProfile } from '@/lib/supabase/auth';
+import { subscribeToPush } from '@/lib/push/subscription';
+import { useInstallState } from '@/lib/push/useInstallState';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import type { AgeRange, ProtocolCategory } from '@/types';
@@ -36,6 +38,7 @@ export default function OnboardingPage() {
   const [eveningTime, setEveningTime] = useState('21:00');
 
   const templates = protocols.filter(p => p.isTemplate);
+  const installState = useInstallState();
 
   useEffect(() => {
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -62,9 +65,16 @@ export default function OnboardingPage() {
       activateProtocol(selectedProtocolId, today);
     }
 
-    // Persist to Supabase — non-blocking, don't block navigation on failure
+    // Persist to Supabase — non-blocking
     const p = useStore.getState().profile;
     if (p) saveProfile({ ...p, ...patch, onboarded: true }).catch(() => {});
+
+    // Attempt push subscription if running as installed Home Screen PWA.
+    // This is a best-effort call from a user gesture (button click).
+    // Failure here is non-blocking — user can enable push in Settings later.
+    if (installState === 'standalone') {
+      subscribeToPush().catch(() => {});
+    }
 
     router.push('/app');
   }
@@ -201,9 +211,18 @@ export default function OnboardingPage() {
               ))}
             </div>
 
-            <p className="text-xs text-[#8B949E] leading-relaxed bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.2)] rounded-xl px-4 py-3">
-              💡 Browser notifications will be requested when you first open the app. You can manage this in Settings.
-            </p>
+            {installState === 'browser' ? (
+              <div className="bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-[#FBB924]">Add to Home Screen for push reminders</p>
+                <p className="text-xs text-[#8B949E] leading-relaxed">
+                  Tap the share icon in Safari, then &ldquo;Add to Home Screen&rdquo;. Push notifications only work from the installed app.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-[#8B949E] leading-relaxed bg-[rgba(16,185,129,0.06)] border border-[rgba(16,185,129,0.2)] rounded-xl px-4 py-3">
+                Push reminders will be requested when you tap Get started.
+              </p>
+            )}
 
             <Button fullWidth size="lg" onClick={handleFinish}>
               Get started →
