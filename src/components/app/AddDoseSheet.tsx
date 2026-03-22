@@ -6,6 +6,7 @@ import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { v4 as uuid } from 'uuid';
 import type { DoseForm, RouteOfAdmin, FrequencyType, ItemType } from '@/types';
+import { DOSE_FORM_ICONS, ROUTE_ICONS } from '@/lib/icons';
 import { format } from 'date-fns';
 
 interface Props { open: boolean; onClose: () => void; }
@@ -17,27 +18,34 @@ const ITEM_TYPES: { value: ItemType; label: string }[] = [
 ];
 
 const DOSE_FORMS: { value: DoseForm; label: string }[] = [
-  { value: 'tablet',   label: 'Tablet' },
-  { value: 'capsule',  label: 'Capsule' },
-  { value: 'injection', label: 'Injection' },
-  { value: 'drops',    label: 'Drops / Liquid' },
-  { value: 'cream',    label: 'Cream / Gel' },
-  { value: 'powder',   label: 'Powder' },
-  { value: 'patch',    label: 'Patch' },
-  { value: 'inhaler',  label: 'Inhaler' },
-  { value: 'other',    label: 'Other' },
+  { value: 'tablet',      label: `${DOSE_FORM_ICONS.tablet} Tablet` },
+  { value: 'capsule',     label: `${DOSE_FORM_ICONS.capsule} Capsule` },
+  { value: 'softgel',     label: `${DOSE_FORM_ICONS.softgel} Soft-gel / Gelcap` },
+  { value: 'injection',   label: `${DOSE_FORM_ICONS.injection} Injection` },
+  { value: 'cream',       label: `${DOSE_FORM_ICONS.cream} Cream / Gel` },
+  { value: 'drops',       label: `${DOSE_FORM_ICONS.drops} Drops` },
+  { value: 'powder',      label: `${DOSE_FORM_ICONS.powder} Powder / Granules` },
+  { value: 'liquid',      label: `${DOSE_FORM_ICONS.liquid} Liquid / Syrup` },
+  { value: 'patch',       label: `${DOSE_FORM_ICONS.patch} Patch` },
+  { value: 'inhaler',     label: `${DOSE_FORM_ICONS.inhaler} Inhaler` },
+  { value: 'spray',       label: `${DOSE_FORM_ICONS.spray} Spray` },
+  { value: 'eye_drops',   label: `${DOSE_FORM_ICONS.eye_drops} Eye drops` },
+  { value: 'nasal_spray', label: `${DOSE_FORM_ICONS.nasal_spray} Nasal spray` },
+  { value: 'suppository', label: `${DOSE_FORM_ICONS.suppository} Suppository` },
+  { value: 'lozenge',     label: `${DOSE_FORM_ICONS.lozenge} Lozenge / Pastille` },
+  { value: 'other',       label: `${DOSE_FORM_ICONS.other} Other` },
 ];
 
 const ROUTES: { value: RouteOfAdmin; label: string }[] = [
-  { value: 'oral',            label: 'Oral (by mouth)' },
-  { value: 'subcutaneous',    label: 'Subcutaneous injection' },
-  { value: 'intramuscular',   label: 'Intramuscular injection' },
-  { value: 'topical',         label: 'Topical (skin)' },
-  { value: 'sublingual',      label: 'Sublingual (under tongue)' },
-  { value: 'inhalation',      label: 'Inhalation' },
-  { value: 'nasal',           label: 'Nasal' },
-  { value: 'iv',              label: 'IV' },
-  { value: 'other',           label: 'Other' },
+  { value: 'oral',            label: `${ROUTE_ICONS.oral} Oral (by mouth)` },
+  { value: 'subcutaneous',    label: `${ROUTE_ICONS.subcutaneous} Subcutaneous` },
+  { value: 'intramuscular',   label: `${ROUTE_ICONS.intramuscular} Intramuscular` },
+  { value: 'topical',         label: `${ROUTE_ICONS.topical} Topical (skin)` },
+  { value: 'sublingual',      label: `${ROUTE_ICONS.sublingual} Sublingual (under tongue)` },
+  { value: 'inhalation',      label: `${ROUTE_ICONS.inhalation} Inhalation` },
+  { value: 'nasal',           label: `${ROUTE_ICONS.nasal} Nasal` },
+  { value: 'iv',              label: `${ROUTE_ICONS.iv} IV` },
+  { value: 'other',           label: `${ROUTE_ICONS.other} Other` },
 ];
 
 const WITH_FOOD = [
@@ -122,7 +130,7 @@ export function AddDoseSheet({ open, onClose }: Props) {
       instructions: instructions.trim() || undefined,
       startDay: 1,
       sortOrder: 99,
-      icon: itemType === 'analysis' ? '🧪' : itemType === 'therapy' ? '🩺' : '💊',
+      icon: itemType === 'analysis' ? '🧪' : itemType === 'therapy' ? '🩺' : (DOSE_FORM_ICONS[doseForm] ?? '💊'),
       color: ['blue', 'green', 'purple', 'yellow', 'red', 'pink'][Math.floor(Math.random() * 6)],
     });
 

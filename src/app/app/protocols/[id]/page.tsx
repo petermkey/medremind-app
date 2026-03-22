@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import type { DoseForm, FrequencyType, ProtocolCategory, ProtocolItem, RouteOfAdmin } from '@/types';
+import { DOSE_FORM_ICONS, ROUTE_ICONS } from '@/lib/icons';
 
 const ROUTE_LABELS: Record<string, string> = {
   oral: 'Oral', subcutaneous: 'Subcut.', intramuscular: 'IM',
@@ -389,15 +390,22 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 value={itemDraft.doseForm}
                 onChange={e => setItemDraft(d => ({ ...d, doseForm: e.target.value as DoseForm }))}
                 options={[
-                  { value: 'tablet', label: 'Tablet' },
-                  { value: 'capsule', label: 'Capsule' },
-                  { value: 'injection', label: 'Injection' },
-                  { value: 'drops', label: 'Drops/Liquid' },
-                  { value: 'cream', label: 'Cream/Gel' },
-                  { value: 'powder', label: 'Powder' },
-                  { value: 'patch', label: 'Patch' },
-                  { value: 'inhaler', label: 'Inhaler' },
-                  { value: 'other', label: 'Other' },
+                  { value: 'tablet',      label: `${DOSE_FORM_ICONS.tablet} Tablet` },
+                  { value: 'capsule',     label: `${DOSE_FORM_ICONS.capsule} Capsule` },
+                  { value: 'softgel',     label: `${DOSE_FORM_ICONS.softgel} Soft-gel` },
+                  { value: 'injection',   label: `${DOSE_FORM_ICONS.injection} Injection` },
+                  { value: 'cream',       label: `${DOSE_FORM_ICONS.cream} Cream / Gel` },
+                  { value: 'drops',       label: `${DOSE_FORM_ICONS.drops} Drops` },
+                  { value: 'powder',      label: `${DOSE_FORM_ICONS.powder} Powder` },
+                  { value: 'liquid',      label: `${DOSE_FORM_ICONS.liquid} Liquid / Syrup` },
+                  { value: 'patch',       label: `${DOSE_FORM_ICONS.patch} Patch` },
+                  { value: 'inhaler',     label: `${DOSE_FORM_ICONS.inhaler} Inhaler` },
+                  { value: 'spray',       label: `${DOSE_FORM_ICONS.spray} Spray` },
+                  { value: 'eye_drops',   label: `${DOSE_FORM_ICONS.eye_drops} Eye drops` },
+                  { value: 'nasal_spray', label: `${DOSE_FORM_ICONS.nasal_spray} Nasal spray` },
+                  { value: 'suppository', label: `${DOSE_FORM_ICONS.suppository} Suppository` },
+                  { value: 'lozenge',     label: `${DOSE_FORM_ICONS.lozenge} Lozenge` },
+                  { value: 'other',       label: `${DOSE_FORM_ICONS.other} Other` },
                 ]}
               />
               <Select
@@ -405,15 +413,15 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 value={itemDraft.route}
                 onChange={e => setItemDraft(d => ({ ...d, route: e.target.value as RouteOfAdmin }))}
                 options={[
-                  { value: 'oral', label: 'Oral' },
-                  { value: 'subcutaneous', label: 'Subcutaneous' },
-                  { value: 'intramuscular', label: 'Intramuscular' },
-                  { value: 'topical', label: 'Topical' },
-                  { value: 'sublingual', label: 'Sublingual' },
-                  { value: 'inhalation', label: 'Inhalation' },
-                  { value: 'nasal', label: 'Nasal' },
-                  { value: 'iv', label: 'IV' },
-                  { value: 'other', label: 'Other' },
+                  { value: 'oral',            label: `${ROUTE_ICONS.oral} Oral` },
+                  { value: 'subcutaneous',    label: `${ROUTE_ICONS.subcutaneous} Subcutaneous` },
+                  { value: 'intramuscular',   label: `${ROUTE_ICONS.intramuscular} Intramuscular` },
+                  { value: 'topical',         label: `${ROUTE_ICONS.topical} Topical` },
+                  { value: 'sublingual',      label: `${ROUTE_ICONS.sublingual} Sublingual` },
+                  { value: 'inhalation',      label: `${ROUTE_ICONS.inhalation} Inhalation` },
+                  { value: 'nasal',           label: `${ROUTE_ICONS.nasal} Nasal` },
+                  { value: 'iv',              label: `${ROUTE_ICONS.iv} IV` },
+                  { value: 'other',           label: `${ROUTE_ICONS.other} Other` },
                 ]}
               />
               <Select
