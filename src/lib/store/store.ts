@@ -1214,8 +1214,9 @@ export const useStore = create<AppState>()(
         profile: s.profile,
         notificationSettings: s.notificationSettings,
         activeProtocols: s.activeProtocols,
-        scheduledDoses: s.scheduledDoses,
-        doseRecords: s.doseRecords,
+        // scheduledDoses and doseRecords are excluded — they can be large
+        // (100s–1000s of rows) and overflow the 5 MB iOS localStorage quota.
+        // They are loaded from Supabase on boot instead.
         // user custom protocols only
         protocols: s.protocols.filter(p => !p.isTemplate),
       }),
