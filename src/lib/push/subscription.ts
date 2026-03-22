@@ -55,17 +55,34 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
     return { ok: false, reason: 'not-supported', message: 'Service worker not available' };
   }
 
+  const subscribeOptions = {
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidKey),
+  };
+
   let subscription: PushSubscription;
   try {
     // Reuse an existing subscription if one already exists for this device.
     subscription = await registration.pushManager.getSubscription()
-      ?? await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey),
-        });
+      ?? await registration.pushManager.subscribe(subscribeOptions);
   } catch (err) {
-    console.error('[push] subscribe failed', err);
-    return { ok: false, reason: 'error', message: String(err) };
+    const isQuota = err instanceof Error && err.name === 'QuotaExceededError';
+    if (isQuota) {
+      // iOS quirk: subscription exists internally but getSubscription() returned null.
+      // Unregister the SW and re-register to clear the stale state, then subscribe.
+      try {
+        await registration.unregister();
+        const newReg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
+        await navigator.serviceWorker.ready;
+        subscription = await newReg.pushManager.subscribe(subscribeOptions);
+      } catch (retryErr) {
+        console.error('[push] subscribe retry failed', retryErr);
+        return { ok: false, reason: 'error', message: String(retryErr) };
+      }
+    } else {
+      console.error('[push] subscribe failed', err);
+      return { ok: false, reason: 'error', message: String(err) };
+    }
   }
 
   const json = subscription.toJSON();
