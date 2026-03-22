@@ -179,6 +179,38 @@ export async function syncProtocolUpsert(userId: string, protocol: Protocol) {
 export async function syncProtocolItemDelete(userId: string, protocolId: string, itemId: string) {
   const supabase = getSupabaseClient();
   const id = cloudProtocolItemId(userId, protocolId, itemId);
+
+  // 1. Find all scheduled_doses that reference this protocol item.
+  const { data: doseRows, error: doseErr } = await supabase
+    .from('scheduled_doses')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('protocol_item_id', id);
+  if (doseErr) throw new Error(`Delete protocol item failed: ${doseErr.message}`);
+
+  const doseIds = ((doseRows ?? []) as Array<{ id: string }>).map(r => r.id);
+
+  // 2. Delete dose_records referencing those doses (FK constraint).
+  for (const ids of chunk(doseIds, 250)) {
+    const { error: rErr } = await supabase
+      .from('dose_records')
+      .delete()
+      .eq('user_id', userId)
+      .in('scheduled_dose_id', ids);
+    if (rErr) throw new Error(`Delete protocol item failed: ${rErr.message}`);
+  }
+
+  // 3. Delete the scheduled_doses themselves.
+  for (const ids of chunk(doseIds, 250)) {
+    const { error: sErr } = await supabase
+      .from('scheduled_doses')
+      .delete()
+      .eq('user_id', userId)
+      .in('id', ids);
+    if (sErr) throw new Error(`Delete protocol item failed: ${sErr.message}`);
+  }
+
+  // 4. Delete the protocol item.
   const { error } = await supabase.from('protocol_items').delete().eq('id', id);
   if (error) throw new Error(`Delete protocol item failed: ${error.message}`);
 }
