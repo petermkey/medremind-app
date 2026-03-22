@@ -1,8 +1,9 @@
 // ─── Core domain types ────────────────────────────────────────────────
 
 export type DoseForm =
-  | 'tablet' | 'capsule' | 'injection' | 'cream' | 'drops'
-  | 'powder' | 'liquid' | 'patch' | 'inhaler' | 'other';
+  | 'tablet' | 'capsule' | 'softgel' | 'injection' | 'cream' | 'drops'
+  | 'powder' | 'liquid' | 'patch' | 'inhaler' | 'spray' | 'eye_drops'
+  | 'nasal_spray' | 'suppository' | 'lozenge' | 'other';
 
 export type RouteOfAdmin =
   | 'oral' | 'subcutaneous' | 'intramuscular' | 'topical'
