@@ -461,6 +461,11 @@ export const useStore = create<AppState>()(
         const state = get();
         const protocol = state.protocols.find(p => p.id === protocolId);
         if (!protocol || !state.profile) throw new Error('Protocol or profile not found');
+        // Guard: prevent duplicate activation if already active or paused.
+        const existingRunning = state.activeProtocols.find(
+          ap => ap.protocolId === protocolId && (ap.status === 'active' || ap.status === 'paused'),
+        );
+        if (existingRunning) return existingRunning;
         const fixedDurationDays = normalizeDurationDays(protocol.durationDays);
         const endDate = computeInclusiveEndDate(startDate, fixedDurationDays);
 
@@ -785,7 +790,10 @@ export const useStore = create<AppState>()(
       selectProtocolDetailReadModel: (protocolId, date) => {
         const state = get();
         const protocol = state.protocols.find(p => p.id === protocolId);
-        const instance = state.activeProtocols.find(ap => ap.protocolId === protocolId);
+        // Prefer the running (active/paused) instance; fall back to latest completed/abandoned.
+        const instance =
+          state.activeProtocols.find(ap => ap.protocolId === protocolId && (ap.status === 'active' || ap.status === 'paused')) ??
+          state.activeProtocols.filter(ap => ap.protocolId === protocolId).at(-1);
         const instanceIds = new Set(
           state.activeProtocols
             .filter(ap => ap.protocolId === protocolId)
@@ -825,7 +833,7 @@ export const useStore = create<AppState>()(
           actionableFutureRows,
           handledHistoryRows,
           futureBoundaryDate: instance?.endDate,
-          canActivate: !instance,
+          canActivate: !instance || (instance.status !== 'active' && instance.status !== 'paused'),
           canPause: instance?.status === 'active',
           canResume: instance?.status === 'paused',
           canComplete: instance?.status === 'active',
