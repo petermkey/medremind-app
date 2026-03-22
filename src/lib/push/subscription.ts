@@ -92,12 +92,7 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
 
   const supabase = getSupabase();
   const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      endpoint,
-      p256dh,
-      auth,
-      user_agent: navigator.userAgent.slice(0, 200),
-    },
+    { endpoint, p256dh, auth },
     { onConflict: 'user_id,endpoint' },
   );
 
