@@ -1,6 +1,6 @@
 # MedRemind Current Status
 
-Date: 2026-03-21
+Date: 2026-03-22
 Owner: engineering runtime status on current `main`
 
 > **Lifecycle contract:** `docs/lifecycle-contract-v1.md` is the authoritative behavioral specification
@@ -71,6 +71,13 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Regeneration uses live protocol reference and preserves handled history.
 - Snooze uses replacement-row semantics (original → `snoozed`, replacement → `pending`).
 - Archive path is lifecycle-aware (`deleteProtocol` archives when history exists).
+
+### Medication icon system (landed 2026-03-22)
+
+- New `src/lib/icons.ts` — centralized `DOSE_FORM_ICONS` (16 entries) and `ROUTE_ICONS` (9 entries) maps keyed by `DoseForm` / `RouteOfAdmin` type.
+- `DoseForm` type expanded from 10 → 16 values: added `softgel`, `spray`, `eye_drops`, `nasal_spray`, `suppository`, `lozenge`.
+- Icon auto-assigned in `AddDoseSheet` from `DOSE_FORM_ICONS[doseForm]` instead of hardcoded 💊.
+- Form and Route `<Select>` options across all three editors (AddDoseSheet, protocols/new, protocols/[id]) show emoji prefix beside each label.
 
 ### Protocols screen UX
 

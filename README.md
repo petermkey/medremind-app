@@ -22,6 +22,8 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
   - protocol metadata edit
   - protocol item composition edit (add/edit/delete)
   - lifecycle transitions: activate, pause, resume, complete, archive-aware delete
+  - 16 dose-form icons (tablet, capsule, softgel, injection, cream, drops, powder, liquid, patch, inhaler, spray, eye_drops, nasal_spray, suppository, lozenge, other) auto-assigned from `DoseForm`
+  - 9 route-of-administration icons (oral, subcutaneous, intramuscular, topical, sublingual, inhalation, nasal, iv, other) shown in Form/Route selects
 - Schedule:
   - per-day schedule view with week strip selector
   - dose actions: take, skip, snooze

@@ -11,6 +11,20 @@ Scope: protocol lifecycle, dose generation, schedule visibility, and read-model 
 
 ## 1. Core entities and statuses
 
+### DoseForm values (16)
+
+`tablet` | `capsule` | `softgel` | `injection` | `cream` | `drops` | `powder` | `liquid` | `patch` | `inhaler` | `spray` | `eye_drops` | `nasal_spray` | `suppository` | `lozenge` | `other`
+
+Each value maps to a distinct emoji in `src/lib/icons.ts → DOSE_FORM_ICONS`. Icon is auto-assigned on item creation by `AddDoseSheet`.
+
+### RouteOfAdmin values (9)
+
+`oral` | `subcutaneous` | `intramuscular` | `topical` | `sublingual` | `inhalation` | `nasal` | `iv` | `other`
+
+Each maps to `ROUTE_ICONS` in `src/lib/icons.ts`. Shown as emoji prefix in Form/Route selects across all editors.
+
+
+
 Managed primarily in `src/lib/store/store.ts`:
 
 - `Protocol`, `ProtocolItem`, `ActiveProtocol`, `ScheduledDose`, `DoseRecord`

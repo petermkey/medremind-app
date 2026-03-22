@@ -1,6 +1,6 @@
 # Agent Handoff (Current Main)
 
-Date: 2026-03-21
+Date: 2026-03-22
 Audience: agents continuing work from current `main`
 
 ## 1. Source-of-truth scope
@@ -88,7 +88,13 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 | `e053921` | feat(auth): Google and Apple OAuth with callback route and route protection fix (Apple subsequently removed) |
 | `963aea1` | CI: production environment for main branch Vercel build |
 
-## 5. Most important code surfaces
+## 5. Recent landed features (on main as of 2026-03-22)
+
+| Commit | What landed |
+|--------|------------|
+| `3995947` | feat(icons): 16 dose-form icons + 9 route-of-admin icons; DoseForm type expanded from 10 → 16 values |
+
+## 6. Most important code surfaces
 
 - Domain/store: `src/lib/store/store.ts`
 - Sync + commands: `src/lib/supabase/realtimeSync.ts`
@@ -98,8 +104,9 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Route guard: `src/proxy.ts` (server-side routing, committed on main) + `middleware.ts` (entry point, committed on `codex/oauth-google-apple`)
 - OAuth callback: `src/app/auth/callback/route.ts` (committed on `codex/oauth-google-apple`)
 - Cloud pull/import/backup: `src/lib/supabase/cloudStore.ts`, `src/lib/supabase/importStore.ts`
+- Icon registry: `src/lib/icons.ts` — `DOSE_FORM_ICONS`, `ROUTE_ICONS`
 
-## 6. Landed migration/tooling summary
+## 7. Landed migration/tooling summary
 
 Already landed on `main`:
 
@@ -112,7 +119,7 @@ Operationally pending (live environment execution, not code changes):
 - C5 parity run and D4 consistency run on real data
 - Consolidated anomaly triage for rollout/decommission readiness
 
-## 7. Mandatory execution model
+## 8. Mandatory execution model
 
 1. Start from clean `main`.
 2. Create one correctly named slice branch when coding.
@@ -120,7 +127,7 @@ Operationally pending (live environment execution, not code changes):
 4. Stop/report on drift or unrelated file contamination.
 5. Use `main` only for merge/cleanup/operational run tasks.
 
-## 8. Operational run prerequisites
+## 9. Operational run prerequisites
 
 Required environment for D2/D3/C5/D4 scripts:
 

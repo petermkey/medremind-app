@@ -1,6 +1,6 @@
 # MedRemind System Logic (Current)
 
-Date: 2026-03-21
+Date: 2026-03-22
 Status: top-level source-of-truth index for current `main`
 
 ## 1. Source-of-truth map
