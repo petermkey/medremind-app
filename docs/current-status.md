@@ -72,6 +72,15 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Snooze uses replacement-row semantics (original → `snoozed`, replacement → `pending`).
 - Archive path is lifecycle-aware (`deleteProtocol` archives when history exists).
 
+### Push notifications cron (landed 2026-03-22)
+
+- Vercel Hobby plan supports daily cron only — `vercel.json` crons removed entirely.
+- External cron: **cron-job.org job #7402449** calls `GET /api/cron/notify` every minute.
+- Auth: `Authorization: Bearer <CRON_SECRET>` (set in Vercel env, stored in `vercel-env-import.env`).
+- Fire window: ±1 min. Deduplication via `notification_log` table.
+- Sync error fix: `syncProtocolItemDelete` now cascade-deletes `dose_records` → `scheduled_doses` before deleting `protocol_items` (FK constraint fix).
+- Settings page: sync error shown inline with **Retry now** / **Clear outbox** buttons.
+
 ### Medication icon system (landed 2026-03-22)
 
 - New `src/lib/icons.ts` — centralized `DOSE_FORM_ICONS` (16 entries) and `ROUTE_ICONS` (9 entries) maps keyed by `DoseForm` / `RouteOfAdmin` type.

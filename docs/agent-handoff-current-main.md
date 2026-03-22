@@ -92,7 +92,18 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 
 | Commit | What landed |
 |--------|------------|
+| `4b76ca1` | fix(cron): remove cron from vercel.json (Hobby plan daily-only limit) — external cron-job.org job #7402449 fires every minute |
+| `b53501e` | fix(sync): cascade-delete dose_records → scheduled_doses before protocol_item (FK constraint fix) |
+| `32760f3` | fix(push): sync error UI with Retry now / Clear outbox buttons; WINDOW_MINUTES restored to 1 |
 | `3995947` | feat(icons): 16 dose-form icons + 9 route-of-admin icons; DoseForm type expanded from 10 → 16 values |
+
+## 5a. Push notification infrastructure
+
+- **Cron:** cron-job.org job `#7402449`, every minute, `GET https://medremind-app-two.vercel.app/api/cron/notify`
+- **Auth:** `Authorization: Bearer <CRON_SECRET>` — value in `vercel-env-import.env`
+- **Fire window:** ±1 min around scheduled_time (adjusted for lead_time_min)
+- **Deduplication:** `notification_log` table (user_id + scheduled_dose_id unique)
+- **Delivery:** `web-push` via `/api/push/send` → `push_subscriptions` table
 
 ## 6. Most important code surfaces
 
