@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store/store';
 import { getCurrentUser } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
 import { startSyncOutbox } from '@/lib/supabase/syncOutbox';
+import { registerServiceWorker } from '@/lib/push/swRegister';
 import { BottomNav } from '@/components/app/BottomNav';
 import { SyncStatusPill } from '@/components/app/SyncStatusPill';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -80,6 +81,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     boot();
+    // Register service worker unconditionally — does not require push permission.
+    // Permission is requested later via explicit user action in Settings / onboarding.
+    registerServiceWorker();
     return () => { cancelled = true; };
   }, []);
 

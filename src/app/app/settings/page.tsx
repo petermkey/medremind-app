@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, waitForRealtimeSyncIdle } from '@/lib/store/store';
 import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
+import { subscribeToPush, unsubscribeFromPush } from '@/lib/push/subscription';
+import { useInstallState } from '@/lib/push/useInstallState';
 import {
   backupCurrentStoreToSupabase,
   downloadCurrentStoreSnapshot,
@@ -47,6 +49,7 @@ export default function SettingsPage() {
   const [flushing, setFlushing] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const installState = useInstallState();
 
   useEffect(() => {
     let cancelled = false;
@@ -73,18 +76,29 @@ export default function SettingsPage() {
     show('✓ Profile saved');
   }
 
-  function saveNotifications() {
+  async function saveNotifications() {
     updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime });
-    if (pushEnabled && typeof window !== 'undefined' && 'Notification' in window) {
-      Notification.requestPermission().then(perm => {
-        if (perm !== 'granted') {
+
+    if (pushEnabled) {
+      const result = await subscribeToPush();
+      if (!result.ok) {
+        if (result.reason === 'not-installed') {
           setPushEnabled(false);
-          show('Notification permission denied', 'warning');
+          updateNotificationSettings({ pushEnabled: false });
+          show('Add MedRemind to your Home Screen first, then enable push.', 'warning');
+        } else if (result.reason === 'permission-denied') {
+          setPushEnabled(false);
+          updateNotificationSettings({ pushEnabled: false });
+          show('Notification permission denied.', 'warning');
         } else {
-          show('✓ Notifications enabled');
+          show('Push setup failed. Try again.', 'warning');
         }
-      });
+        return;
+      }
+      show('✓ Push notifications enabled');
     } else {
+      // User turned push off — unsubscribe this device.
+      await unsubscribeFromPush();
       show('✓ Preferences saved');
     }
   }
@@ -118,6 +132,7 @@ export default function SettingsPage() {
         setFlushing(false);
       }
     }
+    await unsubscribeFromPush().catch(() => {});
     await supabaseSignOut();
     clearSyncOutbox();
     signOut();
@@ -246,7 +261,15 @@ export default function SettingsPage() {
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
-          <Toggle label="Push notifications" sub="Browser alerts at dose time" checked={pushEnabled} onChange={setPushEnabled} />
+          {installState === 'browser' && (
+            <div className="bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+              <p className="text-xs font-semibold text-[#FBB924]">Add to Home Screen for push notifications</p>
+              <p className="text-xs text-[#8B949E] leading-relaxed">
+                Push notifications only work when MedRemind is installed on your Home Screen. In Safari, tap the share icon and select &ldquo;Add to Home Screen&rdquo;.
+              </p>
+            </div>
+          )}
+          <Toggle label="Push notifications" sub="Dose reminders delivered to your device" checked={pushEnabled} onChange={setPushEnabled} />
           <Toggle label="Email digest" sub="Daily summary at set time" checked={emailEnabled} onChange={setEmailEnabled} />
           <Select label="Reminder lead time" value={leadTime} onChange={e => setLeadTime(e.target.value)}
             options={[

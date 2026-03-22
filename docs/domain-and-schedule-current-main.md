@@ -1,7 +1,13 @@
 # Domain and Schedule Logic (Current Main)
 
-Date: 2026-03-19
+Date: 2026-03-19 (lifecycle contract reference added 2026-03-21)
 Scope: protocol lifecycle, dose generation, schedule visibility, and read-model selectors on current `main`
+
+> **Lifecycle contract:** This document describes current web implementation behavior.
+> The authoritative platform-neutral behavioral specification is `docs/lifecycle-contract-v1.md`.
+> Any agent working on protocol actions, dose actions, snooze semantics, persistence effects,
+> progress aggregation inputs, or future iOS lifecycle work must read the lifecycle contract first.
+> When this document and the lifecycle contract conflict, the lifecycle contract is correct.
 
 ## 1. Core entities and statuses
 
@@ -123,3 +129,7 @@ Activation path:
 - rule engine remains centralized in one large store module
 - recurrence model is practical but not a full scheduling DSL
 - server-side canonical scheduling engine is not yet introduced
+
+The dose generation algorithm is now formally specified in `docs/lifecycle-contract-v1.md` §3.13.
+Future clients (iOS and others) must implement that specification — they must not derive generation
+behavior solely from `expandItemToDoses` in `store.ts`.
