@@ -1209,6 +1209,26 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'medremind-store',
+      // Custom storage: on QuotaExceededError, evict the old (oversized) entry
+      // and retry. This recovers devices whose localStorage was filled by the
+      // previous partialize that included scheduledDoses + doseRecords.
+      storage: {
+        getItem: (key: string) => {
+          try { return JSON.parse(localStorage.getItem(key) ?? 'null'); } catch { return null; }
+        },
+        setItem: (key: string, value: unknown) => {
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+          } catch (err) {
+            if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+              // Evict the stale oversized entry and retry once.
+              localStorage.removeItem(key);
+              try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+            }
+          }
+        },
+        removeItem: (key: string) => localStorage.removeItem(key),
+      },
       // Don't persist seed protocols — merge on load
       partialize: (s) => ({
         profile: s.profile,
