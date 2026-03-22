@@ -10,14 +10,17 @@ Use this order for current behavior and process truth:
 1. `docs/project-rules-and-current-operating-model.md`
 2. `docs/agent-handoff-current-main.md` — read this FIRST for working-tree state awareness
 3. `docs/future-agent-guide.md` — feature map, risk boundaries, persistence model
-4. `docs/architecture-current-main.md`
-5. `docs/auth-and-persistence-current-main.md`
-6. `docs/domain-and-schedule-current-main.md`
-7. `docs/current-status.md`
-8. `docs/current-status-and-next-phase.md`
-9. `README.md`
+4. **`docs/lifecycle-contract-v1.md` — authoritative lifecycle behavioral specification (read before any lifecycle work)**
+5. `docs/architecture-current-main.md`
+6. `docs/auth-and-persistence-current-main.md`
+7. `docs/domain-and-schedule-current-main.md`
+8. `docs/current-status.md`
+9. `docs/current-status-and-next-phase.md`
+10. `README.md`
 
-If any statement conflicts with code, code on current `main` wins.
+**Lifecycle contract overrides implementation inference:** When interpreting lifecycle behavior (protocol states, dose actions, persistence semantics, snooze semantics, idempotency rules), `docs/lifecycle-contract-v1.md` is the authority. `src/lib/store/store.ts` is the current web implementation of that contract, not the contract itself. If this document and the browser store code conflict, the lifecycle contract is correct and the code is the bug.
+
+If any other statement conflicts with code, code on current `main` wins.
 
 ## 2. Core runtime model
 
@@ -36,6 +39,8 @@ If any statement conflicts with code, code on current `main` wins.
 5. Snooze creates replacement-row lineage (original row remains traceable).
 6. Command-path sync for take/skip/snooze and pause/resume/complete/archive remains idempotent.
 7. Sign-out guard must protect pending realtime sync and outbox work.
+
+The full behavioral specification for invariants 3–6 is in `docs/lifecycle-contract-v1.md`. Do not rely on store code alone to understand these invariants.
 
 ## 4. Migration posture on current main
 

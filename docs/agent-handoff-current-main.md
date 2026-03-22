@@ -7,8 +7,11 @@ Audience: agents continuing work from current `main`
 
 - Code source of truth: `main`.
 - Process/governance source: `docs/project-rules-and-current-operating-model.md`.
+- **Lifecycle behavioral specification: `docs/lifecycle-contract-v1.md`** — authoritative, platform-neutral. Read before touching any lifecycle logic.
 - Behavior source: `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`, `docs/current-status.md`.
 - Historical snapshots in `docs/` are context only.
+
+**Lifecycle contract note:** `src/lib/store/store.ts` is the current web implementation of the lifecycle model. It is not the contract. Do not treat Zustand store code as the authoritative specification for protocol states, dose states, persistence semantics, snooze lineage, or idempotency behavior. The lifecycle contract is the specification. Code discrepancies are bugs.
 
 ## 2. OAuth state — branch `codex/oauth-google-apple` (PR #5 open against main)
 

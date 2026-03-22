@@ -10,12 +10,17 @@ Read in this order before touching any file:
 1. `docs/project-rules-and-current-operating-model.md` — governance, branch naming, preflight rules
 2. `docs/agent-handoff-current-main.md` — where things stand TODAY, including branch and PR state
 3. `docs/current-status.md` — what is implemented, what is deferred, what is pending merge
-4. `docs/architecture-current-main.md` — full stack, routing, persistence, auth model
-5. `docs/auth-and-persistence-current-main.md` — auth flows, outbox, sign-out guard
-6. `docs/domain-and-schedule-current-main.md` — protocol/dose lifecycle, selectors, snooze semantics
-7. `README.md` — quick-start, env vars, available scripts
+4. **`docs/lifecycle-contract-v1.md` — authoritative behavioral specification for all lifecycle logic**
+5. `docs/architecture-current-main.md` — full stack, routing, persistence, auth model
+6. `docs/auth-and-persistence-current-main.md` — auth flows, outbox, sign-out guard
+7. `docs/domain-and-schedule-current-main.md` — web implementation behavior and selectors
+8. `README.md` — quick-start, env vars, available scripts
 
-Do not read historical docs first. They are timeline artifacts. If any doc conflicts with code on `main`, code wins.
+Do not read historical docs first. They are timeline artifacts.
+
+**Critical:** For lifecycle behavior (protocol states, dose states, transitions, persistence effects, snooze semantics, idempotency), the lifecycle contract (#4 above) is the authority. `src/lib/store/store.ts` is the current web implementation of that contract. It is **not** the contract. Do not reverse-engineer lifecycle rules from Zustand code. If the contract and the store code conflict, the contract is correct and the code has a bug.
+
+If any other doc conflicts with code on `main`, code wins.
 
 ## 2. What to do first on any new task
 
@@ -49,12 +54,33 @@ If your task is unrelated to OAuth: the main branch is clean; create a new branc
 
 If your task is to verify account-linking or merge PR #5: see `docs/auth-and-persistence-current-main.md` §15.
 
-## 4. Risk boundaries — what requires extra care
+## 4. Lifecycle contract — what every agent must know
+
+`docs/lifecycle-contract-v1.md` is the authoritative behavioral specification for:
+- Protocol state model (`active`, `paused`, `completed`, `abandoned`)
+- Dose state model (`pending`, `taken`, `skipped`, `snoozed`, `overdue`)
+- All valid and forbidden lifecycle transitions
+- Exact persistence effects for every action (which tables, which fields, in what order)
+- Snooze replacement-row semantics and the deterministic replacement ID algorithm
+- clientOperationId format and idempotency expectations
+- Accepted warning-only conditions and open ambiguities
+
+**You must read `docs/lifecycle-contract-v1.md` before:**
+- Modifying any dose action (take, skip, snooze)
+- Modifying any protocol lifecycle action (pause, resume, complete, archive)
+- Modifying sync or outbox logic
+- Modifying progress aggregation inputs
+- Implementing lifecycle behavior in iOS or any future client
+- Debugging lifecycle-related persistence anomalies
+
+**`src/lib/store/store.ts` is an implementation, not the contract.** Changes to `store.ts` that alter lifecycle behavior must be validated against the contract. If the code and the contract diverge, update the contract in the same commit and flag the divergence explicitly.
+
+## 5. Risk boundaries — what requires extra care
 
 ### High-risk files (domain + sync core)
 
-- `src/lib/store/store.ts` — 1234 lines; domain logic, sync wiring, all selectors. Any change here can affect every screen. Build + E2E smoke required.
-- `src/lib/supabase/realtimeSync.ts` — all cloud command paths. Changes here affect cloud durability.
+- `src/lib/store/store.ts` — 1234 lines; domain logic, sync wiring, all selectors. Any change here can affect every screen. Changes that touch lifecycle behavior must be validated against `docs/lifecycle-contract-v1.md`. Build + E2E smoke required.
+- `src/lib/supabase/realtimeSync.ts` — all cloud command paths. Changes here affect cloud durability. Must conform to persistence contract in `docs/lifecycle-contract-v1.md` §3.
 - `src/app/app/layout.tsx` — auth boot gate. Bugs here cause infinite spinners or boot loops.
 - `src/proxy.ts` — server route guard. Changes here affect auth boundary for all routes.
 

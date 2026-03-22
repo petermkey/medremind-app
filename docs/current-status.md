@@ -3,6 +3,10 @@
 Date: 2026-03-21
 Owner: engineering runtime status on current `main`
 
+> **Lifecycle contract:** `docs/lifecycle-contract-v1.md` is the authoritative behavioral specification
+> for protocol states, dose states, lifecycle transitions, persistence effects, snooze semantics, and
+> idempotency. Read it before any lifecycle work. It supersedes inference from `store.ts`.
+
 ## 1. Current maturity
 
 Overall: beta with hardened auth/session flows, lifecycle command paths, additive write-through paths, read-model selector migration, migration tooling landed, and recent UX improvements to dose cards and progress screen.
