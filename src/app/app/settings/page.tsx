@@ -15,6 +15,7 @@ import {
   clearSyncOutbox,
   flushSyncOutbox,
   getSyncStatusSnapshot,
+  pumpOutbox,
   subscribeSyncStatus,
   type SyncStatus,
 } from '@/lib/supabase/syncOutbox';
@@ -250,6 +251,24 @@ export default function SettingsPage() {
     }
   }
 
+  function handleClearOutbox() {
+    clearSyncOutbox();
+    setSyncStatus('Outbox cleared. Local changes that were stuck will not be retried.');
+    show('Outbox cleared');
+  }
+
+  async function handleRetrySync() {
+    setSyncStatus('Retrying sync...');
+    await pumpOutbox({ force: true });
+    const snap = getSyncStatusSnapshot();
+    if (!snap.lastError) {
+      setSyncStatus('Sync succeeded.');
+      show('✓ Sync OK');
+    } else {
+      setSyncStatus(`Retry failed: ${snap.lastError}`);
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
@@ -345,8 +364,16 @@ export default function SettingsPage() {
           <p className="text-xs text-[#8B949E] leading-relaxed">
             Cloud sync: {outbox.pending > 0 ? `${outbox.pending} pending change(s)` : 'all changes synced'}.
             {outbox.lastSuccessAt ? ` Last success: ${new Date(outbox.lastSuccessAt).toLocaleTimeString()}.` : ''}
-            {outbox.lastError ? ` Last error: ${outbox.lastError}.` : ''}
           </p>
+          {outbox.lastError && (
+            <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
+              <p className="text-xs text-[#FCA5A5]">Sync error: {outbox.lastError}</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={handleRetrySync}>Retry now</Button>
+                <Button variant="danger" size="sm" onClick={handleClearOutbox}>Clear outbox</Button>
+              </div>
+            </div>
+          )}
           <p className="text-xs text-[#8B949E] leading-relaxed">
             Import old `medremind-store` snapshot into Supabase for the current signed-in account.
           </p>
