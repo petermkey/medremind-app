@@ -14,8 +14,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Notification fire window: ±1 minute around the current UTC time.
-const WINDOW_MINUTES = 1;
+// Notification fire window: ±31 minutes around the current UTC time.
+// Cron runs hourly (Vercel Hobby limit). ±31 min overlap ensures zero gaps
+// across hourly boundaries; notification_log deduplication prevents re-sends.
+const WINDOW_MINUTES = 31;
 
 export async function GET(request: NextRequest) {
   // Vercel sets this header on cron invocations; also accept CRON_SECRET bearer.
