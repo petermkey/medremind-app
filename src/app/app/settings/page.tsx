@@ -79,32 +79,38 @@ export default function SettingsPage() {
   async function saveNotifications() {
     try {
       updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime });
-
-      if (pushEnabled) {
-        const result = await subscribeToPush();
-        if (!result.ok) {
-          if (result.reason === 'not-installed') {
-            setPushEnabled(false);
-            updateNotificationSettings({ pushEnabled: false });
-            show('Add MedRemind to your Home Screen first, then enable push.', 'warning');
-          } else if (result.reason === 'permission-denied') {
-            setPushEnabled(false);
-            updateNotificationSettings({ pushEnabled: false });
-            show('Notification permission denied.', 'warning');
-          } else {
-            show(`Push setup failed: ${result.message ?? result.reason}`, 'warning');
-          }
-          return;
-        }
-        show('✓ Push notifications enabled');
-      } else {
-        // User turned push off — unsubscribe this device.
-        await unsubscribeFromPush();
-        show('✓ Preferences saved');
-      }
     } catch (err) {
-      console.error('[settings] saveNotifications error', err);
-      show(`Error: ${String(err)}`, 'warning');
+      console.error('[settings] store write error', err);
+      show(`Store error: ${String(err)}`, 'warning');
+      return;
+    }
+
+    if (!pushEnabled) {
+      try { await unsubscribeFromPush(); } catch { /* ignore */ }
+      show('✓ Preferences saved');
+      return;
+    }
+
+    try {
+      const result = await subscribeToPush();
+      if (!result.ok) {
+        if (result.reason === 'not-installed') {
+          setPushEnabled(false);
+          updateNotificationSettings({ pushEnabled: false });
+          show('Add MedRemind to your Home Screen first, then enable push.', 'warning');
+        } else if (result.reason === 'permission-denied') {
+          setPushEnabled(false);
+          updateNotificationSettings({ pushEnabled: false });
+          show('Notification permission denied.', 'warning');
+        } else {
+          show(`Push failed: ${result.message ?? result.reason}`, 'warning');
+        }
+        return;
+      }
+      show('✓ Push notifications enabled');
+    } catch (err) {
+      console.error('[settings] subscribeToPush threw', err);
+      show(`Push error: ${String(err)}`, 'warning');
     }
   }
 
