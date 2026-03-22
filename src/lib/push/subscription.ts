@@ -91,10 +91,18 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
   const auth = json.keys?.['auth']!;
 
   const supabase = getSupabase();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, reason: 'error', message: 'Not authenticated' };
+
   // Delete any stale row for this endpoint, then insert fresh.
-  // This avoids relying on a UNIQUE constraint that may not yet exist.
   await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
-  const { error } = await supabase.from('push_subscriptions').insert({ endpoint, p256dh, auth });
+  const { error } = await supabase.from('push_subscriptions').insert({
+    user_id: user.id,
+    endpoint,
+    p256dh,
+    auth,
+  });
 
   if (error) {
     console.error('[push] save subscription failed', error);
