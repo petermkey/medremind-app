@@ -60,7 +60,6 @@ export default function SchedulePage() {
   const todayStr = useMemo(() => currentDateForTimezone(profile?.timezone), [profile?.timezone]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [clock, setClock] = useState('');
   const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
   const isHistoryDate = selectedDate < todayStr;
   const isFutureDate = selectedDate > todayStr;
@@ -68,12 +67,6 @@ export default function SchedulePage() {
   const pausedHistoryActionMessage = 'Past doses can be moved only in active protocols. Resume this protocol first.';
   const pausedProtocolActionMessage = 'Protocol is paused. Resume it to change this dose.';
 
-  useEffect(() => {
-    const update = () => setClock(format(new Date(), 'HH:mm'));
-    update();
-    const t = setInterval(update, 10000);
-    return () => clearInterval(t);
-  }, []);
 
   const actionableDoses = useMemo(
     () => (isHistoryDate ? selectHistoryDayRows(selectedDate) : selectAppActionableDoses(selectedDate)),
@@ -191,14 +184,6 @@ export default function SchedulePage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Status bar */}
-      <div className="flex justify-between items-center px-5 pt-3 pb-1.5 flex-shrink-0">
-        <span className="text-sm font-bold text-[#F0F6FC]">{clock}</span>
-        <div className="flex gap-1.5 text-xs text-[#8B949E]">
-          <span>●●●</span><span>WiFi</span><span>🔋</span>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="px-5 pb-4 flex-shrink-0">
         <div className="flex justify-between items-center mb-3">
