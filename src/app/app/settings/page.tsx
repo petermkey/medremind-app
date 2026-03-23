@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, waitForRealtimeSyncIdle } from '@/lib/store/store';
 import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
-import { subscribeToPush, unsubscribeFromPush } from '@/lib/push/subscription';
+import { subscribeToPush, unsubscribeFromPush, saveNotificationSettingsToSupabase } from '@/lib/push/subscription';
 import { useInstallState } from '@/lib/push/useInstallState';
 import {
   backupCurrentStoreToSupabase,
@@ -85,6 +85,14 @@ export default function SettingsPage() {
       show(`Store error: ${String(err)}`, 'warning');
       return;
     }
+
+    // Persist to Supabase so the cron job can find this user.
+    saveNotificationSettingsToSupabase({
+      pushEnabled,
+      emailEnabled,
+      leadTimeMin: parseInt(leadTime),
+      digestTime,
+    }).catch(err => console.error('[settings] notification_settings sync failed', err));
 
     if (!pushEnabled) {
       try { await unsubscribeFromPush(); } catch { /* ignore */ }

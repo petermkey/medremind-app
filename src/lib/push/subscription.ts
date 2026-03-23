@@ -136,3 +136,29 @@ export async function unsubscribeFromPush(): Promise<void> {
   const supabase = getSupabase();
   await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
 }
+
+/**
+ * Persist notification preferences to Supabase so the cron job can find
+ * users with push_enabled = true.
+ */
+export async function saveNotificationSettingsToSupabase(settings: {
+  pushEnabled: boolean;
+  emailEnabled: boolean;
+  leadTimeMin: number;
+  digestTime: string;
+}): Promise<void> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('notification_settings').upsert(
+    {
+      user_id: user.id,
+      push_enabled: settings.pushEnabled,
+      email_enabled: settings.emailEnabled,
+      lead_time_min: settings.leadTimeMin,
+      digest_time: settings.digestTime,
+    },
+    { onConflict: 'user_id' },
+  );
+}
