@@ -1,7 +1,7 @@
 # iOS Web Push — Architecture & Known Issues
 
 Date: 2026-03-23
-Status: Implemented, deployed to production, functional end-to-end
+Status: Implemented, deployed to production, **verified end-to-end 2026-03-23**
 
 ---
 
@@ -15,7 +15,7 @@ Status: Implemented, deployed to production, functional end-to-end
 | Install detection | `src/lib/push/useInstallState.ts` — detects `standalone` vs `browser` mode |
 | Push delivery | `POST /api/push/send` — CRON_SECRET auth, calls `web-push`, auto-deletes stale endpoints |
 | Scheduler | `GET /api/cron/notify` — queries `notification_settings`, finds due doses, deduplicates via `notification_log` |
-| Cron trigger | [cron-job.org](https://cron-job.org) job #7402449 — calls `/api/cron/notify` every minute with Bearer token |
+| Cron trigger | [cron-job.org](https://cron-job.org) job #7402447 — calls `/api/cron/notify` every minute with Bearer token |
 | DB tables | `push_subscriptions`, `notification_log` (see `supabase/003_web_push.sql`) |
 
 ---
@@ -111,3 +111,52 @@ curl https://medremind-app-two.vercel.app/api/cron/notify \
 - Header: `Authorization: Bearer <CRON_SECRET>`
 - Vercel Hobby plan does NOT support sub-daily cron jobs — cron-job.org is the trigger
 - `vercel.json` has `"crons": []` (empty — Vercel cron disabled)
+- Job ID: **7402447** (console.cron-job.org/jobs/7402447)
+- cron-job.org API key stored in `vercel-env-import.env` (local only, not committed)
+
+---
+
+## 9. Incidents & fixes (2026-03-23)
+
+### Bug: `RangeError: Invalid time value` in `/api/cron/notify`
+
+**Symptom:** cron returned HTTP 500, no notifications delivered.
+
+**Root cause:** `new Date(targetUtc.toLocaleString('en-CA', { timeZone: tz }))` throws
+`RangeError` in Node 22 / V8 — `toLocaleString('en-CA')` returns a locale-formatted
+string that `new Date()` cannot parse.
+
+**Fix (commit `028cf6f`):** replaced with `Intl.DateTimeFormat('en-CA').formatToParts()`:
+```ts
+const localDateParts = new Intl.DateTimeFormat('en-CA', {
+  timeZone: tz,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+}).formatToParts(targetUtc);
+const localDate = `${...year}-${...month}-${...day}`;
+```
+
+### Env vars missing from Vercel Production
+
+All env vars were added via CLI with `printf` (no trailing `\n`):
+```bash
+printf 'value' | npx vercel env add VAR_NAME production
+```
+Using `echo` or heredoc appends `\n` which breaks string comparison (401 Unauthorized).
+
+**Complete list of required Vercel env vars:**
+
+| Var | Source |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project settings |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project settings |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase project settings → service_role |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | `vercel-env-import.env` |
+| `VAPID_PRIVATE_KEY` | `vercel-env-import.env` |
+| `VAPID_EMAIL` | `vercel-env-import.env` |
+| `CRON_SECRET` | `vercel-env-import.env` |
+| `NEXT_PUBLIC_APP_URL` | `https://medremind-app-two.vercel.app` |
+
+### cron-job.org job was disabled
+
+After saving the job in the UI, it was showing `enabled: false` via API.
+Fix: `PATCH /jobs/7402447` with `{"job":{"enabled":true}}` via cron-job.org REST API.
