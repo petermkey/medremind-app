@@ -70,9 +70,11 @@ export async function GET(request: NextRequest) {
       const tz = profileRow?.timezone ?? 'UTC';
 
       // Local calendar date for the user (YYYY-MM-DD).
-      const localDate = new Date(
-        targetUtc.toLocaleString('en-CA', { timeZone: tz }),
-      ).toISOString().slice(0, 10);
+      const localDateParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(targetUtc);
+      const localDate = `${localDateParts.find(p => p.type === 'year')!.value}-${localDateParts.find(p => p.type === 'month')!.value}-${localDateParts.find(p => p.type === 'day')!.value}`;
 
       // Local HH:MM time window.
       const windowStart = new Date(targetUtc.getTime() - WINDOW_MINUTES * 60 * 1000);
