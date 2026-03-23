@@ -69,6 +69,14 @@ export default function SettingsPage() {
     return subscribeSyncStatus(setOutbox);
   }, []);
 
+  // Sync local form state with store after Zustand rehydrates from localStorage.
+  useEffect(() => {
+    setPushEnabled(notificationSettings.pushEnabled);
+    setEmailEnabled(notificationSettings.emailEnabled);
+    setLeadTime(String(notificationSettings.leadTimeMin));
+    setDigestTime(notificationSettings.digestTime);
+  }, [notificationSettings]);
+
   async function handleSaveProfile() {
     const patch = { name: name.trim(), timezone, ageRange: ageRange as '18-30'|'31-50'|'51-70'|'70+' };
     updateProfile(patch);
