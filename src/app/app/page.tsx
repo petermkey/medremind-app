@@ -167,7 +167,7 @@ export default function SchedulePage() {
       }
       show(`Dose removed for today`, 'warning');
     } else {
-      endProtocolFromToday(dose.activeProtocolId, dose.id, dose.scheduledDate);
+      endProtocolFromToday(dose.activeProtocolId, dose.scheduledDate);
       show(`${dose.protocolItem.name} removed from schedule`, 'warning');
     }
   }

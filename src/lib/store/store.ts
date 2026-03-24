@@ -6,7 +6,7 @@ import { format, addDays, parseISO, isBefore, isAfter } from 'date-fns';
 import type {
   UserProfile, ActiveProtocol, Protocol, ProtocolItem,
   ScheduledDose, DoseRecord, DoseStatus, NotificationSettings,
-  ProtocolStatus, PlannedOccurrence, OccurrenceStatus,
+  ProtocolStatus, PlannedOccurrence, OccurrenceStatus, ExecutionEvent,
 } from '@/types';
 import { SEED_PROTOCOLS, SEED_DRUGS } from '@/lib/data/seed';
 import type { Drug } from '@/types';
@@ -85,7 +85,6 @@ function nowDateTimeForTimezone(timezone?: string): { date: string; time: string
 }
 
 const today = () => nowDateTimeForTimezone().date;
-const nowTime = () => format(new Date(), 'HH:mm');
 
 function isFutureDoseByDate(
   dose: ScheduledDose,
@@ -102,6 +101,31 @@ function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
   const { date: todayDate, time: currentTime } = nowDateTimeForTimezone(profile?.timezone);
   return dose.scheduledDate < todayDate ||
     (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
+}
+
+// ─── F4: ExecutionEvent builder ────────────────────────────────────────
+// Constructs a local ExecutionEvent from a dose action at write time.
+// idempotencyKey matches the clientOperationId used in cloud sync so
+// the local and remote events can be correlated later.
+function buildExecutionEvent(
+  dose: ScheduledDose,
+  record: DoseRecord,
+  eventType: ExecutionEvent['eventType'],
+  idempotencyKey: string,
+): ExecutionEvent {
+  return {
+    id: record.id,
+    userId: record.userId,
+    legacyScheduledDoseId: dose.id,
+    activeProtocolId: dose.activeProtocolId,
+    protocolItemId: dose.protocolItemId,
+    eventType,
+    eventAt: record.recordedAt,
+    effectiveDate: dose.scheduledDate,
+    effectiveTime: dose.scheduledTime,
+    note: record.note,
+    idempotencyKey,
+  };
 }
 
 // ─── Occurrence model (F3) ─────────────────────────────────────────────
@@ -311,6 +335,9 @@ interface AppState {
   activeProtocols: ActiveProtocol[];
   scheduledDoses: ScheduledDose[];
   doseRecords: DoseRecord[];
+  // F4: canonical local action history — populated by take/skip/snooze write path.
+  // doseRecords remains for backward compat with legacy data; new actions write to both.
+  executionEvents: ExecutionEvent[];
   drugs: Drug[];
 
   // Actions — Auth
@@ -368,7 +395,7 @@ interface AppState {
   skipDose: (doseId: string, note?: string) => void;
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
   removeDose: (doseId: string) => void;
-  endProtocolFromToday: (activeProtocolId: string, doseId: string, fromDate?: string) => void;
+  endProtocolFromToday: (activeProtocolId: string, fromDate?: string) => void;
   regenerateDoses: (activeProtocolId: string) => void;
 
   // Actions — Settings
@@ -398,6 +425,7 @@ export const useStore = create<AppState>()(
       activeProtocols: [],
       scheduledDoses: [],
       doseRecords: [],
+      executionEvents: [],
       drugs: SEED_DRUGS,
 
       // ── Auth ──────────────────────────────────────────────────────────
@@ -1017,11 +1045,19 @@ export const useStore = create<AppState>()(
         const todayDate = today();
         if (date >= todayDate) return [];
 
-        const recordByDoseId = new Map<string, DoseRecord[]>();
+        // F4: build lookup sets from both legacy doseRecords and new executionEvents.
+        // executionEvents is the canonical source for new actions; doseRecords covers legacy data.
+        const handledByRecord = new Set<string>();
         for (const record of state.doseRecords) {
-          const list = recordByDoseId.get(record.scheduledDoseId) ?? [];
-          list.push(record);
-          recordByDoseId.set(record.scheduledDoseId, list);
+          if (record.action === 'taken' || record.action === 'skipped') {
+            handledByRecord.add(record.scheduledDoseId);
+          }
+        }
+        const handledByEvent = new Set<string>();
+        for (const event of state.executionEvents) {
+          if (event.eventType === 'taken' || event.eventType === 'skipped') {
+            handledByEvent.add(event.legacyScheduledDoseId);
+          }
         }
 
         return state.scheduledDoses
@@ -1030,12 +1066,8 @@ export const useStore = create<AppState>()(
             const o = projectToOccurrence(dose);
             // Superseded occurrences (snoozed origins) never appear on their original day.
             if (o.occurrenceStatus === 'superseded') return false;
-            const records = recordByDoseId.get(dose.id) ?? [];
             const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
-            const hasHandledRecord = records.some(
-              r => r.action === 'taken' || r.action === 'skipped',
-            );
-            return isHandledStatus || hasHandledRecord;
+            return isHandledStatus || handledByRecord.has(dose.id) || handledByEvent.has(dose.id);
           })
           .map(projectToOccurrence)
           .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
@@ -1060,12 +1092,16 @@ export const useStore = create<AppState>()(
         const clientOperationId = `take:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateStatus = dose.status !== 'taken';
+        const executionEvent = buildExecutionEvent(dose, record, 'taken', clientOperationId);
         if (shouldAppendRecord || shouldUpdateStatus) {
           set(s => ({
             scheduledDoses: s.scheduledDoses.map(d =>
               d.id === doseId ? { ...d, status: 'taken' as DoseStatus } : d
             ),
             doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+            executionEvents: shouldAppendRecord
+              ? [...s.executionEvents, executionEvent]
+              : s.executionEvents,
           }));
         }
         if (state.profile?.id) {
@@ -1098,12 +1134,16 @@ export const useStore = create<AppState>()(
         const clientOperationId = `skip:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateStatus = dose.status !== 'skipped';
+        const executionEvent = buildExecutionEvent(dose, record, 'skipped', clientOperationId);
         if (shouldAppendRecord || shouldUpdateStatus) {
           set(s => ({
             scheduledDoses: s.scheduledDoses.map(d =>
               d.id === doseId ? { ...d, status: 'skipped' as DoseStatus } : d
             ),
             doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+            executionEvents: shouldAppendRecord
+              ? [...s.executionEvents, executionEvent]
+              : s.executionEvents,
           }));
         }
         if (state.profile?.id) {
@@ -1194,6 +1234,9 @@ export const useStore = create<AppState>()(
               : shouldUpdateRecordNote
                 ? s.doseRecords.map(r => (r.id === record.id ? { ...r, note: recordNote } : r))
                 : s.doseRecords,
+            executionEvents: shouldAppendRecord
+              ? [...s.executionEvents, buildExecutionEvent(replacementDose, record, 'snoozed', clientOperationId)]
+              : s.executionEvents,
           }));
         }
         if (state.profile?.id) {
@@ -1233,7 +1276,7 @@ export const useStore = create<AppState>()(
         }
       },
 
-      endProtocolFromToday: (activeProtocolId, doseId, fromDate) => {
+      endProtocolFromToday: (activeProtocolId, fromDate) => {
         const state = get();
         // Use the provided fromDate (e.g. a past dose's scheduledDate) or fall back to today.
         const cutoffDate = fromDate ?? today();
