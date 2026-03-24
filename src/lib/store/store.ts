@@ -95,6 +95,15 @@ function isFutureDoseByDate(
   return dose.scheduledDate > todayDate;
 }
 
+// overdue is a derived UI concept — never persisted as a terminal status.
+// A pending dose is overdue when its scheduled slot is in the past.
+function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
+  if (dose.status !== 'pending') return false;
+  const { date: todayDate, time: currentTime } = nowDateTimeForTimezone(profile?.timezone);
+  return dose.scheduledDate < todayDate ||
+    (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
+}
+
 function generateId(prefix: string): string {
   try {
     return uuid();
@@ -488,20 +497,10 @@ export const useStore = create<AppState>()(
           newDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
 
-        // Mark past doses as overdue
-        const now = today();
-        const nt = nowTime();
-        const markedDoses = newDoses.map(d => {
-          if (d.scheduledDate < now || (d.scheduledDate === now && d.scheduledTime < nt)) {
-            return { ...d, status: 'overdue' as DoseStatus };
-          }
-          return d;
-        });
-
-        set(s => ({ scheduledDoses: [...s.scheduledDoses, ...markedDoses] }));
+        set(s => ({ scheduledDoses: [...s.scheduledDoses, ...newDoses] }));
         syncFireAndForget(
-          syncActivation(state.profile.id, active, markedDoses),
-          { kind: 'activation', payload: { userId: state.profile.id, active, doses: markedDoses } },
+          syncActivation(state.profile.id, active, newDoses),
+          { kind: 'activation', payload: { userId: state.profile.id, active, doses: newDoses } },
         );
         return active;
       },
@@ -844,6 +843,7 @@ export const useStore = create<AppState>()(
       },
 
       selectProgressSummaryForDates: (dates) => {
+        const profile = get().profile;
         const uniqueDates = [...new Set(dates)];
         let total = 0;
         let taken = 0;
@@ -854,7 +854,8 @@ export const useStore = create<AppState>()(
           total += doses.length;
           taken += doses.filter(d => d.status === 'taken').length;
           skipped += doses.filter(d => d.status === 'skipped').length;
-          overdue += doses.filter(d => d.status === 'overdue').length;
+          // legacy DB rows may have status='overdue'; new rows stay 'pending' — derive both
+          overdue += doses.filter(d => d.status === 'overdue' || isOverdue(d, profile)).length;
         }
         const pct = total ? Math.round((taken / total) * 100) : 0;
         return { total, taken, skipped, overdue, pct };
@@ -942,25 +943,21 @@ export const useStore = create<AppState>()(
           .filter(dose => {
             if (dose.scheduledDate !== date) return false;
 
+            // Explicit lineage: if this dose has a successor it was rescheduled (snoozed) away.
+            // Don't show it on the original day — the user mentally moved it.
+            // Fallback to legacy status/record check for rows created before F2.
+            if (dose.successorDoseId) return false;
+
             const records = recordByDoseId.get(dose.id) ?? [];
-            let latestAction: DoseRecord['action'] | null = null;
-            let latestRecordedAt = '';
-            for (const record of records) {
-              if (record.recordedAt >= latestRecordedAt) {
-                latestRecordedAt = record.recordedAt;
-                latestAction = record.action;
-              }
-            }
             const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
             const hasHandledRecord = records.some(
               record => record.action === 'taken' || record.action === 'skipped',
             );
-            const wasMovedBySnooze = dose.status === 'snoozed' || latestAction === 'snoozed';
+            // Legacy fallback: rows without successorDoseId may still have snoozed status/record.
+            const wasMovedLegacy = dose.status === 'snoozed'
+              || records.some(r => r.action === 'snoozed');
+            if (wasMovedLegacy) return false;
 
-            if (wasMovedBySnooze) return false;
-
-            // A snoozed origin dose is logically moved to a new slot and should not remain
-            // visible on the original day; only handled history stays on the day surface.
             return isHandledStatus || hasHandledRecord;
           })
           .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
@@ -1062,6 +1059,8 @@ export const useStore = create<AppState>()(
           scheduledTime,
           status: 'pending',
           snoozedUntil,
+          predecessorDoseId: dose.id,
+          successorDoseId: undefined,
         };
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'snoozed',
@@ -1086,15 +1085,21 @@ export const useStore = create<AppState>()(
         if (shouldAppendRecord || shouldUpdateRecordNote || originalNeedsUpdate || replacementNeedsUpsert) {
           set(s => ({
             scheduledDoses: (() => {
-              const updated = s.scheduledDoses.map(d =>
-                d.id === doseId
-                  ? {
+              const updated = s.scheduledDoses.map(d => {
+                if (d.id === doseId) {
+                  return {
                     ...d,
                     status: 'snoozed' as DoseStatus,
                     snoozedUntil,
-                  }
-                  : d
-              );
+                    successorDoseId: replacementDoseId,
+                  };
+                }
+                // When reusing an existing dose as replacement, stamp its predecessor.
+                if (reuseExistingId && d.id === reuseExistingId) {
+                  return { ...d, predecessorDoseId: doseId };
+                }
+                return d;
+              });
               // Only add replacement if it's a new dose (not a reused existing one).
               if (!reuseExistingId) {
                 const idx = updated.findIndex(d => d.id === replacementDoseId);
