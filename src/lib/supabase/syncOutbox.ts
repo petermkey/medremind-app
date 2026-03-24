@@ -16,6 +16,7 @@ import {
   syncProtocolItemDelete,
   syncProtocolUpsert,
   syncRegeneratedDoses,
+  syncEndProtocolFromTodayCommand,
 } from './realtimeSync';
 
 type SyncKind =
@@ -32,7 +33,8 @@ type SyncKind =
   | 'pauseCommand'
   | 'resumeCommand'
   | 'completeCommand'
-  | 'archiveCommand';
+  | 'archiveCommand'
+  | 'endProtocolFromToday';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -99,6 +101,11 @@ type SyncPayloadMap = {
     activeIds: string[];
     clientOperationId: string;
   };
+  endProtocolFromToday: {
+    userId: string;
+    activeProtocolId: string;
+    today: string;
+  };
 };
 
 export type SyncOperation =
@@ -115,7 +122,8 @@ export type SyncOperation =
   | { kind: 'pauseCommand'; payload: SyncPayloadMap['pauseCommand'] }
   | { kind: 'resumeCommand'; payload: SyncPayloadMap['resumeCommand'] }
   | { kind: 'completeCommand'; payload: SyncPayloadMap['completeCommand'] }
-  | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] };
+  | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] }
+  | { kind: 'endProtocolFromToday'; payload: SyncPayloadMap['endProtocolFromToday'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -284,6 +292,12 @@ async function executeOperation(op: SyncOperation) {
         op.payload.protocol,
         op.payload.activeIds,
         op.payload.clientOperationId,
+      );
+    case 'endProtocolFromToday':
+      return syncEndProtocolFromTodayCommand(
+        op.payload.userId,
+        op.payload.activeProtocolId,
+        op.payload.today,
       );
     default:
       return Promise.resolve();

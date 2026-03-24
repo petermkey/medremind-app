@@ -35,6 +35,7 @@ interface Props {
   onTake: () => void;
   onSkip: () => void;
   onSnooze: () => void;
+  onDelete: () => void;
   actionsDisabled?: boolean;
   takenAt?: string; // ISO timestamp of actual intake
 }
@@ -44,11 +45,11 @@ function fmt(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = false, takenAt }: Props) {
+export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt }: Props) {
   const item = dose.protocolItem;
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const statusColor = STATUS_COLOR[dose.status] ?? '#8B949E';
-  const [swiped, setSwiped] = useState(false);
+  const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const gesture = useRef<{
     pointerId: number | null;
     startX: number;
@@ -66,19 +67,18 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
   };
 
   useEffect(() => {
-    // Ensure stale row-local swipe state is not reused if card identity changes.
-    setSwiped(false);
+    setSwipeDir(null);
   }, [dose.id]);
 
   useEffect(() => {
-    if (actionsDisabled) setSwiped(false);
+    if (actionsDisabled) setSwipeDir(null);
   }, [actionsDisabled]);
 
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ doseId?: string }>).detail;
       if (detail?.doseId && detail.doseId !== dose.id) {
-        setSwiped(false);
+        setSwipeDir(null);
       }
     };
     window.addEventListener('med-card-open', handler as EventListener);
@@ -105,10 +105,16 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
       return;
     }
     if (dx > 50) {
-      setSwiped(true);
+      // Swipe LEFT → Delete panel
+      setSwipeDir('left');
       window.dispatchEvent(new CustomEvent('med-card-open', { detail: { doseId: dose.id } }));
+    } else if (dx < -50) {
+      // Swipe RIGHT → Snooze/Skip panel
+      setSwipeDir('right');
+      window.dispatchEvent(new CustomEvent('med-card-open', { detail: { doseId: dose.id } }));
+    } else if (Math.abs(dx) < 30) {
+      setSwipeDir(null);
     }
-    if (dx < -30) setSwiped(false);
   };
 
   const tags: string[] = [];
@@ -117,6 +123,10 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
   if (item.route === 'subcutaneous') tags.push('Subcut.');
   if (item.route === 'intramuscular') tags.push('IM');
   if (item.itemType === 'analysis') tags.push('Lab test');
+
+  const cardTranslate =
+    swipeDir === 'left'  ? '-translate-x-[90px]' :
+    swipeDir === 'right' ? 'translate-x-[130px]' : '';
 
   return (
     <div
@@ -127,15 +137,53 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
       onPointerCancel={resetGesture}
       style={{ touchAction: 'pan-y' }}
     >
+      {/* Snooze/Skip panel — left side, revealed by swipe RIGHT */}
+      <div
+        className={[
+          'absolute left-0 top-0 bottom-0 flex items-stretch transition-transform duration-200',
+          swipeDir === 'right' ? 'translate-x-0' : '-translate-x-full',
+        ].join(' ')}
+      >
+        <button
+          type="button"
+          aria-label={`Snooze ${item.name}`}
+          aria-disabled={actionsDisabled}
+          onClick={() => {
+            onSnooze();
+            setSwipeDir(null);
+          }}
+          className={[
+            'px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-l-[18px]',
+            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+          ].join(' ')}
+        >
+          ⏰<br />Snooze
+        </button>
+        <button
+          type="button"
+          aria-label={`Skip ${item.name}`}
+          aria-disabled={actionsDisabled}
+          onClick={() => {
+            onSkip();
+            setSwipeDir(null);
+          }}
+          className={[
+            'px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1',
+            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+          ].join(' ')}
+        >
+          ✕<br />Skip
+        </button>
+      </div>
+
       {/* Card */}
       <div
         className={[
           'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
           'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
-          swiped ? '-translate-x-[130px]' : '',
+          cardTranslate,
           actionsDisabled ? 'opacity-70' : dose.status === 'taken' ? 'opacity-60' : '',
         ].join(' ')}
-        style={{ borderRadius: swiped ? '18px 0 0 18px' : undefined }}
       >
         {/* Status stripe */}
         <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-sm" style={{ background: statusColor }} />
@@ -197,42 +245,23 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, actionsDisabled = fals
         </button>
       </div>
 
-      {/* Swipe actions */}
+      {/* Delete panel — right side, revealed by swipe LEFT */}
       <div
         className={[
           'absolute right-0 top-0 bottom-0 flex items-stretch transition-transform duration-200',
-          swiped ? 'translate-x-0' : 'translate-x-full',
+          swipeDir === 'left' ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
       >
         <button
           type="button"
-          aria-label={`Snooze ${item.name}`}
-          aria-disabled={actionsDisabled}
+          aria-label={`Delete ${item.name}`}
           onClick={() => {
-            onSnooze();
-            setSwiped(false);
+            onDelete();
+            setSwipeDir(null);
           }}
-          className={[
-            'px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1',
-            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
-          ].join(' ')}
+          className="px-5 bg-[#7F1D1D] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
         >
-          ⏰<br />Snooze
-        </button>
-        <button
-          type="button"
-          aria-label={`Skip ${item.name}`}
-          aria-disabled={actionsDisabled}
-          onClick={() => {
-            onSkip();
-            setSwiped(false);
-          }}
-          className={[
-            'px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]',
-            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
-          ].join(' ')}
-        >
-          ✕<br />Skip
+          🗑<br />Delete
         </button>
       </div>
     </div>

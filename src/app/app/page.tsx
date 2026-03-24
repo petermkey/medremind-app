@@ -52,6 +52,7 @@ export default function SchedulePage() {
     takeDose,
     skipDose,
     snoozeDose,
+    endProtocolFromToday,
     scheduledDoses,
     doseRecords,
   } = useStore();
@@ -61,6 +62,7 @@ export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
+  const [deleteTargetDose, setDeleteTargetDose] = useState<ScheduledDose | null>(null);
   const isHistoryDate = selectedDate < todayStr;
   const isFutureDate = selectedDate > todayStr;
   const futureActionMessage = 'This dose can be changed only on its scheduled day or later.';
@@ -148,6 +150,19 @@ export default function SchedulePage() {
       : addDays(now, 7);
     nextWeek.setHours(intendedHours, intendedMinutes, 0, 0);
     return nextWeek;
+  }
+
+  function applyDelete(option: 'today' | 'forward') {
+    const dose = deleteTargetDose;
+    if (!dose) return;
+    setDeleteTargetDose(null);
+    if (option === 'today') {
+      skipDose(dose.id);
+      show(`Dose removed for today`, 'warning');
+    } else {
+      endProtocolFromToday(dose.activeProtocolId, dose.id);
+      show(`${dose.protocolItem.name} removed from schedule`, 'warning');
+    }
   }
 
   function applySnooze(option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
@@ -298,6 +313,7 @@ export default function SchedulePage() {
                       }
                       setSnoozeTargetDose(dose);
                     }}
+                    onDelete={() => setDeleteTargetDose(dose)}
                   />
                 );
               })()
@@ -317,6 +333,19 @@ export default function SchedulePage() {
       </button>
 
       <AddDoseSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
+      {deleteTargetDose && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-end">
+          <div className="w-full rounded-t-2xl bg-[#0F172A] border-t border-[rgba(255,255,255,0.08)] p-4 pb-6">
+            <div className="text-sm font-bold text-[#F0F6FC] mb-1">Remove dose</div>
+            <div className="text-xs text-[#8B949E] mb-3">{deleteTargetDose.protocolItem.name}</div>
+            <div className="flex flex-col gap-2">
+              <button type="button" aria-label="Delete today only" onClick={() => applyDelete('today')} className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#F0F6FC] font-semibold">Delete today only</button>
+              <button type="button" aria-label="Delete from all following days" onClick={() => applyDelete('forward')} className="bg-[#1C2333] border border-red-900/50 rounded-xl py-3 text-sm text-red-400 font-semibold">Delete from all following days</button>
+            </div>
+            <button type="button" aria-label="Cancel delete" onClick={() => setDeleteTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#8B949E]">Cancel</button>
+          </div>
+        </div>
+      )}
       {snoozeTargetDose && (
         <div className="fixed inset-0 z-40 bg-black/50 flex items-end">
           <div className="w-full rounded-t-2xl bg-[#0F172A] border-t border-[rgba(255,255,255,0.08)] p-4 pb-6">

@@ -1314,3 +1314,27 @@ export async function syncArchiveProtocolCommand(
     throw error;
   }
 }
+
+export async function syncEndProtocolFromTodayCommand(
+  userId: string,
+  activeProtocolId: string,
+  todayDate: string,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const cActiveId = cloudActiveId(userId, activeProtocolId);
+
+  const { error: updateError } = await supabase
+    .from('active_protocols')
+    .update({ end_date: todayDate })
+    .eq('id', cActiveId)
+    .eq('user_id', userId);
+  if (updateError) throw new Error(`endProtocolFromToday update failed: ${updateError.message}`);
+
+  const { error: deleteError } = await supabase
+    .from('scheduled_doses')
+    .delete()
+    .eq('active_protocol_id', cActiveId)
+    .eq('user_id', userId)
+    .gt('scheduled_date', todayDate);
+  if (deleteError) throw new Error(`endProtocolFromToday delete doses failed: ${deleteError.message}`);
+}
