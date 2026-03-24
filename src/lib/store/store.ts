@@ -990,10 +990,11 @@ export const useStore = create<AppState>()(
         return doses
           .filter(d => {
             const o = projectToOccurrence(d);
-            // Superseded slots (snoozed origins) are not actionable.
+            // Superseded slots (snoozed origins) are not shown in today's view.
             if (o.occurrenceStatus === 'superseded') return false;
-            // Handled doses are shown in history, not in the actionable queue.
-            if (d.status === 'taken' || d.status === 'skipped') return false;
+            // Skipped doses are not actionable and not shown.
+            if (d.status === 'skipped') return false;
+            // Taken doses remain visible (shown with taken state in the card).
             return true;
           })
           .map(projectToOccurrence);
