@@ -142,6 +142,42 @@ export interface NotificationSettings {
   digestTime: string;        // HH:MM
 }
 
+// ─── Occurrence model (F3) ─────────────────────────────────────────────
+//
+// OccurrenceStatus is the structural state of a planned medication slot:
+//   planned    — live, actionable occurrence
+//   superseded — rescheduled away (snooze origin); a successor exists
+//   cancelled  — explicitly removed from the plan
+//
+// This is distinct from DoseStatus, which is a mixed legacy field.
+// PlannedOccurrence extends ScheduledDose so all existing UI components
+// (MedCard, etc.) can consume it without changes.
+
+export type OccurrenceStatus = 'planned' | 'superseded' | 'cancelled';
+
+export interface PlannedOccurrence extends ScheduledDose {
+  // Structural occurrence state — derived at read time, never written to DB for new rows.
+  occurrenceStatus: OccurrenceStatus;
+  // Stable slot identifier: "{activeProtocolId}|{protocolItemId}|{scheduledDate}|{scheduledTime}"
+  occurrenceKey: string;
+}
+
+// ExecutionEvent mirrors the execution_events DB table.
+// For F3 this type is foundational; population from the write path is F4.
+export interface ExecutionEvent {
+  id: string;
+  userId: string;
+  legacyScheduledDoseId: string;  // bridge to scheduled_doses
+  activeProtocolId: string;
+  protocolItemId: string;
+  eventType: 'taken' | 'skipped' | 'snoozed';
+  eventAt: string;                // ISO timestamp
+  effectiveDate?: string;         // YYYY-MM-DD
+  effectiveTime?: string;         // HH:MM
+  note?: string;
+  idempotencyKey?: string;
+}
+
 // ─── App state helpers ──────────────────────────────────────────────────
 
 export interface DaySchedule {

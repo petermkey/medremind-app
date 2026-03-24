@@ -6,7 +6,7 @@ import { format, addDays, parseISO, isBefore, isAfter } from 'date-fns';
 import type {
   UserProfile, ActiveProtocol, Protocol, ProtocolItem,
   ScheduledDose, DoseRecord, DoseStatus, NotificationSettings,
-  ProtocolStatus,
+  ProtocolStatus, PlannedOccurrence, OccurrenceStatus, ExecutionEvent,
 } from '@/types';
 import { SEED_PROTOCOLS, SEED_DRUGS } from '@/lib/data/seed';
 import type { Drug } from '@/types';
@@ -85,7 +85,6 @@ function nowDateTimeForTimezone(timezone?: string): { date: string; time: string
 }
 
 const today = () => nowDateTimeForTimezone().date;
-const nowTime = () => format(new Date(), 'HH:mm');
 
 function isFutureDoseByDate(
   dose: ScheduledDose,
@@ -103,6 +102,74 @@ function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
   return dose.scheduledDate < todayDate ||
     (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
 }
+
+// ─── F5: getDayScheduleFromState ──────────────────────────────────────
+// Pure helper — returns sorted doses for a date from raw state slices.
+// Past dates: all doses (any protocol status) to preserve history.
+// Today/future: only doses belonging to active protocol instances.
+function getDayScheduleFromState(
+  scheduledDoses: ScheduledDose[],
+  activeProtocols: ActiveProtocol[],
+  date: string,
+): ScheduledDose[] {
+  const todayDate = today();
+  const sorted = (arr: ScheduledDose[]) =>
+    [...arr].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  if (date < todayDate) {
+    return sorted(scheduledDoses.filter(d => d.scheduledDate === date));
+  }
+  const activeIds = new Set(
+    activeProtocols.filter(ap => ap.status === 'active').map(ap => ap.id),
+  );
+  return sorted(
+    scheduledDoses.filter(d => d.scheduledDate === date && activeIds.has(d.activeProtocolId)),
+  );
+}
+
+// ─── F4: ExecutionEvent builder ────────────────────────────────────────
+// Constructs a local ExecutionEvent from a dose action at write time.
+// idempotencyKey matches the clientOperationId used in cloud sync so
+// the local and remote events can be correlated later.
+function buildExecutionEvent(
+  dose: ScheduledDose,
+  record: DoseRecord,
+  eventType: ExecutionEvent['eventType'],
+  idempotencyKey: string,
+): ExecutionEvent {
+  return {
+    id: record.id,
+    userId: record.userId,
+    legacyScheduledDoseId: dose.id,
+    activeProtocolId: dose.activeProtocolId,
+    protocolItemId: dose.protocolItemId,
+    eventType,
+    eventAt: record.recordedAt,
+    effectiveDate: dose.scheduledDate,
+    effectiveTime: dose.scheduledTime,
+    note: record.note,
+    idempotencyKey,
+  };
+}
+
+// ─── Occurrence model (F3) ─────────────────────────────────────────────
+//
+// Projects a ScheduledDose into a PlannedOccurrence at read time.
+// occurrenceStatus is derived — never written — following these rules:
+//   superseded: dose has an explicit successor (F2 lineage) OR legacy snoozed status
+//   cancelled:  dose was removed from the plan without an action record
+//   planned:    everything else (live, actionable slot)
+//
+// PlannedOccurrence extends ScheduledDose so all existing consumers
+// (MedCard, page.tsx, etc.) can receive it without modification.
+function projectToOccurrence(dose: ScheduledDose): PlannedOccurrence {
+  let occurrenceStatus: OccurrenceStatus = 'planned';
+  if (dose.successorDoseId || dose.status === 'snoozed') {
+    occurrenceStatus = 'superseded';
+  }
+  const occurrenceKey = `${dose.activeProtocolId}|${dose.protocolItemId}|${dose.scheduledDate}|${dose.scheduledTime}`;
+  return { ...dose, occurrenceStatus, occurrenceKey };
+}
+
 
 function generateId(prefix: string): string {
   try {
@@ -292,6 +359,9 @@ interface AppState {
   activeProtocols: ActiveProtocol[];
   scheduledDoses: ScheduledDose[];
   doseRecords: DoseRecord[];
+  // F4: canonical local action history — populated by take/skip/snooze write path.
+  // doseRecords remains for backward compat with legacy data; new actions write to both.
+  executionEvents: ExecutionEvent[];
   drugs: Drug[];
 
   // Actions — Auth
@@ -315,8 +385,6 @@ interface AppState {
   removeProtocolItem: (protocolId: string, itemId: string) => void;
 
   // Actions — Schedule
-  getDaySchedule: (date: string) => ScheduledDose[];
-  selectAppActionableDoses: (date: string) => ScheduledDose[];
   selectAppNextDose: (date: string) => ScheduledDose | undefined;
   selectAppSummaryMetrics: (date: string) => { taken: number; total: number; pct: number };
   selectProtocolDetailReadModel: (protocolId: string, date: string) => {
@@ -335,14 +403,19 @@ interface AppState {
   selectProgressDayStatus: (date: string) => { taken: number; skipped: number; remaining: number };
   selectProgressDayProtocolStats: (date: string) => Record<string, { total: number; taken: number }>;
   selectProgressProtocolWeights: (dates: string[]) => Record<string, number>;
-  selectTodayScheduleView: (date: string) => ScheduledDose[];
   selectCalendarVisibleDoseDates: (anchorDate: string, lookbackDays?: number, lookaheadDays?: number) => string[];
-  selectHistoryDayRows: (date: string) => ScheduledDose[];
+
+  // F3 — occurrence-based selectors (PlannedOccurrence extends ScheduledDose;
+  // all existing consumers continue to work without changes).
+  // These replace selectAppActionableDoses + selectHistoryDayRows as the canonical read path.
+  selectActionableOccurrences: (date: string) => PlannedOccurrence[];
+  selectHistoryOccurrences: (date: string) => PlannedOccurrence[];
+
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
   removeDose: (doseId: string) => void;
-  endProtocolFromToday: (activeProtocolId: string, doseId: string, fromDate?: string) => void;
+  endProtocolFromToday: (activeProtocolId: string, fromDate?: string) => void;
   regenerateDoses: (activeProtocolId: string) => void;
 
   // Actions — Settings
@@ -372,6 +445,7 @@ export const useStore = create<AppState>()(
       activeProtocols: [],
       scheduledDoses: [],
       doseRecords: [],
+      executionEvents: [],
       drugs: SEED_DRUGS,
 
       // ── Auth ──────────────────────────────────────────────────────────
@@ -744,41 +818,20 @@ export const useStore = create<AppState>()(
 
       // ── Schedule ──────────────────────────────────────────────────────
 
-      getDaySchedule: (date) => {
-        const todayDate = today();
-        const isPastDate = date < todayDate;
-        if (isPastDate) {
-          const pastDoses = get().scheduledDoses.filter(d => d.scheduledDate === date);
-          return pastDoses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-        }
-
-        const activeIds = new Set(
-          get().activeProtocols
-            .filter(ap => ap.status === 'active')
-            .map(ap => ap.id),
-        );
-        const doses = get().scheduledDoses.filter(
-          d => d.scheduledDate === date && activeIds.has(d.activeProtocolId),
-        );
-        return doses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-      },
-
-      selectAppActionableDoses: (date) => {
-        const doses = get().getDaySchedule(date);
-        return doses.filter(d => d.status !== 'skipped' && d.status !== 'snoozed');
-      },
-
       selectAppNextDose: (date) => {
-        const actionable = get().selectAppActionableDoses(date);
+        const actionable = get().selectActionableOccurrences(date);
         return actionable
           .filter(d => d.status === 'pending' || (d.status as string) === 'upcoming')
           .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
       },
 
       selectAppSummaryMetrics: (date) => {
-        const actionable = get().selectAppActionableDoses(date);
-        const taken = actionable.filter(d => d.status === 'taken').length;
-        const total = actionable.length;
+        // Use getDayScheduleFromState directly — needs both taken + pending for accurate adherence %.
+        // Exclude superseded (snoozed origins) and snoozed to avoid double-counting.
+        const doses = getDayScheduleFromState(get().scheduledDoses, get().activeProtocols, date)
+          .filter(d => !d.successorDoseId && d.status !== 'snoozed');
+        const taken = doses.filter(d => d.status === 'taken').length;
+        const total = doses.length;
         const pct = total ? Math.round((taken / total) * 100) : 0;
         return { taken, total, pct };
       },
@@ -838,8 +891,8 @@ export const useStore = create<AppState>()(
       },
 
       selectProgressDayDoses: (date) => {
-        const doses = get().getDaySchedule(date);
-        return doses.filter(d => d.status !== 'snoozed');
+        return getDayScheduleFromState(get().scheduledDoses, get().activeProtocols, date)
+          .filter(d => d.status !== 'snoozed');
       },
 
       selectProgressSummaryForDates: (dates) => {
@@ -894,10 +947,6 @@ export const useStore = create<AppState>()(
         return weights;
       },
 
-      selectTodayScheduleView: (date) => {
-        return get().selectAppActionableDoses(date);
-      },
-
       selectCalendarVisibleDoseDates: (anchorDate, lookbackDays = 60, lookaheadDays = 60) => {
         const state = get();
         const parsedAnchor = parseISO(anchorDate);
@@ -927,39 +976,59 @@ export const useStore = create<AppState>()(
         return [...dates].sort();
       },
 
-      selectHistoryDayRows: (date) => {
+      // ── F3 occurrence-based selectors ─────────────────────────────────
+      //
+      // selectActionableOccurrences replaces selectAppActionableDoses as the
+      // canonical read path for today/future schedule UI. Filtering is driven
+      // by occurrenceStatus (structural) rather than mixed DoseStatus inference.
+      //
+      // selectHistoryOccurrences replaces selectHistoryDayRows for past-day
+      // history surfaces, using the same occurrence projection.
+
+      selectActionableOccurrences: (date) => {
+        const doses = getDayScheduleFromState(get().scheduledDoses, get().activeProtocols, date);
+        return doses
+          .filter(d => {
+            const o = projectToOccurrence(d);
+            // Superseded slots (snoozed origins) are not actionable.
+            if (o.occurrenceStatus === 'superseded') return false;
+            // Handled doses are shown in history, not in the actionable queue.
+            if (d.status === 'taken' || d.status === 'skipped') return false;
+            return true;
+          })
+          .map(projectToOccurrence);
+      },
+
+      selectHistoryOccurrences: (date) => {
         const state = get();
         const todayDate = today();
         if (date >= todayDate) return [];
 
-        const recordByDoseId = new Map<string, DoseRecord[]>();
+        // F4: build lookup sets from both legacy doseRecords and new executionEvents.
+        // executionEvents is the canonical source for new actions; doseRecords covers legacy data.
+        const handledByRecord = new Set<string>();
         for (const record of state.doseRecords) {
-          const list = recordByDoseId.get(record.scheduledDoseId) ?? [];
-          list.push(record);
-          recordByDoseId.set(record.scheduledDoseId, list);
+          if (record.action === 'taken' || record.action === 'skipped') {
+            handledByRecord.add(record.scheduledDoseId);
+          }
+        }
+        const handledByEvent = new Set<string>();
+        for (const event of state.executionEvents) {
+          if (event.eventType === 'taken' || event.eventType === 'skipped') {
+            handledByEvent.add(event.legacyScheduledDoseId);
+          }
         }
 
         return state.scheduledDoses
           .filter(dose => {
             if (dose.scheduledDate !== date) return false;
-
-            // Explicit lineage: if this dose has a successor it was rescheduled (snoozed) away.
-            // Don't show it on the original day — the user mentally moved it.
-            // Fallback to legacy status/record check for rows created before F2.
-            if (dose.successorDoseId) return false;
-
-            const records = recordByDoseId.get(dose.id) ?? [];
+            const o = projectToOccurrence(dose);
+            // Superseded occurrences (snoozed origins) never appear on their original day.
+            if (o.occurrenceStatus === 'superseded') return false;
             const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
-            const hasHandledRecord = records.some(
-              record => record.action === 'taken' || record.action === 'skipped',
-            );
-            // Legacy fallback: rows without successorDoseId may still have snoozed status/record.
-            const wasMovedLegacy = dose.status === 'snoozed'
-              || records.some(r => r.action === 'snoozed');
-            if (wasMovedLegacy) return false;
-
-            return isHandledStatus || hasHandledRecord;
+            return isHandledStatus || handledByRecord.has(dose.id) || handledByEvent.has(dose.id);
           })
+          .map(projectToOccurrence)
           .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
       },
 
@@ -982,12 +1051,16 @@ export const useStore = create<AppState>()(
         const clientOperationId = `take:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateStatus = dose.status !== 'taken';
+        const executionEvent = buildExecutionEvent(dose, record, 'taken', clientOperationId);
         if (shouldAppendRecord || shouldUpdateStatus) {
           set(s => ({
             scheduledDoses: s.scheduledDoses.map(d =>
               d.id === doseId ? { ...d, status: 'taken' as DoseStatus } : d
             ),
             doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+            executionEvents: shouldAppendRecord
+              ? [...s.executionEvents, executionEvent]
+              : s.executionEvents,
           }));
         }
         if (state.profile?.id) {
@@ -1020,12 +1093,16 @@ export const useStore = create<AppState>()(
         const clientOperationId = `skip:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateStatus = dose.status !== 'skipped';
+        const executionEvent = buildExecutionEvent(dose, record, 'skipped', clientOperationId);
         if (shouldAppendRecord || shouldUpdateStatus) {
           set(s => ({
             scheduledDoses: s.scheduledDoses.map(d =>
               d.id === doseId ? { ...d, status: 'skipped' as DoseStatus } : d
             ),
             doseRecords: shouldAppendRecord ? [...s.doseRecords, record] : s.doseRecords,
+            executionEvents: shouldAppendRecord
+              ? [...s.executionEvents, executionEvent]
+              : s.executionEvents,
           }));
         }
         if (state.profile?.id) {
@@ -1116,6 +1193,9 @@ export const useStore = create<AppState>()(
               : shouldUpdateRecordNote
                 ? s.doseRecords.map(r => (r.id === record.id ? { ...r, note: recordNote } : r))
                 : s.doseRecords,
+            executionEvents: shouldAppendRecord
+              ? [...s.executionEvents, buildExecutionEvent(replacementDose, record, 'snoozed', clientOperationId)]
+              : s.executionEvents,
           }));
         }
         if (state.profile?.id) {
@@ -1155,7 +1235,7 @@ export const useStore = create<AppState>()(
         }
       },
 
-      endProtocolFromToday: (activeProtocolId, doseId, fromDate) => {
+      endProtocolFromToday: (activeProtocolId, fromDate) => {
         const state = get();
         // Use the provided fromDate (e.g. a past dose's scheduledDate) or fall back to today.
         const cutoffDate = fromDate ?? today();

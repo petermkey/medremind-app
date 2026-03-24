@@ -1114,6 +1114,50 @@ export async function syncSnoozeDoseCommand(
       }
     }
 
+    // F4: update planned_occurrences lineage for snooze.
+    // Mark the origin occurrence as superseded and create a successor occurrence for
+    // the replacement slot. Failures here are non-fatal — the scheduled_doses path
+    // already succeeded, and planned_occurrences is still a write-through bridge.
+    try {
+      const { data: originOccurrence } = await supabase
+        .from('planned_occurrences')
+        .select('id, occurrence_key, revision')
+        .eq('user_id', userId)
+        .eq('legacy_scheduled_dose_id', cDoseId)
+        .maybeSingle();
+
+      if (originOccurrence) {
+        const successorOccurrenceKey = `${cReplacementActiveId}|${cReplacementItemId}|${targetDate}|${targetTime}`;
+        const successorOccurrenceId = stableUuid(`planned-occurrence:${userId}`, successorOccurrenceKey);
+
+        // Create successor occurrence row for the replacement slot.
+        await supabase.from('planned_occurrences').upsert({
+          id: successorOccurrenceId,
+          user_id: userId,
+          active_protocol_id: cReplacementActiveId,
+          protocol_id: cloudProtocolId(userId, dose.activeProtocol.protocolId),
+          protocol_item_id: cReplacementItemId,
+          occurrence_date: targetDate,
+          occurrence_time: targetTime,
+          occurrence_key: successorOccurrenceKey,
+          revision: 1,
+          status: 'planned',
+          supersedes_occurrence_id: originOccurrence.id,
+          source_generation: 'snooze_command',
+          legacy_scheduled_dose_id: cReplacementDoseId,
+        }, { onConflict: 'user_id,occurrence_key,revision' });
+
+        // Mark origin as superseded.
+        await supabase.from('planned_occurrences').update({
+          status: 'superseded',
+          superseded_by_occurrence_id: successorOccurrenceId,
+          superseded_at: record.recordedAt,
+        }).eq('id', originOccurrence.id).eq('user_id', userId);
+      }
+    } catch (occurrenceErr) {
+      console.warn('[snooze-occurrence-lineage]', occurrenceErr instanceof Error ? occurrenceErr.message : occurrenceErr);
+    }
+
     await updateDoseSyncOperationLedger(userId, clientOperationId, 'succeeded');
 
     return {
