@@ -9,14 +9,14 @@ Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/r
 
 | File | Status | Role |
 |------|--------|------|
-| `src/lib/supabase/auth.ts` | Committed (`codex/oauth-google-apple`) | All auth functions: sign-up, sign-in, sign-out, OAuth (Google only), resend, profile load |
-| `src/app/(auth)/login/page.tsx` | Committed (`codex/oauth-google-apple`) | Login UI with email/password + Google OAuth button |
-| `src/app/(auth)/register/page.tsx` | Committed (`codex/oauth-google-apple`) | Register UI with email/password + Google OAuth button |
-| `src/app/auth/callback/route.ts` | Committed (`codex/oauth-google-apple`) | OAuth PKCE code-exchange route handler |
-| `middleware.ts` (repo root) | Committed (`codex/oauth-google-apple`) | Delegates to `proxy()` — session refresh + route guard entry point |
-| `src/proxy.ts` | Committed | Server-side route guard (protects `/app*`, redirects authenticated users away from `/login`/`/register`) |
-| `src/app/app/layout.tsx` | Committed | Client-side app bootstrap gate (auth check, cloud pull, onboarding redirect) |
-| `src/lib/supabase/server.ts` | Committed | Server-side Supabase client factory (used by callback route) |
+| `src/lib/supabase/auth.ts` | Landed on `main` for email auth; OAuth additions pending on `codex/oauth-google-apple` | All auth functions: sign-up, sign-in, sign-out, OAuth (Google only), resend, profile load |
+| `src/app/(auth)/login/page.tsx` | Landed on `main` for email auth; Google OAuth UI pending on `codex/oauth-google-apple` | Login UI with email/password + Google OAuth button |
+| `src/app/(auth)/register/page.tsx` | Landed on `main` for email auth; Google OAuth UI pending on `codex/oauth-google-apple` | Register UI with email/password + Google OAuth button |
+| `src/app/auth/callback/route.ts` | Pending on `codex/oauth-google-apple` | OAuth PKCE code-exchange route handler |
+| `middleware.ts` (repo root) | Pending on `codex/oauth-google-apple` | Delegates to `proxy()` — session refresh + route guard entry point |
+| `src/proxy.ts` | Landed on `main` | Server-side route guard (protects `/app*`, redirects authenticated users away from `/login`/`/register`) |
+| `src/app/app/layout.tsx` | Landed on `main` | Client-side app bootstrap gate (auth check, cloud pull, onboarding redirect) |
+| `src/lib/supabase/server.ts` | Landed on `main` | Server-side Supabase client factory (used by callback route) |
 
 ---
 
@@ -60,9 +60,9 @@ Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/r
 
 ---
 
-## 3. OAuth auth — Google only (committed, staging-verified)
+## 3. OAuth auth — Google only (pending on branch, staging-verified)
 
-**Status:** Google OAuth is committed on branch `codex/oauth-google-apple` (PR #5 open against main). Google sign-in has been verified end-to-end in a real browser against the staging environment. Apple sign-in has been **removed** — no Apple button exists in the UI and the provider type is narrowed to `'google'` only in `auth.ts`.
+**Status:** Google OAuth is implemented on branch `codex/oauth-google-apple` (PR #5 open against `main`) and is not yet merged into `main`. Google sign-in has been verified end-to-end in a real browser against the staging environment. Apple sign-in has been **removed** on that branch — no Apple button exists in the UI and the provider type is narrowed to `'google'` only in `auth.ts`.
 
 Branch: `codex/oauth-google-apple` | PR #5 | Supabase project ref: `hagypgvfkjkncznoctoq`
 Staging URL: `https://medremind-6m0wqxa7w-peter-7822s-projects.vercel.app`
@@ -199,7 +199,7 @@ Two layers:
 - Secondary auth gate; enforces onboarding redirect
 - Handles auth boot failure without infinite lock
 
-**`middleware.ts`** (repo root, committed on `codex/oauth-google-apple`):
+**`middleware.ts`** (repo root, pending on `codex/oauth-google-apple`):
 - Thin entry point — delegates entirely to `proxy()` from `src/proxy.ts`
 - `proxy()` handles both session refresh and route protection in one pass
 - Matcher: all routes except Next.js internals and static images

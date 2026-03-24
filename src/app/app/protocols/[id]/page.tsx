@@ -104,6 +104,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     addProtocolItem,
     removeProtocolItem,
     regenerateDoses,
+    deleteProtocol,
   } = useStore();
   const { show } = useToast();
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -281,6 +282,29 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           {detailReadModel.canComplete && instance && (
             <Button size="sm" variant="danger" onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }}>✓ Complete</Button>
           )}
+          {!protocol.isTemplate && (
+            <Button
+              size="sm"
+              variant="danger"
+              aria-label="Delete protocol"
+              data-testid="delete-protocol-button"
+              onClick={() => {
+                const confirmText = protocol.isArchived
+                  ? `Archive this protocol and keep history?`
+                  : `Delete protocol "${protocol.name}"?`;
+                if (!confirm(confirmText)) return;
+                const result = deleteProtocol(protocol.id);
+                if (result.mode === 'archived') {
+                  show('Protocol archived to preserve history', 'warning');
+                } else {
+                  show('Protocol deleted', 'warning');
+                }
+                router.replace('/app/protocols');
+              }}
+            >
+              🗑 Delete
+            </Button>
+          )}
         </div>
 
         {courseFinishedWithoutClosure && instance && (
@@ -340,6 +364,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             </div>
           ))}
         </div>
+
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
           <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Future plan</div>
           <div className="text-[12px] text-[#8B949E] mb-2">

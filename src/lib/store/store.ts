@@ -1182,12 +1182,13 @@ export const useStore = create<AppState>()(
         const profileId = state.profile?.id;
 
         // Remove the target dose and all doses from cutoffDate onwards for this protocol.
+        const dayBefore = format(addDays(parseISO(cutoffDate), -1), 'yyyy-MM-dd');
         set(s => ({
           scheduledDoses: s.scheduledDoses.filter(d =>
             !(d.activeProtocolId === activeProtocolId && d.scheduledDate >= cutoffDate)
           ),
           activeProtocols: s.activeProtocols.map(ap =>
-            ap.id === activeProtocolId ? { ...ap, endDate: cutoffDate } : ap
+            ap.id === activeProtocolId ? { ...ap, endDate: dayBefore } : ap
           ),
         }));
 
@@ -1327,3 +1328,7 @@ export const useStore = create<AppState>()(
     }
   )
 );
+
+if (typeof window !== 'undefined') {
+  (window as any).useStore = useStore;
+}

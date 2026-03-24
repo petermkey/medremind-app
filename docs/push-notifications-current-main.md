@@ -15,7 +15,7 @@ Status: Implemented, deployed to production, **verified end-to-end 2026-03-23**
 | Install detection | `src/lib/push/useInstallState.ts` — detects `standalone` vs `browser` mode |
 | Push delivery | `POST /api/push/send` — CRON_SECRET auth, calls `web-push`, auto-deletes stale endpoints |
 | Scheduler | `GET /api/cron/notify` — queries `notification_settings`, finds due doses, deduplicates via `notification_log` |
-| Cron trigger | [cron-job.org](https://cron-job.org) job #7402447 — calls `/api/cron/notify` every minute with Bearer token |
+| Cron trigger | [cron-job.org](https://cron-job.org) job #7402449 — calls `/api/cron/notify` every minute with Bearer token |
 | DB tables | `push_subscriptions`, `notification_log` (see `supabase/003_web_push.sql`) |
 
 ---
@@ -111,7 +111,7 @@ curl https://medremind-app-two.vercel.app/api/cron/notify \
 - Header: `Authorization: Bearer <CRON_SECRET>`
 - Vercel Hobby plan does NOT support sub-daily cron jobs — cron-job.org is the trigger
 - `vercel.json` has `"crons": []` (empty — Vercel cron disabled)
-- Job ID: **7402447** (console.cron-job.org/jobs/7402447)
+- Job ID: **7402449** (console.cron-job.org/jobs/7402449)
 - cron-job.org API key stored in `vercel-env-import.env` (local only, not committed)
 
 ---
@@ -159,4 +159,4 @@ Using `echo` or heredoc appends `\n` which breaks string comparison (401 Unautho
 ### cron-job.org job was disabled
 
 After saving the job in the UI, it was showing `enabled: false` via API.
-Fix: `PATCH /jobs/7402447` with `{"job":{"enabled":true}}` via cron-job.org REST API.
+Fix: `PATCH /jobs/7402449` with `{"job":{"enabled":true}}` via cron-job.org REST API.

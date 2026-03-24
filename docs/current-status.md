@@ -26,7 +26,7 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Sign-out guard sequence (waits for in-flight sync + outbox flush before sign-out).
 - Server-side route guard (`src/proxy.ts`): unauthenticated `/app*` → `/login`; authenticated `/login`/`/register` → `/app`.
 
-**Committed on `codex/oauth-google-apple` (PR #5, staging-verified, pending merge):**
+**Pending on branch `codex/oauth-google-apple` (PR #5, staging-verified, not merged into `main`):**
 - Google OAuth — `/login` and `/register` pages have a Google button calling `signInWithOAuth('google')`.
 - `signInWithOAuth` in `auth.ts` — initiates `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`. Provider type narrowed to `'google'` only.
 - `/auth/callback/route.ts` — server-side PKCE code exchange; queries `profiles.onboarded`; redirects to `/app` or `/onboarding`; falls back to `/login?error=oauth`.
@@ -123,7 +123,7 @@ Landed implementation slices on `main`:
 
 ## 4. Remaining work categories
 
-### Work on `codex/oauth-google-apple` (committed, staging-verified, pending merge to main)
+### Work on `codex/oauth-google-apple` (pending branch, staging-verified, not merged to `main`)
 
 - Google OAuth integration: `middleware.ts`, `src/app/auth/callback/route.ts`, login/register page updates, `signInWithOAuth` in `auth.ts`.
 - Merge gate: account-linking verification required before production deploy. See `docs/auth-and-persistence-current-main.md` §15.

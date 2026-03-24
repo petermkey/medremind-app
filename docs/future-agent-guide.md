@@ -39,7 +39,7 @@ Stop and report if:
 
 ## 3. Known branch state (as of 2026-03-21)
 
-Branch `codex/oauth-google-apple` is open as PR #5 against `main`. It is **committed and CI-green**. The main working tree is clean.
+Branch `codex/oauth-google-apple` is open as PR #5 against `main`. It is **committed and CI-green**. Treat any working tree cleanliness statement in this section as point-in-time status as of 2026-03-21, not a current guarantee.
 
 | What | State |
 |------|-------|
@@ -50,7 +50,7 @@ Branch `codex/oauth-google-apple` is open as PR #5 against `main`. It is **commi
 | Staging | Google OAuth verified end-to-end in real browser |
 | Merge gate | Account-linking verification required before production |
 
-If your task is unrelated to OAuth: the main branch is clean; create a new branch from `main` as normal.
+If your task is unrelated to OAuth: start from current `main`, run preflight, and create a new branch only after confirming the working tree is actually clean.
 
 If your task is to verify account-linking or merge PR #5: see `docs/auth-and-persistence-current-main.md` §15.
 

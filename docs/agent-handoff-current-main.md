@@ -17,7 +17,7 @@ Audience: agents continuing work from current `main`
 
 OAuth changes are committed and CI is green. This section documents the current state of that branch.
 
-### What is committed on `codex/oauth-google-apple`
+### What is implemented on `codex/oauth-google-apple` (pending branch, not merged into `main`)
 
 | File | Change |
 |------|--------|
@@ -76,7 +76,7 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Local-first store with cloud sync and outbox retry.
 - Command-based lifecycle/dose sync with additive write-through coverage.
 - Selector-based lifecycle-aware read paths on key screens.
-- Auth: email/password + Google OAuth. Apple sign-in removed. Google OAuth committed on `codex/oauth-google-apple`, staging-verified.
+- Auth: email/password on `main` plus Google OAuth on pending branch `codex/oauth-google-apple`. Apple sign-in removed on that branch. Google OAuth is staging-verified but not merged.
 
 ## 4. Recent landed features (last 5 commits on `codex/oauth-google-apple`)
 
@@ -146,3 +146,27 @@ Required environment for D2/D3/C5/D4 scripts:
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 If missing, do not run tooling; report environment not ready.
+
+## 10. Lifecycle Hardening — branch `codex/p2-lifecycle-hardening` (Active)
+
+This slice implements store-level invariant checks and UX refinements based on `PLAN2p.md`.
+
+### Status and Changes
+
+| Feature | Change | Status |
+|---------|--------|--------|
+| **Store Guardians** | `pause`, `resume`, `complete` now have status-based guards vs the contract. | **Done** |
+| **Local Invariants** | `pausedAt`/`completedAt` cleared synchronously on status transitions in-store. | **Done** |
+| **endDate Fix** | `endProtocolFromToday` corrected to use `dayBefore` for consistency with regeneration. | **Done** |
+| **UX: Current Filter** | `Active` filter renamed to `Current`, includes `active + paused`. | **Done** |
+| **UX: Resume CTA** | `Resume` button promoted to primary action on paused protocols. | **Done** |
+| **UX: Finish Banner** | "Course finished" banner added to protocol details when `endDate` passed. | **Done** |
+| **UX: Delete Logic** | Precise confirm text for Archive vs Delete permanently. | **Done** |
+| **Documentation** | `docs/protocol-lifecycle-current-main.md` updated to implementation state. | **Done** |
+| **E2E Coverage** | `tests/e2e/lifecycle.spec.ts` added to cover transitions and archival. | **Added** |
+
+### Next Steps for Implementation
+
+1. **Verify Sync Resilience**: Ensure `sync_operations` ledger entries correctly mirror the new store guards.
+2. **Smoke Test**: Run `tests/e2e/lifecycle.spec.ts` in an authenticated local environment.
+3. **Merge**: Once E2E passes and build is confirmed, merge to `main`.

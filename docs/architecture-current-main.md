@@ -1,7 +1,7 @@
 # Architecture (Current Main)
 
 Date: 2026-03-21 (updated post-OAuth staging verification)
-Source of truth: current `main` + branch `codex/oauth-google-apple` (PR #5 open, staging-verified)
+Source of truth: code on current `main`; pending OAuth changes are referenced explicitly from branch `codex/oauth-google-apple` (PR #5 open, staging-verified) where relevant
 
 ## 1. Runtime stack and boundaries
 
