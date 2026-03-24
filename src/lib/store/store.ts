@@ -6,7 +6,7 @@ import { format, addDays, parseISO, isBefore, isAfter } from 'date-fns';
 import type {
   UserProfile, ActiveProtocol, Protocol, ProtocolItem,
   ScheduledDose, DoseRecord, DoseStatus, NotificationSettings,
-  ProtocolStatus,
+  ProtocolStatus, PlannedOccurrence, OccurrenceStatus,
 } from '@/types';
 import { SEED_PROTOCOLS, SEED_DRUGS } from '@/lib/data/seed';
 import type { Drug } from '@/types';
@@ -102,6 +102,25 @@ function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
   const { date: todayDate, time: currentTime } = nowDateTimeForTimezone(profile?.timezone);
   return dose.scheduledDate < todayDate ||
     (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
+}
+
+// ─── Occurrence model (F3) ─────────────────────────────────────────────
+//
+// Projects a ScheduledDose into a PlannedOccurrence at read time.
+// occurrenceStatus is derived — never written — following these rules:
+//   superseded: dose has an explicit successor (F2 lineage) OR legacy snoozed status
+//   cancelled:  dose was removed from the plan without an action record
+//   planned:    everything else (live, actionable slot)
+//
+// PlannedOccurrence extends ScheduledDose so all existing consumers
+// (MedCard, page.tsx, etc.) can receive it without modification.
+function projectToOccurrence(dose: ScheduledDose): PlannedOccurrence {
+  let occurrenceStatus: OccurrenceStatus = 'planned';
+  if (dose.successorDoseId || dose.status === 'snoozed') {
+    occurrenceStatus = 'superseded';
+  }
+  const occurrenceKey = `${dose.activeProtocolId}|${dose.protocolItemId}|${dose.scheduledDate}|${dose.scheduledTime}`;
+  return { ...dose, occurrenceStatus, occurrenceKey };
 }
 
 function generateId(prefix: string): string {
@@ -338,6 +357,13 @@ interface AppState {
   selectTodayScheduleView: (date: string) => ScheduledDose[];
   selectCalendarVisibleDoseDates: (anchorDate: string, lookbackDays?: number, lookaheadDays?: number) => string[];
   selectHistoryDayRows: (date: string) => ScheduledDose[];
+
+  // F3 — occurrence-based selectors (PlannedOccurrence extends ScheduledDose;
+  // all existing consumers continue to work without changes).
+  // These replace selectAppActionableDoses + selectHistoryDayRows as the canonical read path.
+  selectActionableOccurrences: (date: string) => PlannedOccurrence[];
+  selectHistoryOccurrences: (date: string) => PlannedOccurrence[];
+
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
@@ -960,6 +986,58 @@ export const useStore = create<AppState>()(
 
             return isHandledStatus || hasHandledRecord;
           })
+          .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
+      },
+
+      // ── F3 occurrence-based selectors ─────────────────────────────────
+      //
+      // selectActionableOccurrences replaces selectAppActionableDoses as the
+      // canonical read path for today/future schedule UI. Filtering is driven
+      // by occurrenceStatus (structural) rather than mixed DoseStatus inference.
+      //
+      // selectHistoryOccurrences replaces selectHistoryDayRows for past-day
+      // history surfaces, using the same occurrence projection.
+
+      selectActionableOccurrences: (date) => {
+        const doses = get().getDaySchedule(date);
+        return doses
+          .filter(d => {
+            const o = projectToOccurrence(d);
+            // Superseded slots (snoozed origins) are not actionable.
+            if (o.occurrenceStatus === 'superseded') return false;
+            // Handled doses are shown in history, not in the actionable queue.
+            if (d.status === 'taken' || d.status === 'skipped') return false;
+            return true;
+          })
+          .map(projectToOccurrence);
+      },
+
+      selectHistoryOccurrences: (date) => {
+        const state = get();
+        const todayDate = today();
+        if (date >= todayDate) return [];
+
+        const recordByDoseId = new Map<string, DoseRecord[]>();
+        for (const record of state.doseRecords) {
+          const list = recordByDoseId.get(record.scheduledDoseId) ?? [];
+          list.push(record);
+          recordByDoseId.set(record.scheduledDoseId, list);
+        }
+
+        return state.scheduledDoses
+          .filter(dose => {
+            if (dose.scheduledDate !== date) return false;
+            const o = projectToOccurrence(dose);
+            // Superseded occurrences (snoozed origins) never appear on their original day.
+            if (o.occurrenceStatus === 'superseded') return false;
+            const records = recordByDoseId.get(dose.id) ?? [];
+            const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
+            const hasHandledRecord = records.some(
+              r => r.action === 'taken' || r.action === 'skipped',
+            );
+            return isHandledStatus || hasHandledRecord;
+          })
+          .map(projectToOccurrence)
           .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
       },
 

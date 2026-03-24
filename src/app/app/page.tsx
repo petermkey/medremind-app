@@ -7,7 +7,7 @@ import { MedCard } from '@/components/app/MedCard';
 import { AddDoseSheet } from '@/components/app/AddDoseSheet';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
-import type { ScheduledDose } from '@/types';
+import type { PlannedOccurrence } from '@/types';
 
 function fmtTime(t: string) {
   const [h, m] = t.split(':').map(Number);
@@ -44,8 +44,8 @@ function currentDateForTimezone(timezone?: string) {
 export default function SchedulePage() {
   const {
     profile,
-    selectAppActionableDoses,
-    selectHistoryDayRows,
+    selectActionableOccurrences,
+    selectHistoryOccurrences,
     selectAppNextDose,
     selectAppSummaryMetrics,
     selectCalendarVisibleDoseDates,
@@ -62,8 +62,8 @@ export default function SchedulePage() {
   const todayStr = useMemo(() => currentDateForTimezone(profile?.timezone), [profile?.timezone]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [snoozeTargetDose, setSnoozeTargetDose] = useState<ScheduledDose | null>(null);
-  const [deleteTargetDose, setDeleteTargetDose] = useState<ScheduledDose | null>(null);
+  const [snoozeTargetDose, setSnoozeTargetDose] = useState<PlannedOccurrence | null>(null);
+  const [deleteTargetDose, setDeleteTargetDose] = useState<PlannedOccurrence | null>(null);
   const isHistoryDate = selectedDate < todayStr;
   const isFutureDate = selectedDate > todayStr;
   const futureActionMessage = 'This dose can be changed only on its scheduled day or later.';
@@ -72,8 +72,8 @@ export default function SchedulePage() {
 
 
   const actionableDoses = useMemo(
-    () => (isHistoryDate ? selectHistoryDayRows(selectedDate) : selectAppActionableDoses(selectedDate)),
-    [selectedDate, isHistoryDate, scheduledDoses, selectHistoryDayRows, selectAppActionableDoses],
+    () => (isHistoryDate ? selectHistoryOccurrences(selectedDate) : selectActionableOccurrences(selectedDate)),
+    [selectedDate, isHistoryDate, scheduledDoses, selectHistoryOccurrences, selectActionableOccurrences],
   );
 
   // Dates that have at least one dose (for week strip dots)
@@ -121,7 +121,7 @@ export default function SchedulePage() {
     return map;
   }, [doseRecords]);
 
-  function getSnoozeUntil(dose: ScheduledDose, option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
+  function getSnoozeUntil(dose: PlannedOccurrence, option: '1h' | 'evening' | 'tomorrow' | 'next_week') {
     const now = new Date();
     const isHistoricalDose = dose.scheduledDate < todayStr;
     const intendedTime = dose.protocolItem.times[0] ?? dose.scheduledTime;
