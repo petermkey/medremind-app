@@ -170,6 +170,7 @@ function projectToOccurrence(dose: ScheduledDose): PlannedOccurrence {
   return { ...dose, occurrenceStatus, occurrenceKey };
 }
 
+
 function generateId(prefix: string): string {
   try {
     return uuid();
