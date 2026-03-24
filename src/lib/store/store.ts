@@ -84,8 +84,8 @@ function nowDateTimeForTimezone(timezone?: string): { date: string; time: string
   };
 }
 
-const today = () => nowDateTimeForTimezone().date;
-const nowTime = () => format(new Date(), 'HH:mm');
+const today = (timezone?: string) => nowDateTimeForTimezone(timezone).date;
+const nowTime = (timezone?: string) => nowDateTimeForTimezone(timezone).time;
 
 function isFutureDoseByDate(
   dose: ScheduledDose,
@@ -489,8 +489,8 @@ export const useStore = create<AppState>()(
         }
 
         // Mark past doses as overdue
-        const now = today();
-        const nt = nowTime();
+        const now = today(state.profile.timezone);
+        const nt = nowTime(state.profile.timezone);
         const markedDoses = newDoses.map(d => {
           if (d.scheduledDate < now || (d.scheduledDate === now && d.scheduledTime < nt)) {
             return { ...d, status: 'overdue' as DoseStatus };
@@ -507,6 +507,8 @@ export const useStore = create<AppState>()(
       },
 
       pauseProtocol: (activeId) => {
+        const active = get().activeProtocols.find(ap => ap.id === activeId);
+        if (!active || active.status !== 'active') return;
         const pausedAt = new Date().toISOString();
         const profileId = get().profile?.id;
         const clientOperationId = buildLifecycleCommandOperationId('pause', activeId, pausedAt);
@@ -524,12 +526,16 @@ export const useStore = create<AppState>()(
       },
 
       resumeProtocol: (activeId) => {
+        const active = get().activeProtocols.find(ap => ap.id === activeId);
+        if (!active || active.status !== 'paused') return;
         const profileId = get().profile?.id;
         const resumedAt = new Date().toISOString();
         const clientOperationId = buildLifecycleCommandOperationId('resume', activeId, resumedAt);
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
-            ap.id === activeId ? { ...ap, status: 'active' as ProtocolStatus, pausedAt: undefined } : ap
+            ap.id === activeId
+              ? { ...ap, status: 'active' as ProtocolStatus, pausedAt: undefined, completedAt: undefined }
+              : ap
           ),
         }));
         if (profileId) {
@@ -541,12 +547,21 @@ export const useStore = create<AppState>()(
       },
 
       completeProtocol: (activeId) => {
+        const active = get().activeProtocols.find(ap => ap.id === activeId);
+        if (!active || active.status !== 'active') return;
         const completedAt = new Date().toISOString();
         const profileId = get().profile?.id;
         const clientOperationId = buildLifecycleCommandOperationId('complete', activeId, completedAt);
         set(s => ({
           activeProtocols: s.activeProtocols.map(ap =>
-            ap.id === activeId ? { ...ap, status: 'completed' as ProtocolStatus, completedAt } : ap
+            ap.id === activeId
+              ? {
+                ...ap,
+                status: 'completed' as ProtocolStatus,
+                completedAt,
+                pausedAt: undefined,
+              }
+              : ap
           ),
         }));
         if (profileId) {
@@ -609,7 +624,7 @@ export const useStore = create<AppState>()(
           const activeProtocols = s.activeProtocols.map(ap => {
             if (ap.protocolId !== id || !nextProtocol) return ap;
             const nextActive = { ...ap, protocol: nextProtocol };
-            if (!durationChanged || ap.status === 'completed') return nextActive;
+            if (!durationChanged || (ap.status !== 'active' && ap.status !== 'paused')) return nextActive;
             activeToRegenerate.add(ap.id);
             return {
               ...nextActive,
@@ -659,6 +674,7 @@ export const useStore = create<AppState>()(
               return {
                 ...ap,
                 status: 'abandoned' as ProtocolStatus,
+                pausedAt: undefined,
                 completedAt: undefined,
                 protocol: archivedProtocol ?? ap.protocol,
               };
@@ -746,7 +762,7 @@ export const useStore = create<AppState>()(
       // ── Schedule ──────────────────────────────────────────────────────
 
       getDaySchedule: (date) => {
-        const todayDate = today();
+        const todayDate = today(get().profile?.timezone);
         const isPastDate = date < todayDate;
         if (isPastDate) {
           const pastDoses = get().scheduledDoses.filter(d => d.scheduledDate === date);
@@ -903,7 +919,7 @@ export const useStore = create<AppState>()(
         const resolvedAnchor = Number.isNaN(parsedAnchor.getTime()) ? new Date() : parsedAnchor;
         const fromDate = format(addDays(resolvedAnchor, -lookbackDays), 'yyyy-MM-dd');
         const toDate = format(addDays(resolvedAnchor, lookaheadDays), 'yyyy-MM-dd');
-        const todayDate = today();
+        const todayDate = today(state.profile?.timezone);
         const activeById = new Map(state.activeProtocols.map(ap => [ap.id, ap]));
         const dates = new Set<string>();
 
@@ -928,7 +944,7 @@ export const useStore = create<AppState>()(
 
       selectHistoryDayRows: (date) => {
         const state = get();
-        const todayDate = today();
+        const todayDate = today(state.profile?.timezone);
         if (date >= todayDate) return [];
 
         const recordByDoseId = new Map<string, DoseRecord[]>();
@@ -970,7 +986,10 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
+        const active = state.activeProtocols.find(ap => ap.id === dose.activeProtocolId);
+        if (!active || active.status !== 'active') return;
         if (isFutureDoseByDate(dose, state.profile)) return;
+        if (dose.status !== 'pending' && dose.status !== 'overdue') return;
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'taken',
         );
@@ -984,7 +1003,7 @@ export const useStore = create<AppState>()(
         };
         const clientOperationId = `take:${record.id}`;
         const shouldAppendRecord = !existingRecord;
-        const shouldUpdateStatus = dose.status !== 'taken';
+        const shouldUpdateStatus = true;
         if (shouldAppendRecord || shouldUpdateStatus) {
           set(s => ({
             scheduledDoses: s.scheduledDoses.map(d =>
@@ -1008,7 +1027,10 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
+        const active = state.activeProtocols.find(ap => ap.id === dose.activeProtocolId);
+        if (!active || active.status !== 'active') return;
         if (isFutureDoseByDate(dose, state.profile)) return;
+        if (dose.status !== 'pending' && dose.status !== 'overdue') return;
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'skipped',
         );
@@ -1022,7 +1044,7 @@ export const useStore = create<AppState>()(
         };
         const clientOperationId = `skip:${record.id}`;
         const shouldAppendRecord = !existingRecord;
-        const shouldUpdateStatus = dose.status !== 'skipped';
+        const shouldUpdateStatus = true;
         if (shouldAppendRecord || shouldUpdateStatus) {
           set(s => ({
             scheduledDoses: s.scheduledDoses.map(d =>
@@ -1046,7 +1068,10 @@ export const useStore = create<AppState>()(
         const state = get();
         const dose = state.scheduledDoses.find(d => d.id === doseId);
         if (!dose) return;
+        const active = state.activeProtocols.find(ap => ap.id === dose.activeProtocolId);
+        if (!active || active.status !== 'active') return;
         if (isFutureDoseByDate(dose, state.profile)) return;
+        if (dose.status !== 'pending') return;
         const targetDate = typeof option === 'number'
           ? new Date(Date.now() + option * 60000)
           : new Date(option.until);
@@ -1078,7 +1103,7 @@ export const useStore = create<AppState>()(
         const clientOperationId = `snooze:${record.id}`;
         const shouldAppendRecord = !existingRecord;
         const shouldUpdateRecordNote = Boolean(existingRecord && existingRecord.note !== recordNote);
-        const originalNeedsUpdate = dose.status !== 'snoozed' || dose.snoozedUntil !== snoozedUntil;
+        const originalNeedsUpdate = true;
         const existingReplacement = state.scheduledDoses.find(d => d.id === replacementDoseId);
         const replacementNeedsUpsert = !existingReplacement
           || existingReplacement.scheduledDate !== scheduledDate
