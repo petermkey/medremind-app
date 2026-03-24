@@ -22,6 +22,10 @@ const WINDOW_MINUTES = 1;
 // How often to re-notify for unactioned (pending/overdue) doses.
 const REMINDER_INTERVAL_MINUTES = 10;
 
+// Maximum total notifications per dose (1 initial + N-1 reminders).
+// After this cap, no further reminders are sent regardless of dose status.
+const MAX_NOTIFICATIONS = 3;
+
 export async function GET(request: NextRequest) {
   // Vercel sets this header on cron invocations; also accept CRON_SECRET bearer.
   const authHeader = request.headers.get('authorization');
@@ -198,12 +202,14 @@ export async function GET(request: NextRequest) {
       {
         const reminderCutoff = new Date(now.getTime() - REMINDER_INTERVAL_MINUTES * 60 * 1000);
 
-        // Find log rows for this user where last notification was sent >= REMINDER_INTERVAL_MINUTES ago.
+        // Find log rows for this user where last notification was sent >= REMINDER_INTERVAL_MINUTES ago
+        // and the dose has not yet reached MAX_NOTIFICATIONS.
         const { data: logRows, error: logErr } = await supabase
           .from('notification_log')
           .select('scheduled_dose_id, notification_count')
           .eq('user_id', userId)
-          .lte('sent_at', reminderCutoff.toISOString());
+          .lte('sent_at', reminderCutoff.toISOString())
+          .lt('notification_count', MAX_NOTIFICATIONS);
 
         if (logErr) {
           console.error('[cron/notify] Pass B log fetch failed', userId, logErr);
