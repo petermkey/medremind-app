@@ -155,21 +155,7 @@ export default function SchedulePage() {
     if (!targetDose) return;
     setSnoozeTargetDose(null);
 
-    const baseUntil = getSnoozeUntil(targetDose, option);
-    const until = (() => {
-      const occupied = new Set(
-        scheduledDoses
-          .filter(d => d.id !== targetDose.id && d.protocolItemId === targetDose.protocolItemId)
-          .map(d => `${d.scheduledDate}|${d.scheduledTime}`),
-      );
-      const candidate = new Date(baseUntil);
-      for (let i = 0; i < 72; i++) {
-        const key = `${format(candidate, 'yyyy-MM-dd')}|${format(candidate, 'HH:mm')}`;
-        if (!occupied.has(key)) return candidate;
-        candidate.setMinutes(candidate.getMinutes() + 5);
-      }
-      return baseUntil;
-    })();
+    const until = new Date(getSnoozeUntil(targetDose, option));
     snoozeDose(targetDose.id, { until: until.toISOString() });
     const label =
       option === '1h'

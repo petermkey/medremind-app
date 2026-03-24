@@ -132,30 +132,23 @@ function resolveSnoozeTargetSlot(
   doses: ScheduledDose[],
   sourceDose: ScheduledDose,
   baseTarget: Date,
-): { scheduledDate: string; scheduledTime: string; snoozedUntil: string } {
-  const cursor = new Date(baseTarget);
-  for (let i = 0; i < 72; i++) {
-    const scheduledDate = format(cursor, 'yyyy-MM-dd');
-    const scheduledTime = format(cursor, 'HH:mm');
-    const replacementDoseId = buildSnoozeReplacementDoseId(sourceDose.id, scheduledDate, scheduledTime);
-    const occupied = doses.some(d =>
-      d.activeProtocolId === sourceDose.activeProtocolId
-      && d.protocolItemId === sourceDose.protocolItemId
-      && d.scheduledDate === scheduledDate
-      && d.scheduledTime === scheduledTime
-      && d.id !== sourceDose.id
-      && d.id !== replacementDoseId
-    );
-    if (!occupied) {
-      return { scheduledDate, scheduledTime, snoozedUntil: cursor.toISOString() };
-    }
-    cursor.setMinutes(cursor.getMinutes() + 5);
+): { scheduledDate: string; scheduledTime: string; snoozedUntil: string; reuseExistingId?: string } {
+  const scheduledDate = format(baseTarget, 'yyyy-MM-dd');
+  const scheduledTime = format(baseTarget, 'HH:mm');
+  // If a pending dose for the same protocol item already exists at the target slot,
+  // reuse it — don't create a second dose.
+  const existing = doses.find(d =>
+    d.activeProtocolId === sourceDose.activeProtocolId
+    && d.protocolItemId === sourceDose.protocolItemId
+    && d.scheduledDate === scheduledDate
+    && d.scheduledTime === scheduledTime
+    && d.id !== sourceDose.id
+    && d.status === 'pending'
+  );
+  if (existing) {
+    return { scheduledDate, scheduledTime, snoozedUntil: baseTarget.toISOString(), reuseExistingId: existing.id };
   }
-  return {
-    scheduledDate: format(baseTarget, 'yyyy-MM-dd'),
-    scheduledTime: format(baseTarget, 'HH:mm'),
-    snoozedUntil: baseTarget.toISOString(),
-  };
+  return { scheduledDate, scheduledTime, snoozedUntil: baseTarget.toISOString() };
 }
 
 function normalizeDurationDays(value: unknown): number | undefined {
@@ -1055,8 +1048,9 @@ export const useStore = create<AppState>()(
           : new Date(option.until);
         if (Number.isNaN(targetDate.getTime())) return;
         const resolvedSlot = resolveSnoozeTargetSlot(state.scheduledDoses, dose, targetDate);
-        const { snoozedUntil, scheduledDate, scheduledTime } = resolvedSlot;
-        const replacementDoseId = buildSnoozeReplacementDoseId(dose.id, scheduledDate, scheduledTime);
+        const { snoozedUntil, scheduledDate, scheduledTime, reuseExistingId } = resolvedSlot;
+        // If a pending dose already exists at the target slot, reuse its ID to avoid duplication.
+        const replacementDoseId = reuseExistingId ?? buildSnoozeReplacementDoseId(dose.id, scheduledDate, scheduledTime);
         const replacementDose: ScheduledDose = {
           ...dose,
           id: replacementDoseId,
@@ -1083,7 +1077,6 @@ export const useStore = create<AppState>()(
         const originalNeedsUpdate = dose.status !== 'snoozed' || dose.snoozedUntil !== snoozedUntil;
         const existingReplacement = state.scheduledDoses.find(d => d.id === replacementDoseId);
         const replacementNeedsUpsert = !existingReplacement
-          || existingReplacement.status !== 'pending'
           || existingReplacement.scheduledDate !== scheduledDate
           || existingReplacement.scheduledTime !== scheduledTime;
         if (shouldAppendRecord || shouldUpdateRecordNote || originalNeedsUpdate || replacementNeedsUpsert) {
@@ -1098,11 +1091,14 @@ export const useStore = create<AppState>()(
                   }
                   : d
               );
-              const idx = updated.findIndex(d => d.id === replacementDoseId);
-              if (idx >= 0) {
-                updated[idx] = { ...updated[idx], ...replacementDose };
-              } else {
-                updated.push(replacementDose);
+              // Only add replacement if it's a new dose (not a reused existing one).
+              if (!reuseExistingId) {
+                const idx = updated.findIndex(d => d.id === replacementDoseId);
+                if (idx >= 0) {
+                  updated[idx] = { ...updated[idx], ...replacementDose };
+                } else {
+                  updated.push(replacementDose);
+                }
               }
               return updated;
             })(),
@@ -1118,7 +1114,7 @@ export const useStore = create<AppState>()(
             syncSnoozeDoseCommand(
               state.profile.id,
               dose,
-              replacementDose,
+              reuseExistingId ? null : replacementDose,
               shouldAppendRecord ? record : (shouldUpdateRecordNote ? { ...record, note: recordNote } : record),
               clientOperationId,
             ),
@@ -1127,7 +1123,7 @@ export const useStore = create<AppState>()(
               payload: {
                 userId: state.profile.id,
                 dose,
-                replacementDose,
+                replacementDose: reuseExistingId ? null : replacementDose,
                 record: shouldAppendRecord ? record : (shouldUpdateRecordNote ? { ...record, note: recordNote } : record),
                 clientOperationId,
               },

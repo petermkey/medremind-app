@@ -72,7 +72,7 @@ type SyncPayloadMap = {
   snoozeCommand: {
     userId: string;
     dose: ScheduledDose;
-    replacementDose: ScheduledDose;
+    replacementDose: ScheduledDose | null;
     record: DoseRecord;
     clientOperationId: string;
   };
