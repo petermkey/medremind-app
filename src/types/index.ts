@@ -103,6 +103,11 @@ export interface ScheduledDose {
   scheduledTime: string;     // HH:MM
   status: DoseStatus;
   snoozedUntil?: string;
+  // Snooze lineage — explicit predecessor/successor chain.
+  // predecessorDoseId: the origin dose this row was created from (set on replacement).
+  // successorDoseId: the replacement dose this row was rescheduled to (set on origin when snoozed).
+  predecessorDoseId?: string;
+  successorDoseId?: string;
 }
 
 // ─── Dose record (immutable log) ───────────────────────────────────────

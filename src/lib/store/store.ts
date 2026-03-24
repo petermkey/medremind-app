@@ -943,25 +943,21 @@ export const useStore = create<AppState>()(
           .filter(dose => {
             if (dose.scheduledDate !== date) return false;
 
+            // Explicit lineage: if this dose has a successor it was rescheduled (snoozed) away.
+            // Don't show it on the original day — the user mentally moved it.
+            // Fallback to legacy status/record check for rows created before F2.
+            if (dose.successorDoseId) return false;
+
             const records = recordByDoseId.get(dose.id) ?? [];
-            let latestAction: DoseRecord['action'] | null = null;
-            let latestRecordedAt = '';
-            for (const record of records) {
-              if (record.recordedAt >= latestRecordedAt) {
-                latestRecordedAt = record.recordedAt;
-                latestAction = record.action;
-              }
-            }
             const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
             const hasHandledRecord = records.some(
               record => record.action === 'taken' || record.action === 'skipped',
             );
-            const wasMovedBySnooze = dose.status === 'snoozed' || latestAction === 'snoozed';
+            // Legacy fallback: rows without successorDoseId may still have snoozed status/record.
+            const wasMovedLegacy = dose.status === 'snoozed'
+              || records.some(r => r.action === 'snoozed');
+            if (wasMovedLegacy) return false;
 
-            if (wasMovedBySnooze) return false;
-
-            // A snoozed origin dose is logically moved to a new slot and should not remain
-            // visible on the original day; only handled history stays on the day surface.
             return isHandledStatus || hasHandledRecord;
           })
           .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
@@ -1063,6 +1059,8 @@ export const useStore = create<AppState>()(
           scheduledTime,
           status: 'pending',
           snoozedUntil,
+          predecessorDoseId: dose.id,
+          successorDoseId: undefined,
         };
         const existingRecord = state.doseRecords.find(
           r => r.scheduledDoseId === doseId && r.action === 'snoozed',
@@ -1087,15 +1085,21 @@ export const useStore = create<AppState>()(
         if (shouldAppendRecord || shouldUpdateRecordNote || originalNeedsUpdate || replacementNeedsUpsert) {
           set(s => ({
             scheduledDoses: (() => {
-              const updated = s.scheduledDoses.map(d =>
-                d.id === doseId
-                  ? {
+              const updated = s.scheduledDoses.map(d => {
+                if (d.id === doseId) {
+                  return {
                     ...d,
                     status: 'snoozed' as DoseStatus,
                     snoozedUntil,
-                  }
-                  : d
-              );
+                    successorDoseId: replacementDoseId,
+                  };
+                }
+                // When reusing an existing dose as replacement, stamp its predecessor.
+                if (reuseExistingId && d.id === reuseExistingId) {
+                  return { ...d, predecessorDoseId: doseId };
+                }
+                return d;
+              });
               // Only add replacement if it's a new dose (not a reused existing one).
               if (!reuseExistingId) {
                 const idx = updated.findIndex(d => d.id === replacementDoseId);
