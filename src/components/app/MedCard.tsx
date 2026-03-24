@@ -45,10 +45,21 @@ function fmt(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
+function deriveDisplayStatus(dose: ScheduledDose): string {
+  if (dose.status !== 'pending') return dose.status;
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const isPast = dose.scheduledDate < todayStr ||
+    (dose.scheduledDate === todayStr && dose.scheduledTime < timeStr);
+  return isPast ? 'overdue' : 'pending';
+}
+
 export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt }: Props) {
   const item = dose.protocolItem;
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
-  const statusColor = STATUS_COLOR[dose.status] ?? '#8B949E';
+  const displayStatus = deriveDisplayStatus(dose);
+  const statusColor = STATUS_COLOR[displayStatus] ?? '#8B949E';
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const gesture = useRef<{
     pointerId: number | null;
@@ -182,7 +193,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
           'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
           cardTranslate,
-          actionsDisabled ? 'opacity-70' : dose.status === 'taken' ? 'opacity-60' : '',
+          actionsDisabled ? 'opacity-70' : displayStatus === 'taken' ? 'opacity-60' : '',
         ].join(' ')}
       >
         {/* Status stripe */}
@@ -202,14 +213,14 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             {item.name} {item.doseAmount ? `${item.doseAmount}${item.doseUnit}` : ''}
           </div>
           <div className="text-xs mt-0.5" style={{ color: statusColor }}>
-            {dose.status === 'taken' && takenAt
+            {displayStatus === 'taken' && takenAt
               ? (() => {
                   const d = new Date(takenAt);
                   const hh = String(d.getHours()).padStart(2, '0');
                   const mm = String(d.getMinutes()).padStart(2, '0');
                   return `✓ Taken at ${fmt(`${hh}:${mm}`)}`;
                 })()
-              : `${STATUS_LABEL[dose.status]} · ${fmt(dose.scheduledTime)}`}
+              : `${STATUS_LABEL[displayStatus] ?? STATUS_LABEL[dose.status]} · ${fmt(dose.scheduledTime)}`}
           </div>
           {tags.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -225,7 +236,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
         {/* Check button */}
         <button
           type="button"
-          aria-label={dose.status === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
+          aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
           onClick={e => {
             e.stopPropagation();
             if (dose.status !== 'taken') onTake();
@@ -234,14 +245,14 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           className={[
             'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
-            dose.status === 'taken'
+            displayStatus === 'taken'
               ? 'bg-[#10B981] border-[#10B981] text-white cursor-default'
-              : dose.status === 'overdue'
+              : displayStatus === 'overdue'
               ? 'border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white'
               : 'border-[rgba(255,255,255,0.15)] text-[#8B949E] hover:border-[#10B981] hover:text-[#10B981]',
           ].join(' ')}
         >
-          {dose.status === 'taken' ? '✓' : ''}
+          {displayStatus === 'taken' ? '✓' : ''}
         </button>
       </div>
 

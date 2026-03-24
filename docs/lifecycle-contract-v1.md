@@ -105,9 +105,9 @@ The `snoozed` original row is logically inert:
 - It must **not** appear in history surfaces for its original date.
 - It must **not** be acted on (take, skip, snooze again) — the replacement dose is the live entity.
 
-#### `overdue`
+#### `overdue` (derived UI label — not persisted for new doses)
 
-A dose whose `scheduledDate + scheduledTime` was in the past at activation time. Set at activation only — not updated dynamically at runtime by server or client. An `overdue` dose is still actionable: a user can take or skip an overdue dose. The backend does not block take or skip on `overdue` status. Whether a client surfaces overdue doses as actionable is a UI concern.
+`overdue` is not a durable domain status. It is a UI label derived at read time: a `pending` dose is considered overdue when its `scheduledDate + scheduledTime` is strictly before the current local date-time. New doses are always written as `pending`; the client derives the overdue display state without mutating stored status. Legacy rows in `scheduled_doses` with `status = 'overdue'` (written before this change) remain valid and are treated the same as `pending` by all action guards. The cron notification query includes both `pending` and `overdue` for backward compatibility with legacy rows.
 
 #### Dose State Terminalness
 
@@ -117,7 +117,7 @@ A dose whose `scheduledDate + scheduledTime` was in the past at activation time.
 | `taken` | **Yes** | No further write |
 | `skipped` | **Yes** | No further write |
 | `snoozed` | **Yes** (original row) | Original row is inert; replacement row is the live entity |
-| `overdue` | No | Can transition to taken or skipped |
+| `overdue` | No | Legacy value — treated as `pending`; new doses are not written with this status |
 
 ---
 
@@ -158,8 +158,8 @@ paused → completed  FORBIDDEN. A paused protocol must be resumed before comple
 pending → taken       via: takeDose
 pending → skipped     via: skipDose
 pending → snoozed     via: snoozeDose
-overdue → taken       via: takeDose
-overdue → skipped     via: skipDose
+overdue → taken       via: takeDose  (legacy rows only; new doses stay pending)
+overdue → skipped     via: skipDose  (legacy rows only)
 ```
 
 **Forbidden transitions:**
@@ -205,12 +205,12 @@ No `active_protocols`, `scheduled_doses`, `dose_records`, `execution_events`, or
 **Computed values:**
 - `endDate`: if `protocol.durationDays` is a positive integer, `endDate = startDate + (durationDays - 1) days`. The end date is **inclusive** — doses are generated up to and including this date. If `durationDays` is null (ongoing), `endDate` is null and generation runs to the generation horizon.
 - **Generation horizon:** 90 days from `startDate` (i.e., `startDate + 89 days`), bounded by `endDate` when present.
-- Doses whose `scheduledDate + scheduledTime` is strictly before the current local date-time at activation are assigned `status = 'overdue'`. All other generated doses are `status = 'pending'`.
+- All generated doses are assigned `status = 'pending'`. `overdue` is a derived UI label computed at read time — it is not written to new rows.
 
 **Cloud sync write order:**
 1. **`protocols`** + **`protocol_items`**: upsert protocol definition first, to guarantee the protocol row exists before the active instance is created.
 2. **`active_protocols`**: upsert one row. Fields: `id`, `user_id`, `protocol_id`, `status = 'active'`, `start_date`, `end_date`, `paused_at = null`, `completed_at = null`, `notes`, `created_at`. Conflict key: `ON CONFLICT (id)`.
-3. **`scheduled_doses`**: upsert all generated dose rows in batches (max 250 per batch). Fields: `id`, `user_id`, `active_protocol_id`, `protocol_item_id`, `scheduled_date`, `scheduled_time`, `status` (`pending` or `overdue`), `snoozed_until = null`. Conflict key: `ON CONFLICT (id)`.
+3. **`scheduled_doses`**: upsert all generated dose rows in batches (max 250 per batch). Fields: `id`, `user_id`, `active_protocol_id`, `protocol_item_id`, `scheduled_date`, `scheduled_time`, `status` (`pending`), `snoozed_until = null`. Conflict key: `ON CONFLICT (id)`.
 4. **`planned_occurrences`**: upsert all future-dated dose rows (`scheduled_date >= today`) as planned occurrence rows. Conflict key: `ON CONFLICT (user_id, occurrence_key, revision)` — do update.
 
 **Planned occurrence field derivation:**

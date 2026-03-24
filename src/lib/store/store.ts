@@ -95,6 +95,15 @@ function isFutureDoseByDate(
   return dose.scheduledDate > todayDate;
 }
 
+// overdue is a derived UI concept — never persisted as a terminal status.
+// A pending dose is overdue when its scheduled slot is in the past.
+function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
+  if (dose.status !== 'pending') return false;
+  const { date: todayDate, time: currentTime } = nowDateTimeForTimezone(profile?.timezone);
+  return dose.scheduledDate < todayDate ||
+    (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
+}
+
 function generateId(prefix: string): string {
   try {
     return uuid();
@@ -488,20 +497,10 @@ export const useStore = create<AppState>()(
           newDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
 
-        // Mark past doses as overdue
-        const now = today();
-        const nt = nowTime();
-        const markedDoses = newDoses.map(d => {
-          if (d.scheduledDate < now || (d.scheduledDate === now && d.scheduledTime < nt)) {
-            return { ...d, status: 'overdue' as DoseStatus };
-          }
-          return d;
-        });
-
-        set(s => ({ scheduledDoses: [...s.scheduledDoses, ...markedDoses] }));
+        set(s => ({ scheduledDoses: [...s.scheduledDoses, ...newDoses] }));
         syncFireAndForget(
-          syncActivation(state.profile.id, active, markedDoses),
-          { kind: 'activation', payload: { userId: state.profile.id, active, doses: markedDoses } },
+          syncActivation(state.profile.id, active, newDoses),
+          { kind: 'activation', payload: { userId: state.profile.id, active, doses: newDoses } },
         );
         return active;
       },
@@ -844,6 +843,7 @@ export const useStore = create<AppState>()(
       },
 
       selectProgressSummaryForDates: (dates) => {
+        const profile = get().profile;
         const uniqueDates = [...new Set(dates)];
         let total = 0;
         let taken = 0;
@@ -854,7 +854,8 @@ export const useStore = create<AppState>()(
           total += doses.length;
           taken += doses.filter(d => d.status === 'taken').length;
           skipped += doses.filter(d => d.status === 'skipped').length;
-          overdue += doses.filter(d => d.status === 'overdue').length;
+          // legacy DB rows may have status='overdue'; new rows stay 'pending' — derive both
+          overdue += doses.filter(d => d.status === 'overdue' || isOverdue(d, profile)).length;
         }
         const pct = total ? Math.round((taken / total) * 100) : 0;
         return { total, taken, skipped, overdue, pct };
