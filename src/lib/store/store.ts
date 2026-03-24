@@ -103,6 +103,29 @@ function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
     (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
 }
 
+// ─── F5: getDayScheduleFromState ──────────────────────────────────────
+// Pure helper — returns sorted doses for a date from raw state slices.
+// Past dates: all doses (any protocol status) to preserve history.
+// Today/future: only doses belonging to active protocol instances.
+function getDayScheduleFromState(
+  scheduledDoses: ScheduledDose[],
+  activeProtocols: ActiveProtocol[],
+  date: string,
+): ScheduledDose[] {
+  const todayDate = today();
+  const sorted = (arr: ScheduledDose[]) =>
+    [...arr].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
+  if (date < todayDate) {
+    return sorted(scheduledDoses.filter(d => d.scheduledDate === date));
+  }
+  const activeIds = new Set(
+    activeProtocols.filter(ap => ap.status === 'active').map(ap => ap.id),
+  );
+  return sorted(
+    scheduledDoses.filter(d => d.scheduledDate === date && activeIds.has(d.activeProtocolId)),
+  );
+}
+
 // ─── F4: ExecutionEvent builder ────────────────────────────────────────
 // Constructs a local ExecutionEvent from a dose action at write time.
 // idempotencyKey matches the clientOperationId used in cloud sync so
@@ -361,8 +384,6 @@ interface AppState {
   removeProtocolItem: (protocolId: string, itemId: string) => void;
 
   // Actions — Schedule
-  getDaySchedule: (date: string) => ScheduledDose[];
-  selectAppActionableDoses: (date: string) => ScheduledDose[];
   selectAppNextDose: (date: string) => ScheduledDose | undefined;
   selectAppSummaryMetrics: (date: string) => { taken: number; total: number; pct: number };
   selectProtocolDetailReadModel: (protocolId: string, date: string) => {
@@ -381,9 +402,7 @@ interface AppState {
   selectProgressDayStatus: (date: string) => { taken: number; skipped: number; remaining: number };
   selectProgressDayProtocolStats: (date: string) => Record<string, { total: number; taken: number }>;
   selectProgressProtocolWeights: (dates: string[]) => Record<string, number>;
-  selectTodayScheduleView: (date: string) => ScheduledDose[];
   selectCalendarVisibleDoseDates: (anchorDate: string, lookbackDays?: number, lookaheadDays?: number) => string[];
-  selectHistoryDayRows: (date: string) => ScheduledDose[];
 
   // F3 — occurrence-based selectors (PlannedOccurrence extends ScheduledDose;
   // all existing consumers continue to work without changes).
@@ -798,41 +817,20 @@ export const useStore = create<AppState>()(
 
       // ── Schedule ──────────────────────────────────────────────────────
 
-      getDaySchedule: (date) => {
-        const todayDate = today();
-        const isPastDate = date < todayDate;
-        if (isPastDate) {
-          const pastDoses = get().scheduledDoses.filter(d => d.scheduledDate === date);
-          return pastDoses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-        }
-
-        const activeIds = new Set(
-          get().activeProtocols
-            .filter(ap => ap.status === 'active')
-            .map(ap => ap.id),
-        );
-        const doses = get().scheduledDoses.filter(
-          d => d.scheduledDate === date && activeIds.has(d.activeProtocolId),
-        );
-        return doses.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-      },
-
-      selectAppActionableDoses: (date) => {
-        const doses = get().getDaySchedule(date);
-        return doses.filter(d => d.status !== 'skipped' && d.status !== 'snoozed');
-      },
-
       selectAppNextDose: (date) => {
-        const actionable = get().selectAppActionableDoses(date);
+        const actionable = get().selectActionableOccurrences(date);
         return actionable
           .filter(d => d.status === 'pending' || (d.status as string) === 'upcoming')
           .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))[0];
       },
 
       selectAppSummaryMetrics: (date) => {
-        const actionable = get().selectAppActionableDoses(date);
-        const taken = actionable.filter(d => d.status === 'taken').length;
-        const total = actionable.length;
+        // Use getDayScheduleFromState directly — needs both taken + pending for accurate adherence %.
+        // Exclude superseded (snoozed origins) and snoozed to avoid double-counting.
+        const doses = getDayScheduleFromState(get().scheduledDoses, get().activeProtocols, date)
+          .filter(d => !d.successorDoseId && d.status !== 'snoozed');
+        const taken = doses.filter(d => d.status === 'taken').length;
+        const total = doses.length;
         const pct = total ? Math.round((taken / total) * 100) : 0;
         return { taken, total, pct };
       },
@@ -892,8 +890,8 @@ export const useStore = create<AppState>()(
       },
 
       selectProgressDayDoses: (date) => {
-        const doses = get().getDaySchedule(date);
-        return doses.filter(d => d.status !== 'snoozed');
+        return getDayScheduleFromState(get().scheduledDoses, get().activeProtocols, date)
+          .filter(d => d.status !== 'snoozed');
       },
 
       selectProgressSummaryForDates: (dates) => {
@@ -948,10 +946,6 @@ export const useStore = create<AppState>()(
         return weights;
       },
 
-      selectTodayScheduleView: (date) => {
-        return get().selectAppActionableDoses(date);
-      },
-
       selectCalendarVisibleDoseDates: (anchorDate, lookbackDays = 60, lookaheadDays = 60) => {
         const state = get();
         const parsedAnchor = parseISO(anchorDate);
@@ -981,42 +975,6 @@ export const useStore = create<AppState>()(
         return [...dates].sort();
       },
 
-      selectHistoryDayRows: (date) => {
-        const state = get();
-        const todayDate = today();
-        if (date >= todayDate) return [];
-
-        const recordByDoseId = new Map<string, DoseRecord[]>();
-        for (const record of state.doseRecords) {
-          const list = recordByDoseId.get(record.scheduledDoseId) ?? [];
-          list.push(record);
-          recordByDoseId.set(record.scheduledDoseId, list);
-        }
-
-        return state.scheduledDoses
-          .filter(dose => {
-            if (dose.scheduledDate !== date) return false;
-
-            // Explicit lineage: if this dose has a successor it was rescheduled (snoozed) away.
-            // Don't show it on the original day — the user mentally moved it.
-            // Fallback to legacy status/record check for rows created before F2.
-            if (dose.successorDoseId) return false;
-
-            const records = recordByDoseId.get(dose.id) ?? [];
-            const isHandledStatus = dose.status === 'taken' || dose.status === 'skipped';
-            const hasHandledRecord = records.some(
-              record => record.action === 'taken' || record.action === 'skipped',
-            );
-            // Legacy fallback: rows without successorDoseId may still have snoozed status/record.
-            const wasMovedLegacy = dose.status === 'snoozed'
-              || records.some(r => r.action === 'snoozed');
-            if (wasMovedLegacy) return false;
-
-            return isHandledStatus || hasHandledRecord;
-          })
-          .sort((a, b) => b.scheduledTime.localeCompare(a.scheduledTime));
-      },
-
       // ── F3 occurrence-based selectors ─────────────────────────────────
       //
       // selectActionableOccurrences replaces selectAppActionableDoses as the
@@ -1027,7 +985,7 @@ export const useStore = create<AppState>()(
       // history surfaces, using the same occurrence projection.
 
       selectActionableOccurrences: (date) => {
-        const doses = get().getDaySchedule(date);
+        const doses = getDayScheduleFromState(get().scheduledDoses, get().activeProtocols, date);
         return doses
           .filter(d => {
             const o = projectToOccurrence(d);
