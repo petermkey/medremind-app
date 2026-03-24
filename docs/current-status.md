@@ -9,7 +9,9 @@ Owner: engineering runtime status on current `main`
 
 ## 1. Current maturity
 
-Overall: beta with hardened auth/session flows, lifecycle command paths, additive write-through paths, read-model selector migration, migration tooling landed, and recent UX improvements to dose cards and progress screen.
+Overall: beta with hardened auth/session flows, lifecycle command paths, additive write-through paths, read-model selector migration, recent UX improvements to dose cards and progress screen, and **fully hardened lifecycle invariants** (archival/pause/resume/complete) verified via E2E.
+- Authoritative specification: `docs/lifecycle-contract-v1.md`
+- Implementation state summary: `docs/medication-lifecycle-current-main.md`
 
 ## 2. Landed behavior on main
 
@@ -90,11 +92,13 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 
 ### Protocols screen UX
 
-- Default filter is "Active"; "All" moved to end.
+- Default filter is "Active" (renamed to "Current", includes paused); "All" includes archived protocols.
 - Swipe-to-reveal Edit/Delete actions on protocol rows.
+- Standard "Delete" button on Protocol Detail page for reliable archival/deletion.
 - Dose actions disabled for paused protocol rows.
 - Guidance toasts for blocked past-day or paused-protocol dose actions.
 - Future-date lock banner and history-date info banner in schedule view.
+- "Course finished" banner on detail page when `endDate` has passed.
 
 ### Command-based sync and additive write-through
 
@@ -130,7 +134,8 @@ Landed implementation slices on `main`:
 
 ### Operational (live environment execution)
 
-- D2 dry-run/apply/rerun validation on real data.
+- P2 lifecycle hardening: invariants, UX refinements, and archival flow (landed and verified via E2E).
+- D2 dry-run/apply/rerun validation on real data (NEXT).
 - D3 dry-run/apply/rerun validation on real data.
 - C5 parity validation runs and anomaly triage.
 - D4 consistency checks and severity triage.
