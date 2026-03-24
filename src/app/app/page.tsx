@@ -52,6 +52,7 @@ export default function SchedulePage() {
     takeDose,
     skipDose,
     snoozeDose,
+    removeDose,
     endProtocolFromToday,
     scheduledDoses,
     doseRecords,
@@ -157,10 +158,16 @@ export default function SchedulePage() {
     if (!dose) return;
     setDeleteTargetDose(null);
     if (option === 'today') {
-      skipDose(dose.id);
+      // For history dates skipDose leaves the card visible (shows as Skipped),
+      // so hard-remove the dose row instead.
+      if (dose.scheduledDate < todayStr) {
+        removeDose(dose.id);
+      } else {
+        skipDose(dose.id);
+      }
       show(`Dose removed for today`, 'warning');
     } else {
-      endProtocolFromToday(dose.activeProtocolId, dose.id);
+      endProtocolFromToday(dose.activeProtocolId, dose.id, dose.scheduledDate);
       show(`${dose.protocolItem.name} removed from schedule`, 'warning');
     }
   }

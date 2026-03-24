@@ -24,6 +24,7 @@ import {
   syncProtocolUpsert,
   syncRegeneratedDoses,
   syncEndProtocolFromTodayCommand,
+  syncRemoveDoseCommand,
 } from '@/lib/supabase/realtimeSync';
 import {
   enqueueSyncOperation,
@@ -331,7 +332,8 @@ interface AppState {
   takeDose: (doseId: string, note?: string) => void;
   skipDose: (doseId: string, note?: string) => void;
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
-  endProtocolFromToday: (activeProtocolId: string, doseId: string) => void;
+  removeDose: (doseId: string) => void;
+  endProtocolFromToday: (activeProtocolId: string, doseId: string, fromDate?: string) => void;
   regenerateDoses: (activeProtocolId: string) => void;
 
   // Actions — Settings
@@ -1134,30 +1136,42 @@ export const useStore = create<AppState>()(
         }
       },
 
-      endProtocolFromToday: (activeProtocolId, doseId) => {
+      removeDose: (doseId) => {
         const state = get();
-        const todayDate = today();
+        const profileId = state.profile?.id;
+        set(s => ({
+          scheduledDoses: s.scheduledDoses.filter(d => d.id !== doseId),
+        }));
+        if (profileId) {
+          syncFireAndForget(
+            syncRemoveDoseCommand(profileId, doseId),
+            { kind: 'removeDose', payload: { userId: profileId, doseId } },
+          );
+        }
+      },
+
+      endProtocolFromToday: (activeProtocolId, doseId, fromDate) => {
+        const state = get();
+        // Use the provided fromDate (e.g. a past dose's scheduledDate) or fall back to today.
+        const cutoffDate = fromDate ?? today();
         const profileId = state.profile?.id;
 
-        // Skip today's dose
-        get().skipDose(doseId);
-
-        // Remove future doses and update end_date locally
+        // Remove the target dose and all doses from cutoffDate onwards for this protocol.
         set(s => ({
           scheduledDoses: s.scheduledDoses.filter(d =>
-            !(d.activeProtocolId === activeProtocolId && d.scheduledDate > todayDate)
+            !(d.activeProtocolId === activeProtocolId && d.scheduledDate >= cutoffDate)
           ),
           activeProtocols: s.activeProtocols.map(ap =>
-            ap.id === activeProtocolId ? { ...ap, endDate: todayDate } : ap
+            ap.id === activeProtocolId ? { ...ap, endDate: cutoffDate } : ap
           ),
         }));
 
         if (profileId) {
           syncFireAndForget(
-            syncEndProtocolFromTodayCommand(profileId, activeProtocolId, todayDate),
+            syncEndProtocolFromTodayCommand(profileId, activeProtocolId, cutoffDate),
             {
               kind: 'endProtocolFromToday',
-              payload: { userId: profileId, activeProtocolId, today: todayDate },
+              payload: { userId: profileId, activeProtocolId, today: cutoffDate },
             },
           );
         }

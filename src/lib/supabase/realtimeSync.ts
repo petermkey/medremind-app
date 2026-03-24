@@ -1315,6 +1315,20 @@ export async function syncArchiveProtocolCommand(
   }
 }
 
+export async function syncRemoveDoseCommand(
+  userId: string,
+  doseId: string,
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  const cDoseId = cloudDoseId(userId, doseId);
+  const { error } = await supabase
+    .from('scheduled_doses')
+    .delete()
+    .eq('id', cDoseId)
+    .eq('user_id', userId);
+  if (error) throw new Error(`removeDose failed: ${error.message}`);
+}
+
 export async function syncEndProtocolFromTodayCommand(
   userId: string,
   activeProtocolId: string,
@@ -1323,18 +1337,24 @@ export async function syncEndProtocolFromTodayCommand(
   const supabase = getSupabaseClient();
   const cActiveId = cloudActiveId(userId, activeProtocolId);
 
+  // Set end_date to the day before cutoffDate so the protocol stops before that date.
+  const dayBefore = new Date(todayDate);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const endDate = dayBefore.toISOString().slice(0, 10);
+
   const { error: updateError } = await supabase
     .from('active_protocols')
-    .update({ end_date: todayDate })
+    .update({ end_date: endDate })
     .eq('id', cActiveId)
     .eq('user_id', userId);
   if (updateError) throw new Error(`endProtocolFromToday update failed: ${updateError.message}`);
 
+  // Delete the target dose and all doses on or after cutoffDate.
   const { error: deleteError } = await supabase
     .from('scheduled_doses')
     .delete()
     .eq('active_protocol_id', cActiveId)
     .eq('user_id', userId)
-    .gt('scheduled_date', todayDate);
+    .gte('scheduled_date', todayDate);
   if (deleteError) throw new Error(`endProtocolFromToday delete doses failed: ${deleteError.message}`);
 }

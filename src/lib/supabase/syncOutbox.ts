@@ -17,6 +17,7 @@ import {
   syncProtocolUpsert,
   syncRegeneratedDoses,
   syncEndProtocolFromTodayCommand,
+  syncRemoveDoseCommand,
 } from './realtimeSync';
 
 type SyncKind =
@@ -34,7 +35,8 @@ type SyncKind =
   | 'resumeCommand'
   | 'completeCommand'
   | 'archiveCommand'
-  | 'endProtocolFromToday';
+  | 'endProtocolFromToday'
+  | 'removeDose';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -106,6 +108,10 @@ type SyncPayloadMap = {
     activeProtocolId: string;
     today: string;
   };
+  removeDose: {
+    userId: string;
+    doseId: string;
+  };
 };
 
 export type SyncOperation =
@@ -123,7 +129,8 @@ export type SyncOperation =
   | { kind: 'resumeCommand'; payload: SyncPayloadMap['resumeCommand'] }
   | { kind: 'completeCommand'; payload: SyncPayloadMap['completeCommand'] }
   | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] }
-  | { kind: 'endProtocolFromToday'; payload: SyncPayloadMap['endProtocolFromToday'] };
+  | { kind: 'endProtocolFromToday'; payload: SyncPayloadMap['endProtocolFromToday'] }
+  | { kind: 'removeDose'; payload: SyncPayloadMap['removeDose'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -299,6 +306,8 @@ async function executeOperation(op: SyncOperation) {
         op.payload.activeProtocolId,
         op.payload.today,
       );
+    case 'removeDose':
+      return syncRemoveDoseCommand(op.payload.userId, op.payload.doseId);
     default:
       return Promise.resolve();
   }
