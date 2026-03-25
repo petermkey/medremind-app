@@ -15,7 +15,7 @@ const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
 };
 
 const FILTERS = [
-  { value: 'active', label: 'Active' },
+  { value: 'active', label: 'Current' },
   { value: 'templates', label: 'Templates' },
   { value: 'custom', label: 'My Protocols' },
   { value: 'all', label: 'All' },
@@ -26,6 +26,8 @@ export default function ProtocolsPage() {
   const {
     protocols,
     activeProtocols,
+    scheduledDoses,
+    doseRecords,
     activateProtocol,
     pauseProtocol,
     resumeProtocol,
@@ -71,17 +73,25 @@ export default function ProtocolsPage() {
   })();
 
   const filtered = dedupedProtocols.filter(p => {
-    if (p.isArchived) return false;
+    if (p.isArchived && filter !== 'all') return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-    const isActive = activeProtocols.some(ap => ap.protocolId === p.id && ap.status === 'active');
-    if (filter === 'active') return isActive;
+    const isCurrent = activeProtocols.some(
+      ap => ap.protocolId === p.id && (ap.status === 'active' || ap.status === 'paused'),
+    );
+    if (filter === 'active') return isCurrent;
     if (filter === 'templates') return p.isTemplate;
-    if (filter === 'custom') return !p.isTemplate;
+    if (filter === 'custom') return !p.isTemplate && !p.isArchived;
     return true;
   });
 
   function getActiveInstance(protocolId: string) {
-    return activeProtocols.find(ap => ap.protocolId === protocolId);
+    return activeProtocols.find(ap =>
+      ap.protocolId === protocolId && (ap.status === 'active' || ap.status === 'paused'),
+    ) ?? activeProtocols.find(ap => ap.protocolId === protocolId);
+  }
+
+  function getStatusLabel(status: string) {
+    return status === 'abandoned' ? 'archived' : status;
   }
 
   function handleActivate(protocolId: string) {
@@ -109,7 +119,20 @@ export default function ProtocolsPage() {
       show('Template protocols cannot be deleted', 'warning');
       return;
     }
-    if (!confirm(`Delete protocol "${protocol.name}"?`)) return;
+    const relatedActiveIds = activeProtocols
+      .filter(ap => ap.protocolId === protocol.id)
+      .map(ap => ap.id);
+    const relatedDoses = scheduledDoses.filter(d => relatedActiveIds.includes(d.activeProtocolId));
+    const relatedDoseIds = new Set(relatedDoses.map(d => d.id));
+    const hasDoseRecordHistory = doseRecords.some(r => relatedDoseIds.has(r.scheduledDoseId));
+    const hasHandledDoseStatus = relatedDoses.some(d =>
+      d.status === 'taken' || d.status === 'skipped' || d.status === 'snoozed',
+    );
+    const willArchive = hasDoseRecordHistory || hasHandledDoseStatus;
+    const confirmText = willArchive
+      ? `Archive protocol "${protocol.name}" and keep history?`
+      : `Delete protocol "${protocol.name}" permanently?`;
+    if (!confirm(confirmText)) return;
     const result = deleteProtocol(protocol.id);
     if (result.mode === 'archived') {
       show('Protocol archived to preserve handled history', 'warning');
@@ -181,21 +204,25 @@ export default function ProtocolsPage() {
               onEdit={() => router.push(`/app/protocols/${p.id}?edit=1`)}
               onDelete={() => handleDelete(p)}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3" data-protocol-name={p.name}>
                 <div className="w-10 h-10 rounded-xl bg-[rgba(59,130,246,0.12)] flex items-center justify-center text-xl flex-shrink-0">
                   {CATEGORY_ICONS[p.category] ?? '💊'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-[#F0F6FC] truncate">{p.name}</span>
-                    {instance && (
+                    {p.isArchived ? (
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B949E]">
+                        archived
+                      </span>
+                    ) : instance ? (
                       <span
                         className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
                         style={{ background: `${statusColor}20`, color: statusColor }}
                       >
-                        {instance.status}
+                        {getStatusLabel(instance.status)}
                       </span>
-                    )}
+                    ) : null}
                     {p.isTemplate && !instance && (
                       <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B5CF6]">
                         template

@@ -10,6 +10,11 @@ import { BottomNav } from '@/components/app/BottomNav';
 import { SyncStatusPill } from '@/components/app/SyncStatusPill';
 import { ToastProvider } from '@/components/ui/Toast';
 
+// Expose store for E2E test automation (safe: only runs client-side)
+if (typeof window !== 'undefined') {
+  (window as any).__medremindStore = useStore;
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { profile, setProfile, resetUserData } = useStore();
@@ -86,6 +91,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     registerServiceWorker();
     return () => { cancelled = true; };
   }, []);
+
 
   if (checking) return (
     <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">

@@ -104,6 +104,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     addProtocolItem,
     removeProtocolItem,
     regenerateDoses,
+    deleteProtocol,
   } = useStore();
   const { show } = useToast();
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -236,9 +237,20 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     show('✓ Protocol activated');
   }
 
+  function getStatusLabel(status: string) {
+    return status === 'abandoned' ? 'Archived' : status;
+  }
+
   const statusColor = !instance ? '#8B949E' :
     instance.status === 'active' ? '#10B981' :
     instance.status === 'paused' ? '#FBBF24' : '#8B949E';
+  const courseFinishedWithoutClosure = Boolean(
+    instance
+    && instance.status === 'active'
+    && instance.endDate
+    && instance.endDate < todayStr
+    && detailReadModel.actionableFutureRows.length === 0,
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -252,7 +264,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           </div>
           {instance && (
             <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-full flex-shrink-0" style={{ background: `${statusColor}20`, color: statusColor }}>
-              {instance.status}
+              {getStatusLabel(instance.status)}
             </span>
           )}
         </div>
@@ -270,7 +282,50 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           {detailReadModel.canComplete && instance && (
             <Button size="sm" variant="danger" onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }}>✓ Complete</Button>
           )}
+          {!protocol.isTemplate && (
+            <Button
+              size="sm"
+              variant="danger"
+              aria-label="Delete protocol"
+              data-testid="delete-protocol-button"
+              onClick={() => {
+                const confirmText = protocol.isArchived
+                  ? `Archive this protocol and keep history?`
+                  : `Delete protocol "${protocol.name}"?`;
+                if (!confirm(confirmText)) return;
+                const result = deleteProtocol(protocol.id);
+                if (result.mode === 'archived') {
+                  show('Protocol archived to preserve history', 'warning');
+                } else {
+                  show('Protocol deleted', 'warning');
+                }
+                router.replace('/app/protocols');
+              }}
+            >
+              🗑 Delete
+            </Button>
+          )}
         </div>
+
+        {courseFinishedWithoutClosure && instance && (
+          <div className="mt-3 bg-[rgba(251,191,36,0.12)] border border-[rgba(251,191,36,0.35)] rounded-xl p-3">
+            <div className="text-xs font-bold text-[#FBBF24] uppercase tracking-wide mb-1">Course finished</div>
+            <div className="text-sm text-[#E6EDF3]">
+              This course reached its end date. Mark as completed, or keep it active for history context.
+            </div>
+            {detailReadModel.canComplete && (
+              <div className="mt-2">
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }}
+                >
+                  ✓ Mark completed
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -309,6 +364,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             </div>
           ))}
         </div>
+
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
           <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Future plan</div>
           <div className="text-[12px] text-[#8B949E] mb-2">
