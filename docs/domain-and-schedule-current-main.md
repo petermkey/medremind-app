@@ -144,6 +144,16 @@ Activation path:
 - recurrence model is practical but not a full scheduling DSL
 - server-side canonical scheduling engine is not yet introduced
 
+## 9. Lifecycle hardening gaps on main (2026-03-25)
+
+The following gaps are tracked by the protocol lifecycle hardening plan (`PLAN2p`):
+
+- Some lifecycle transition validations are still UI-driven rather than strictly enforced in store actions.
+- Local field invariants for `pausedAt/completedAt` may transiently diverge before sync completion.
+- Timezone usage is not fully uniform across all date-boundary paths.
+- Protocols list default filter still does not treat `paused` as part of a single "current" set.
+- End-of-course and delete/archive flows require clearer pre-action UX messaging.
+
 The dose generation algorithm is now formally specified in `docs/lifecycle-contract-v1.md` §3.13.
 Future clients (iOS and others) must implement that specification — they must not derive generation
 behavior solely from `expandItemToDoses` in `store.ts`.

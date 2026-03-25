@@ -141,6 +141,21 @@ Landed implementation slices on `main`:
 2. Domain/schedule engine redesign and test deepening.
 3. UI/PWA pack audit.
 
+### Protocol lifecycle hardening plan status (`PLAN2p`)
+
+Reference plan: `PLAN2p.md` (external working plan used for lifecycle audit and execution sequencing)
+
+Current status on `main` as of 2026-03-25:
+
+- Option A (store-level lifecycle guards, local invariant alignment, timezone guard unification): **pending**
+- Option B (protocols UX refinement: Current filter, archive/delete clarity, end-of-course CTA, archived label wording): **pending**
+- Option C (duplicate-instance policy and broader domain evolution): **not started**, awaiting explicit product decision
+
+Practical implication:
+
+- The plan remains relevant.
+- Priority order remains Option A → Option B → Option C.
+
 ## 5. Risks still requiring discipline
 
 - Auth policy remains split across `src/proxy.ts` (server routing, `middleware.ts` delegates to it) and client bootstrap (`layout.tsx`).
