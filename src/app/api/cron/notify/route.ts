@@ -89,6 +89,22 @@ export async function GET(request: NextRequest) {
 
       const tz = profileRow?.timezone ?? 'UTC';
 
+      // ── Stale-claim recovery ─────────────────────────────────────────────
+      // If a cron worker crashed after writing the Pass A lock but before
+      // delivering the push, the row stays and blocks retries indefinitely.
+      // Treat any notification_count=1 row whose sent_at is older than
+      // 2× the fire window (i.e. the writer is clearly gone) as stale and
+      // delete it so the next Pass A window can re-claim it.
+      {
+        const staleCutoff = new Date(now.getTime() - WINDOW_MINUTES * 2 * 60 * 1000);
+        await supabase
+          .from('notification_log')
+          .delete()
+          .eq('user_id', userId)
+          .eq('notification_count', 1)
+          .lt('sent_at', staleCutoff.toISOString());
+      }
+
       // ── Pass A: Initial scheduled notifications ──────────────────────────
       {
         // Compute the target scheduled_time that maps to "now" given leadTimeMin.
@@ -149,49 +165,62 @@ export async function GET(request: NextRequest) {
           });
 
           if (eligibleDoses.length > 0) {
-            // Deduplication: filter out already-notified doses (initial not yet sent).
-            const doseIds = eligibleDoses.map(d => d.id);
-            const { data: alreadySent } = await supabase
-              .from('notification_log')
-              .select('scheduled_dose_id')
-              .eq('user_id', userId)
-              .in('scheduled_dose_id', doseIds);
+            // Fetch protocol item names for notification body.
+            const itemIds = [...new Set(eligibleDoses.map(d => d.protocol_item_id))];
+            const { data: items } = await supabase
+              .from('protocol_items')
+              .select('id, name')
+              .in('id', itemIds);
 
-            const sentSet = new Set((alreadySent ?? []).map(r => r.scheduled_dose_id));
-            const toNotify = eligibleDoses.filter(d => !sentSet.has(d.id));
+            const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
 
-            if (toNotify.length > 0) {
-              // Fetch protocol item names for notification body.
-              const itemIds = [...new Set(toNotify.map(d => d.protocol_item_id))];
-              const { data: items } = await supabase
-                .from('protocol_items')
-                .select('id, name')
-                .in('id', itemIds);
+            for (const dose of eligibleDoses) {
+              // Atomic Pass A lock: only one concurrent cron invocation may claim
+              // the initial send for this (user_id, scheduled_dose_id).
+              const { data: lockRows, error: lockErr } = await supabase
+                .from('notification_log')
+                .upsert(
+                  {
+                    user_id: userId,
+                    scheduled_dose_id: dose.id,
+                    sent_at: now.toISOString(),
+                    notification_count: 1,
+                  },
+                  { onConflict: 'user_id,scheduled_dose_id', ignoreDuplicates: true },
+                )
+                .select('scheduled_dose_id');
 
-              const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
+              if (lockErr) {
+                console.error('[cron/notify] Pass A lock failed', userId, dose.id, lockErr);
+                continue;
+              }
 
-              for (const dose of toNotify) {
-                const ap = Array.isArray(dose.active_protocols) ? dose.active_protocols[0] : dose.active_protocols;
-                const protocolName: string = (ap?.protocols as { name?: string } | null)?.name ?? 'Medication';
-                const itemName = itemNameMap.get(dose.protocol_item_id) ?? 'dose';
-                const time = dose.scheduled_time.slice(0, 5);
+              if (!lockRows || lockRows.length === 0) {
+                results.push({ userId, doseId: dose.id, status: 'already-locked', pass: 'A' });
+                continue;
+              }
 
-                const title = `MedRemind — ${time}`;
-                const body = `${itemName} (${protocolName})`;
-                const tag = `dose-${dose.id}`;
+              const ap = Array.isArray(dose.active_protocols) ? dose.active_protocols[0] : dose.active_protocols;
+              const protocolName: string = (ap?.protocols as { name?: string } | null)?.name ?? 'Medication';
+              const itemName = itemNameMap.get(dose.protocol_item_id) ?? 'dose';
+              const time = dose.scheduled_time.slice(0, 5);
 
-                const ok = await sendPush(userId, title, body, tag);
-                if (ok) {
-                  // Insert log row; update sent_at and notification_count on conflict
-                  // (safety net in case a row exists from a previous run edge case).
-                  await supabase.from('notification_log').upsert(
-                    { user_id: userId, scheduled_dose_id: dose.id, sent_at: now.toISOString(), notification_count: 1 },
-                    { onConflict: 'user_id,scheduled_dose_id' },
-                  );
-                  results.push({ userId, doseId: dose.id, status: 'sent', pass: 'A' });
-                } else {
-                  results.push({ userId, doseId: dose.id, status: 'send-failed', pass: 'A' });
-                }
+              const title = `MedRemind — ${time}`;
+              const body = `${itemName} (${protocolName})`;
+              const tag = `dose-${dose.id}`;
+
+              const ok = await sendPush(userId, title, body, tag);
+              if (ok) {
+                results.push({ userId, doseId: dose.id, status: 'sent', pass: 'A' });
+              } else {
+                // Release Pass A lock so the next cron window can retry.
+                await supabase
+                  .from('notification_log')
+                  .delete()
+                  .eq('user_id', userId)
+                  .eq('scheduled_dose_id', dose.id)
+                  .eq('notification_count', 1);
+                results.push({ userId, doseId: dose.id, status: 'send-failed', pass: 'A' });
               }
             }
           }
@@ -206,7 +235,7 @@ export async function GET(request: NextRequest) {
         // and the dose has not yet reached MAX_NOTIFICATIONS.
         const { data: logRows, error: logErr } = await supabase
           .from('notification_log')
-          .select('scheduled_dose_id, notification_count')
+          .select('scheduled_dose_id, notification_count, sent_at')
           .eq('user_id', userId)
           .lte('sent_at', reminderCutoff.toISOString())
           .lt('notification_count', MAX_NOTIFICATIONS);
@@ -220,6 +249,7 @@ export async function GET(request: NextRequest) {
 
         const candidateDoseIds = logRows.map(r => r.scheduled_dose_id);
         const logCountMap = new Map(logRows.map(r => [r.scheduled_dose_id, r.notification_count as number]));
+        const logSentAtMap = new Map(logRows.map(r => [r.scheduled_dose_id, r.sent_at as string]));
 
         // Check which of those doses are still pending/overdue with an active protocol.
         const { data: stillPending, error: pendingErr } = await supabase
@@ -274,24 +304,47 @@ export async function GET(request: NextRequest) {
           const time = dose.scheduled_time.slice(0, 5);
           const count = logCountMap.get(dose.id) ?? 1;
 
+          // Atomic Pass B reservation: move sent_at/notification_count forward
+          // only if the row is still eligible for reminder.
+          const { data: reservedRows, error: reserveErr } = await supabase
+            .from('notification_log')
+            .update({
+              sent_at: now.toISOString(),
+              notification_count: count + 1,
+            })
+            .eq('user_id', userId)
+            .eq('scheduled_dose_id', dose.id)
+            .lte('sent_at', reminderCutoff.toISOString())
+            .eq('notification_count', count)
+            .select('scheduled_dose_id');
+
+          if (reserveErr) {
+            console.error('[cron/notify] Pass B reserve failed', userId, dose.id, reserveErr);
+            continue;
+          }
+
+          if (!reservedRows || reservedRows.length === 0) {
+            results.push({ userId, doseId: dose.id, status: 'already-locked', pass: 'B' });
+            continue;
+          }
+
           const title = `⏰ Reminder — ${time}`;
           const body = `${itemName} (${protocolName})`;
           const tag = `dose-${dose.id}`;
 
           const ok = await sendPush(userId, title, body, tag);
           if (ok) {
-            // Update sent_at and increment notification_count.
-            await supabase.from('notification_log').upsert(
-              {
-                user_id: userId,
-                scheduled_dose_id: dose.id,
-                sent_at: now.toISOString(),
-                notification_count: count + 1,
-              },
-              { onConflict: 'user_id,scheduled_dose_id' },
-            );
             results.push({ userId, doseId: dose.id, status: 'sent', pass: 'B' });
           } else {
+            // Rollback the reservation so the next cron window can retry.
+            const prevSentAt = logSentAtMap.get(dose.id);
+            if (prevSentAt) {
+              await supabase
+                .from('notification_log')
+                .update({ sent_at: prevSentAt, notification_count: count })
+                .eq('user_id', userId)
+                .eq('scheduled_dose_id', dose.id);
+            }
             results.push({ userId, doseId: dose.id, status: 'send-failed', pass: 'B' });
           }
         }

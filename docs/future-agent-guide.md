@@ -137,16 +137,25 @@ If your task is to verify account-linking or merge PR #5: see `docs/auth-and-per
 - Flush sync now
 - Sign out (guarded: waits for in-flight + outbox)
 
-## 6. Deferred — what does NOT exist yet
+## 6. Implemented (push notifications)
 
-- Push notifications (VAPID keys in env vars, no service worker registered)
+**Push notifications** are fully implemented and deployed. See `docs/push-notifications-current-main.md` for:
+- iOS-only (home screen installed PWA)
+- Vercel cron every minute via cron-job.org
+- Two-pass firing: Pass A (initial) + Pass B (reminders with rollback on failure)
+- Stale-claim recovery for crashed workers
+- VAPID key management in Vercel env vars
+- End-to-end verified 2026-03-23
+
+## 7. Deferred — what does NOT exist yet
+
 - Email notifications
 - Server-side scheduling engine
 - Offline PWA (manifest present, no service worker)
 - Full auth/email-confirmation redesign
 - Multi-device outbox merge
 
-## 7. Persistence model
+## 8. Persistence model
 
 ### Local store (Zustand + persist)
 
@@ -169,7 +178,7 @@ Persisted keys: `profile`, `notificationSettings`, `protocols` (custom only), `a
 
 Legacy tables (`scheduled_doses`, `dose_records`) remain active during migration. Additive tables (`execution_events`, `planned_occurrences`) are being backfilled via D2/D3 operational tooling.
 
-## 8. Operational tooling scripts
+## 9. Operational tooling scripts (legacy)
 
 Only run with `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set. Always dry-run before apply.
 
@@ -182,14 +191,14 @@ Only run with `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set. Always dry-run b
 
 Run order: D2 → D3 → C5 → D4. Stop if severe anomalies appear.
 
-## 9. Test approach
+## 10. Test approach
 
 - `npm run build` — always run before merge
 - `npm run test:e2e` — Playwright E2E, run public smoke always
 - `npm run test:e2e:headed` — headed mode for debugging
 - No unit test suite present (gap)
 
-## 10. Branch naming
+## 11. Branch naming
 
 Use: `codex/<sprint-id>-<slice-name>`
 
@@ -199,3 +208,22 @@ Examples:
 - `codex/fix-snooze-edge-case`
 
 Forbidden styles: `codex/sprint-4x-*`, `codex/lifecycle-*`, anything without sprint id after `codex/`.
+
+## 12. Agent and skill toolkit
+
+See `CLAUDE.md` at repo root for the full agent/skill reference. Quick index:
+
+| When | Use |
+|---|---|
+| Starting any multi-file task | `planner` agent → writes `.claude/plan/<name>.md` |
+| Before opening a PR | `code-reviewer` agent, then `/verification-loop` |
+| Build or tsc fails | `build-error-resolver` agent |
+| Touching API routes/auth | `security-reviewer` agent |
+| Long session / context filling | `/strategic-compact` skill |
+| After completing a feature | `doc-updater` agent |
+
+Hooks run automatically — no action required:
+- `post-edit-typecheck` runs `tsc --noEmit` after every `.ts/.tsx` edit
+- `pre-bash-commit-quality` checks staged files before every commit
+- `pre-bash-block-no-verify` blocks `--no-verify` unconditionally
+- `pre-write-config-protection` blocks edits to tsconfig.json
