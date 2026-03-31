@@ -35,16 +35,27 @@ Status: Implemented, deployed to production, **verified end-to-end 2026-03-23**
 2. `Notification.requestPermission()` → iOS system dialog
 3. `pushManager.getSubscription() ?? pushManager.subscribe({ userVisibleOnly, applicationServerKey })`
 4. On `QuotaExceededError` (iOS WebKit bug): unregisters SW, re-registers, retries subscribe
-5. Saves `{user_id, endpoint, p256dh, auth}` to `push_subscriptions` via delete+insert
+5. Saves `{user_id, endpoint, p256dh, auth}` to `push_subscriptions` **with single-device enforcement**: older endpoints for the user are deleted first (see `subscription.ts` lines 102–106). If multi-device support is added later, remove the delete and deduplicate in the send path instead.
 6. `saveNotificationSettingsToSupabase()` upserts `{push_enabled, lead_time_min, ...}` to `notification_settings` — **critical for cron to find the user**
 
-### Notification delivery (cron)
+### Notification delivery (cron) — two-pass firing with reliability
+
+**Pass A: Initial scheduled notifications**
 1. cron-job.org hits `GET /api/cron/notify` every minute with `Authorization: Bearer $CRON_SECRET`
-2. Queries `notification_settings` where `push_enabled = true`
-3. For each user: computes target time with `lead_time_min` offset, queries `scheduled_doses` in ±1 min window
-4. Lifecycle filters: `active` protocols only, `pending`/`overdue` doses, within `end_date`
-5. Deduplicates via `notification_log` (upsert on `user_id, scheduled_dose_id`)
-6. Calls `POST /api/push/send` per dose → `webpush.sendNotification()` → Apple APNs
+2. Before processing each user: **stale-claim recovery** deletes `notification_log` rows with `notification_count=1` older than 2× WINDOW_MINUTES (2 min). This unblocks doses whose Pass A lock was written by a crashed worker that never delivered the push.
+3. Queries `notification_settings` where `push_enabled = true`
+4. For each user: computes target time with `lead_time_min` offset, queries `scheduled_doses` in ±1 min window
+5. Lifecycle filters: `active` protocols only, `pending`/`overdue` doses, within `end_date`
+6. Atomic Pass A lock: upsert `notification_log` with `notification_count=1` using `onConflict: ignoreDuplicates` to ensure only one cron worker claims the initial send per dose.
+7. Calls `POST /api/push/send` per dose → `webpush.sendNotification()` → Apple APNs
+8. On success: lock remains; Pass B will later remind
+9. On failure: **lock is deleted immediately** (lines 217–222) so the next cron window can retry the initial send without waiting
+
+**Pass B: Reminder notifications for unactioned doses**
+1. Find log rows where `sent_at ≤ now - REMINDER_INTERVAL_MINUTES` and `notification_count < MAX_NOTIFICATIONS`
+2. Atomic Pass B reservation: update `sent_at` and increment `notification_count` only if the row still matches the window conditions
+3. On success: sends reminder push
+4. On failure: **rolls back reservation** (lines 339–347) — reverts `sent_at` and `notification_count` to previous values so the next cron window can retry the reminder without losing track of the attempt count
 
 ---
 
@@ -116,7 +127,27 @@ curl https://medremind-app-two.vercel.app/api/cron/notify \
 
 ---
 
-## 9. Incidents & fixes (2026-03-23)
+## 9. Reliability features (added 2026-04-01)
+
+### Stale-claim recovery
+
+**Problem:** If a cron worker crashes after writing the Pass A lock (`notification_count=1`) but before calling `/api/push/send`, the row remains indefinitely and blocks all future Pass A attempts for that dose. The dose will never fire.
+
+**Solution:** Before processing each user, delete any `notification_count=1` rows whose `sent_at` is older than 2× WINDOW_MINUTES (i.e., 2 minutes). A worker writing the lock has 2 minutes to deliver; if the timestamp is older, the writer is clearly gone and the row is safe to reclaim.
+
+**Implementation:** Lines 92–106 of `/api/cron/notify`.
+
+### Pass B rollback on transient send failure
+
+**Problem:** When Pass B (reminder) increments `sent_at` and `notification_count` and then the push send fails transiently (network error, quota exceeded, etc.), the reservation update is lost. The next cron window will not find the dose because `sent_at` is already ahead of the reminder cutoff window.
+
+**Solution:** On send failure in Pass B, immediately update the row back to its pre-reservation state using the cached `prevSentAt` and previous `notification_count`. The dose remains in the reminder queue and will be attempted again on the next cron window.
+
+**Implementation:** Lines 339–347 of `/api/cron/notify`.
+
+---
+
+## 10. Incidents & fixes (2026-03-23)
 
 ### Bug: `RangeError: Invalid time value` in `/api/cron/notify`
 
