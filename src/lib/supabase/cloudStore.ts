@@ -109,8 +109,8 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     supabase.from('drugs').select('*').eq('created_by', user.id).eq('is_custom', true),
     supabase.from('protocols').select('*').eq('owner_id', user.id),
     supabase.from('active_protocols').select('*').eq('user_id', user.id),
-    supabase.from('scheduled_doses').select('*').eq('user_id', user.id),
-    supabase.from('dose_records').select('*').eq('user_id', user.id),
+    supabase.from('scheduled_doses').select('*').eq('user_id', user.id).limit(10000),
+    supabase.from('dose_records').select('*').eq('user_id', user.id).limit(10000),
   ]);
 
   if (profileRes.error) {
