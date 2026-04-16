@@ -14,6 +14,7 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 ## Current Functional Scope
 
 - Authentication: register, login, onboarding
+  - Google OAuth sign-in (`/login`, `/register`, callback `/auth/callback`)
   - confirmation-aware signup flow (no forced onboarding when email confirmation is pending)
   - resend confirmation actions with cooldown in confirmation-required states
 - Protocols:
@@ -29,7 +30,7 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
   - dose actions: take, skip, snooze
   - snooze options: `1 hour`, `this evening`, `tomorrow`, `next week`
 - Progress view:
-  - adherence summary, weekly bars, 30-day heatmap
+  - adherence summary, weekly bars, heatmap with 30/60/90-day toggle
 - Settings:
   - export snapshot
   - backup current state to cloud
@@ -105,6 +106,17 @@ Optional:
 - `npm run test:e2e`
 - `npm run test:e2e:headed`
 - `npm run test:e2e:install`
+
+## CI/CD and Runtime Pipelines
+
+- GitHub Actions: `.github/workflows/vercel.yml`
+  - triggers on `push` to `main` and on `pull_request` targeting `main`
+  - uses Node 20
+  - deploys to Vercel via `vercel deploy` (production on `main`)
+- Build mode: `next build --webpack` (set in `package.json`)
+- Scheduler pipeline:
+  - `vercel.json` keeps `"crons": []` (Vercel cron disabled on Hobby constraints)
+  - external cron-job.org job calls `GET /api/cron/notify` every minute with `Authorization: Bearer <CRON_SECRET>`
 
 ## Branch and Governance Rules
 

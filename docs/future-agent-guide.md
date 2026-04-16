@@ -1,6 +1,6 @@
 # Future Agent Guide
 
-Date: 2026-03-21
+Date: 2026-04-17
 Audience: agents starting work on this repository for the first time
 
 ## 1. Read order (mandatory)
@@ -8,8 +8,8 @@ Audience: agents starting work on this repository for the first time
 Read in this order before touching any file:
 
 1. `docs/project-rules-and-current-operating-model.md` — governance, branch naming, preflight rules
-2. `docs/agent-handoff-current-main.md` — where things stand TODAY, including branch and PR state
-3. `docs/current-status.md` — what is implemented, what is deferred, what is pending merge
+2. `docs/agent-handoff-current-main.md` — where things stand TODAY, including current branch/runtime state
+3. `docs/current-status.md` — what is implemented, what is deferred, what remains operational
 4. **`docs/lifecycle-contract-v1.md` — authoritative behavioral specification for all lifecycle logic**
 5. `docs/architecture-current-main.md` — full stack, routing, persistence, auth model
 6. `docs/auth-and-persistence-current-main.md` — auth flows, outbox, sign-out guard
@@ -37,22 +37,22 @@ Stop and report if:
 - branch context from a prior task is still present
 - required environment variables are missing for operational tasks
 
-## 3. Known branch state (as of 2026-03-21)
+## 3. Known branch state (as of 2026-04-17)
 
-Branch `codex/oauth-google-apple` is open as PR #5 against `main`. It is **committed and CI-green**. The main working tree is clean.
+OAuth and lifecycle hardening slices are already merged to `main`. The main working tree is expected to be clean at task start.
 
 | What | State |
 |------|-------|
-| Google OAuth (login + register + callback + middleware) | Committed on `codex/oauth-google-apple` |
+| Google OAuth (login + register + callback + middleware) | Committed on `main` |
 | Apple sign-in | **Removed permanently** — not on any branch, not deferred |
 | Build command | `next build --webpack` (Turbopack removed) |
 | CI | Green — source-based Vercel deploy |
 | Staging | Google OAuth verified end-to-end in real browser |
-| Merge gate | Account-linking verification required before production |
+| Production gate | Account-linking verification still required before production |
 
-If your task is unrelated to OAuth: the main branch is clean; create a new branch from `main` as normal.
+If your task is unrelated to OAuth: create a new branch from clean `main` as normal.
 
-If your task is to verify account-linking or merge PR #5: see `docs/auth-and-persistence-current-main.md` §15.
+If your task is to verify account-linking readiness: see `docs/auth-and-persistence-current-main.md` §15.
 
 ## 4. Lifecycle contract — what every agent must know
 
@@ -101,9 +101,9 @@ If your task is to verify account-linking or merge PR #5: see `docs/auth-and-per
 ### Auth
 - Email/password register with email confirmation gate
 - Login with email-unconfirmed detection and resend
-- Google OAuth (committed on `codex/oauth-google-apple`, staging-verified, PR #5 open)
-- OAuth PKCE callback route at `/auth/callback` (committed on `codex/oauth-google-apple`)
-- Session refresh + route guard entry via `middleware.ts` (committed on `codex/oauth-google-apple`, delegates to `proxy()`)
+- Google OAuth (committed on `main`, staging-verified)
+- OAuth PKCE callback route at `/auth/callback` (committed on `main`)
+- Session refresh + route guard entry via `middleware.ts` (committed on `main`, delegates to `proxy()`)
 - Apple sign-in: removed permanently
 
 ### Dose actions
@@ -151,7 +151,7 @@ If your task is to verify account-linking or merge PR #5: see `docs/auth-and-per
 
 - Email notifications
 - Server-side scheduling engine
-- Offline PWA (manifest present, no service worker)
+- Full offline caching strategy (service worker exists for push, but no offline data shell/cache model)
 - Full auth/email-confirmation redesign
 - Multi-device outbox merge
 
@@ -159,7 +159,7 @@ If your task is to verify account-linking or merge PR #5: see `docs/auth-and-per
 
 ### Local store (Zustand + persist)
 
-Persisted keys: `profile`, `notificationSettings`, `protocols` (custom only), `activeProtocols`, `scheduledDoses`, `doseRecords`, `drugs` (custom only). Seed templates re-merged on hydration.
+Persisted keys: `profile`, `notificationSettings`, `activeProtocols`, `protocols` (custom only). Seed templates are re-merged on hydration. `scheduledDoses` and `doseRecords` are intentionally not persisted (cloud-loaded on boot).
 
 ### Supabase tables (runtime-active)
 
@@ -203,7 +203,7 @@ Run order: D2 → D3 → C5 → D4. Stop if severe anomalies appear.
 Use: `codex/<sprint-id>-<slice-name>`
 
 Examples:
-- `codex/oauth-google-apple` (Google OAuth branch — committed, PR #5 open)
+- `codex/c5-validation-parity-tooling`
 - `codex/e2-progress-week2`
 - `codex/fix-snooze-edge-case`
 

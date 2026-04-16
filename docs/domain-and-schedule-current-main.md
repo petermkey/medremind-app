@@ -1,6 +1,6 @@
 # Domain and Schedule Logic (Current Main)
 
-Date: 2026-03-19 (lifecycle contract reference added 2026-03-21)
+Date: 2026-04-17
 Scope: protocol lifecycle, dose generation, schedule visibility, and read-model selectors on current `main`
 
 > **Lifecycle contract:** This document describes current web implementation behavior.
@@ -135,7 +135,7 @@ Activation path:
 
 ## History
 
-- past-date history surface uses `selectHistoryDayRows`
+- past-date history surface uses `selectHistoryOccurrences`
 - handled and lineage-relevant rows remain visible for history integrity
 
 ## 8. Known domain limitations (deferred)

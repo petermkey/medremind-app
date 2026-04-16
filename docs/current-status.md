@@ -1,6 +1,6 @@
 # MedRemind Current Status
 
-Date: 2026-03-22
+Date: 2026-04-17
 Owner: engineering runtime status on current `main`
 
 > **Lifecycle contract:** `docs/lifecycle-contract-v1.md` is the authoritative behavioral specification
@@ -26,7 +26,7 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Sign-out guard sequence (waits for in-flight sync + outbox flush before sign-out).
 - Server-side route guard (`src/proxy.ts`): unauthenticated `/app*` → `/login`; authenticated `/login`/`/register` → `/app`.
 
-**Committed on `codex/oauth-google-apple` (PR #5, staging-verified, pending merge):**
+**OAuth on `main`:**
 - Google OAuth — `/login` and `/register` pages have a Google button calling `signInWithOAuth('google')`.
 - `signInWithOAuth` in `auth.ts` — initiates `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`. Provider type narrowed to `'google'` only.
 - `/auth/callback/route.ts` — server-side PKCE code exchange; queries `profiles.onboarded`; redirects to `/app` or `/onboarding`; falls back to `/login?error=oauth`.
@@ -47,6 +47,14 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Provider-specific OAuth error messages.
 - Deep-link forwarding after OAuth redirect.
 - Full auth/email-confirmation architecture redesign (noted as deferred larger track).
+
+### Recent reliability hardening on main (2026-04)
+
+- Rolling-horizon dose refresh runs on app boot after cloud pull to regenerate forward pending slots when needed (`pullStoreFromSupabase` + `regenerateDoses`).
+- Supabase pull limits for `scheduled_doses` and `dose_records` raised to `10000` rows to avoid silent truncation.
+- Import upsert conflict handling for `scheduled_doses` hardened in `importStore.ts`.
+- Push cron reliability improved with stale-claim recovery and Pass B rollback on send failure.
+- Service worker notification policy updated to context-aware `renotify` behavior to prevent silent reminder replacements.
 
 ### Dose card UX (landed 2026-03-21)
 
@@ -109,7 +117,7 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Progress uses lifecycle-aware selectors (`selectProgressSummaryForDates`, `selectProgressDayProtocolStats`, `selectProgressDayStatus`, `selectProgressProtocolWeights`).
 - Protocol Detail uses `selectProtocolDetailReadModel`.
 - Calendar date projection uses `selectCalendarVisibleDoseDates`.
-- Past-date history surface uses `selectHistoryDayRows`.
+- Past-date history surface uses `selectHistoryOccurrences`.
 
 ## 3. Landed migration/tooling status
 
@@ -123,10 +131,11 @@ Landed implementation slices on `main`:
 
 ## 4. Remaining work categories
 
-### Work on `codex/oauth-google-apple` (committed, staging-verified, pending merge to main)
+### Production readiness checks
 
-- Google OAuth integration: `middleware.ts`, `src/app/auth/callback/route.ts`, login/register page updates, `signInWithOAuth` in `auth.ts`.
-- Merge gate: account-linking verification required before production deploy. See `docs/auth-and-persistence-current-main.md` §15.
+- Verify Supabase account-linking behavior for existing email/password users signing in with Google.
+- Confirm production Supabase OAuth settings and redirect allowlists.
+- Run live browser verification for login/logout/re-login scenarios under production config.
 
 ### Operational (live environment execution)
 
@@ -146,7 +155,7 @@ Landed implementation slices on `main`:
 - Auth policy remains split across `src/proxy.ts` (server routing, `middleware.ts` delegates to it) and client bootstrap (`layout.tsx`).
 - Store domain and sync concerns remain tightly coupled in `store.ts` (1234 lines).
 - Outbox remains device-local and can accumulate under prolonged failures.
-- **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled on project `hagypgvfkjkncznoctoq`, a user who created an email/password account and later signs in via Google with the same address lands in a duplicate empty account — medication data invisible. Do not merge PR #5 to production before this is confirmed enabled and tested live.
+- **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled on project `hagypgvfkjkncznoctoq`, a user who created an email/password account and later signs in via Google with the same address can land in a duplicate empty account (data appears missing).
 
 ## 6. Quality gate expectation for future slices
 
