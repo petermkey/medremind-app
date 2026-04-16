@@ -10,6 +10,7 @@ import type {
   ScheduledDose,
   UserProfile,
 } from '@/types';
+import { addDays, format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { SEED_DRUGS, SEED_PROTOCOLS } from '@/lib/data/seed';
 import { getSupabaseClient } from './client';
@@ -344,6 +345,21 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     doseRecords,
     drugs: [...SEED_DRUGS, ...customDrugs],
   });
+
+  // Rolling horizon: regenerate doses for active protocols that have
+  // no pending doses within the next 14 days (e.g. after a long gap).
+  const HORIZON_DAYS = 14;
+  const horizonDate = format(addDays(new Date(), HORIZON_DAYS), 'yyyy-MM-dd');
+  const storeActions = useStore.getState();
+  for (const ap of activeProtocols) {
+    if (ap.status !== 'active') continue;
+    const hasFutureDoses = scheduledDoses.some(
+      d => d.activeProtocolId === ap.id && d.scheduledDate >= horizonDate && d.status === 'pending',
+    );
+    if (!hasFutureDoses) {
+      storeActions.regenerateDoses(ap.id);
+    }
+  }
 
   return {
     customDrugs: customDrugs.length,
