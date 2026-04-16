@@ -1,5 +1,8 @@
 # Sprint 2B Read-Model Plan (Historical Design Snapshot)
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 Date: 2026-03-19
 Status: historical design artifact (not current source-of-truth)
 
