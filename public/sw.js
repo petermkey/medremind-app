@@ -30,15 +30,23 @@ self.addEventListener('push', (event) => {
     payload = { title: 'MedRemind', body: event.data.text(), url: '/app' };
   }
 
-  const { title = 'MedRemind', body = '', url = '/app', tag } = payload;
+  const { title = 'MedRemind', body = '', url = '/app', tag, dedupeId } = payload;
+
+  // renotify policy:
+  //   tag present, no dedupeId          → new reminder on existing slot, re-alert the user
+  //   tag present, valid dedupeId       → exact duplicate delivery, suppress re-alert
+  //   no tag                            → generic fallback, use unique tag so it never
+  //                                       overwrites an active reminder notification
+  const hasValidDedupeId = typeof dedupeId === 'string' && dedupeId.length > 0;
+  const notificationTag = tag ?? `medremind-fallback-${Date.now()}`;
+  const renotify = tag != null && !hasValidDedupeId;
 
   const options = {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: tag ?? 'medremind-dose',
-    // renotify: show a new notification even if one with the same tag is active.
-    renotify: Boolean(tag),
+    tag: notificationTag,
+    renotify,
     data: { url },
     // iOS 16.4+ honors requireInteraction on Home Screen PWA.
     requireInteraction: false,

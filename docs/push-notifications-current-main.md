@@ -127,7 +127,25 @@ curl https://medremind-app-two.vercel.app/api/cron/notify \
 
 ---
 
-## 9. Reliability features (added 2026-04-01)
+## 9. Service Worker notification policy (updated 2026-04-02)
+
+### `renotify` logic — `public/sw.js`
+
+The service worker applies context-aware re-alert behaviour based on the push payload:
+
+| Payload | `tag` set? | `dedupeId` valid? | `renotify` | Effect |
+|---|---|---|---|---|
+| Dose reminder (Pass A/B) | yes | no | `true` | Re-alerts user (sound/vibration) even if same-slot notification is visible |
+| Exact duplicate delivery (retry with dedupeId) | yes | yes (non-empty string) | `false` | Silently replaces — no re-alert |
+| Fallback / untagged | no | — | `false` | Uses unique `medremind-fallback-<ts>` tag — cannot overwrite active reminder |
+
+**Why this matters:** Before this change, `renotify: false` was hardcoded, which meant Pass B reminder pushes (and any retry) would silently replace the existing notification without triggering a fresh sound/vibration alert. Missed medication reminders were the result.
+
+**`dedupeId` field:** Optional string the server can include in the push payload to mark an exact duplicate delivery (same event, retried). Currently unused by the server — included for future use.
+
+---
+
+## 10. Reliability features (added 2026-04-01)
 
 ### Stale-claim recovery
 
