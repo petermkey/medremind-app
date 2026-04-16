@@ -277,7 +277,9 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
 
   if (scheduledRows.length) {
     for (const part of chunk(scheduledRows, 250)) {
-      const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
+      const { error } = await supabase.from('scheduled_doses').upsert(part, {
+        onConflict: 'active_protocol_id,protocol_item_id,scheduled_date,scheduled_time',
+      });
       if (error) throw new Error(`Scheduled doses import failed: ${error.message}`);
     }
     summary.scheduledDoses = scheduledRows.length;
