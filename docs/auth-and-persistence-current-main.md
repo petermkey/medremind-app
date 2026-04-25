@@ -241,7 +241,7 @@ This sequence protects against silent data loss during pending writes on sign-ou
 
 Persisted Zustand store keys: `profile`, `notificationSettings`, `activeProtocols`, `protocols` (custom only). Seed templates are re-merged on hydration.
 
-Not persisted intentionally: `scheduledDoses` and `doseRecords` (large datasets; loaded from cloud on boot), `drugs` (seed set is merged during hydrate).
+Not persisted intentionally: `scheduledDoses`, `doseRecords`, and `executionEvents` (large or cloud-owned datasets; loaded from cloud on boot where applicable), `drugs` (seed set is merged during hydrate). Hydration also ignores stale copies of these volatile slices from older localStorage payloads.
 
 Outbox:
 - Local key: `medremind-sync-outbox-v1`

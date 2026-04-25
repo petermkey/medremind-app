@@ -473,6 +473,7 @@ export const useStore = create<AppState>()(
         activeProtocols: [],
         scheduledDoses: [],
         doseRecords: [],
+        executionEvents: [],
         drugs: SEED_DRUGS,
       }),
 
@@ -509,6 +510,7 @@ export const useStore = create<AppState>()(
         activeProtocols: [],
         scheduledDoses: [],
         doseRecords: [],
+        executionEvents: [],
         drugs: SEED_DRUGS,
       }),
 
@@ -1388,9 +1390,13 @@ export const useStore = create<AppState>()(
       // Merge with seed data on rehydration
       merge: (persisted: unknown, current) => {
         const p = persisted as Partial<AppState>;
+        // Keep cloud-owned, high-churn slices out of hydration even if an older
+        // app version left them in localStorage.
         return {
           ...current,
-          ...p,
+          profile: p.profile ?? current.profile,
+          notificationSettings: p.notificationSettings ?? current.notificationSettings,
+          activeProtocols: p.activeProtocols ?? current.activeProtocols,
           protocols: [...SEED_PROTOCOLS, ...(p.protocols ?? [])],
           drugs: SEED_DRUGS,
         };

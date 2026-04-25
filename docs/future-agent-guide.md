@@ -159,7 +159,7 @@ If your task is to verify account-linking readiness: see `docs/auth-and-persiste
 
 ### Local store (Zustand + persist)
 
-Persisted keys: `profile`, `notificationSettings`, `activeProtocols`, `protocols` (custom only). Seed templates are re-merged on hydration. `scheduledDoses` and `doseRecords` are intentionally not persisted (cloud-loaded on boot).
+Persisted keys: `profile`, `notificationSettings`, `activeProtocols`, `protocols` (custom only). Seed templates are re-merged on hydration. `scheduledDoses`, `doseRecords`, and `executionEvents` are intentionally scrubbed during hydration even if an older app version left them in localStorage; schedule/history state must be loaded from Supabase on boot.
 
 ### Supabase tables (runtime-active)
 
