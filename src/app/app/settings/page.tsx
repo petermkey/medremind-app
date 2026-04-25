@@ -143,9 +143,11 @@ export default function SettingsPage() {
         return;
       }
     }
-    if (outbox.pending > 0 || outbox.running) {
+    const latestOutbox = getSyncStatusSnapshot();
+    setOutbox(latestOutbox);
+    if (latestOutbox.pending > 0 || latestOutbox.running) {
       setFlushing(true);
-      setSyncStatus(`Syncing ${outbox.pending} pending change(s) before sign out...`);
+      setSyncStatus(`Syncing ${latestOutbox.pending} pending change(s) before sign out...`);
       try {
         const result = await flushSyncOutbox(8_000);
         if (!result.ok) {
