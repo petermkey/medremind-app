@@ -30,6 +30,9 @@ The algorithm should use conservative, documented reference points rather than u
 - Generated daily targets with manual override.
 - Persisted target profile per user.
 - Target-aware daily food summary at the top of `/app/food`.
+- Historical day navigation for the food diary, similar to the medication schedule day selector.
+- Collapsible food entry cards that keep the diary compact while preserving full meal details on demand.
+- Confirmed swipe-to-delete for accidental or test food entries.
 - Manual water logging and daily water progress.
 - Ability to edit saved nutrition and hydration targets later.
 - Focused tests for calculation logic and the main food-target flow.
@@ -246,6 +249,24 @@ Example:
 
 `1,510 left`
 
+### Day Navigation
+
+The Food page should support scrolling back through past days, similar to the medication schedule.
+
+Default behavior:
+
+- Open on the user's current local date.
+- Provide a horizontal date strip or equivalent date selector above the target summary.
+- Allow selecting yesterday, earlier days, and returning to today.
+- The selected date drives food totals, hydration totals, entries, and the target card progress.
+- Global nutrition and hydration targets apply to every selected date in this slice.
+
+Data behavior:
+
+- Load a range around the selected date rather than only the current day.
+- Use the user's resolved timezone when deciding which entries belong to a local date.
+- If the user logs food while a past date is selected, save the entry against the selected local date using the current local time as the default time. Full time editing is out of scope for this slice.
+
 ### Hydration Summary
 
 Show hydration as a compact, separate tracker near the top of `/app/food`, below or adjacent to the food target cards.
@@ -260,6 +281,48 @@ It should show:
 Example:
 
 `Water 1.2 / 2.8 L - 1.6 L left`
+
+Hydration progress follows the selected date. Quick-add water logs should be added to the selected local date, matching the food logging rule.
+
+### Food Entry Cards
+
+Food entries appear below the target and hydration summaries.
+
+Each entry should be collapsible:
+
+- Collapsed state shows compact summary information only:
+  - time
+  - meal title
+  - calories
+  - protein, fat, carbs, and fiber when available
+  - confidence/source hint for photo-estimated entries
+- Expanded state shows full details:
+  - meal summary
+  - component list
+  - component quantities and confidence
+  - uncertainties
+  - detailed nutrient values shown today
+- Cards should default to collapsed after save and when opening a day with existing entries.
+- The user can tap a collapsed card to expand it and tap again to collapse it.
+
+### Food Entry Delete
+
+Users must be able to delete accidental or test food entries.
+
+Interaction:
+
+- Swipe a food entry card left to reveal a destructive delete action.
+- Tapping delete opens a confirmation prompt.
+- Confirming deletes the entry and its components from the selected day's diary.
+- Canceling returns the card to its normal state without deleting.
+
+Deletion behavior:
+
+- Delete is optimistic locally: the entry disappears immediately after confirmation.
+- The cloud delete must be durable through the sync outbox.
+- If sync is offline or fails, the pending delete remains queued and retried.
+- Food totals and target progress recalculate immediately after local delete.
+- Delete should be available for current and historical dates.
 
 ### Edit Targets
 
@@ -320,6 +383,16 @@ Suggested fields:
 
 Add RLS owner access policy and an index on `(user_id, consumed_at desc)`.
 
+### Food Entry Deletion
+
+Deleting a food entry should remove the parent `food_entries` row. `food_entry_components` already has a cascading foreign key and should be deleted by the database.
+
+Implementation decision:
+
+- Hard delete `food_entries` by `(id, user_id)` with outbox retry.
+- The local store should track pending deleted IDs while the outbox is waiting, so a background pull does not reintroduce an entry that the user already confirmed for deletion.
+- Soft deletes are out of scope for this slice.
+
 ## Client State Design
 
 Keep target and hydration state separate from the existing food entry store where practical.
@@ -342,12 +415,20 @@ The new store owns:
 - water totals for date
 - quick-add water action
 
+The existing food store should add:
+
+- selected-date-aware entry derivation
+- optimistic delete
+- durable `foodEntryDelete` outbox operation
+- pending delete filtering during pulls
+
 ## Error Handling
 
 - If target profile loading fails, keep the food diary usable and show a non-blocking "Targets unavailable" state.
 - If target saving fails, keep form values in memory and show retry.
 - If no target profile exists, show onboarding rather than silently using defaults.
 - If water logging fails, use the same optimistic local write plus durable retry pattern as food entry saves.
+- If food deletion sync fails, keep the delete queued and show the existing sync status pattern rather than restoring the deleted card.
 - Invalid inputs should be rejected before calculation with clear field-level messages.
 
 ## Validation Rules
@@ -383,7 +464,10 @@ Extend the authenticated food E2E coverage:
 
 - First `/app/food` visit with no target profile shows nutrition onboarding.
 - Completing onboarding shows Grid Cards with saved targets.
+- The date selector can move to yesterday and back to today, with selected-day totals updating.
 - Saving a food photo increases consumed values and reduces remaining values.
+- Food entry cards render collapsed by default and can expand to show component details.
+- Swipe-left delete asks for confirmation, removes the entry, and updates totals.
 - Editing targets updates the top cards.
 - Quick-add water increases daily water progress.
 
