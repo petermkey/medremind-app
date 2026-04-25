@@ -11,12 +11,13 @@
 When picking up this project, read in this order:
 
 1. `docs/project-rules-and-current-operating-model.md`
-2. `docs/agent-handoff-current-main.md` — current state including uncommitted working-tree changes
-3. `docs/future-agent-guide.md` — reading order, risk boundaries, feature map, persistence model
-4. `docs/current-status.md`
-5. `docs/architecture-current-main.md`
-6. `docs/system-logic.md`
-7. `README.md`
+2. `docs/agent-superpowers-workflow.md` — Codex/Claude Superpowers adapter and local precedence rules
+3. `docs/agent-handoff-current-main.md` — current state including uncommitted working-tree changes
+4. `docs/future-agent-guide.md` — reading order, risk boundaries, feature map, persistence model
+5. `docs/current-status.md`
+6. `docs/architecture-current-main.md`
+7. `docs/system-logic.md`
+8. `README.md`
 
 Historical incident/persistence/design reports in `docs/` are point-in-time artifacts and must not override the current source-of-truth documents above.
 
