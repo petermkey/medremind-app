@@ -51,7 +51,7 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 ### Recent reliability hardening on main (2026-04)
 
 - Rolling-horizon dose refresh runs on app boot after cloud pull to regenerate forward pending slots when needed (`pullStoreFromSupabase` + `regenerateDoses`).
-- Supabase pull limits for `scheduled_doses` and `dose_records` raised to `10000` rows to avoid silent truncation.
+- Supabase cloud pull for `scheduled_doses` and `dose_records` is paginated in 1000-row pages. Do not replace this with a single `.limit(...)` call: production Supabase REST can still cap the result at 1000 rows, which makes boot pull incomplete and can cause local pending dose regeneration after refresh.
 - Import upsert conflict handling for `scheduled_doses` hardened in `importStore.ts`.
 - Push cron reliability improved with stale-claim recovery and Pass B rollback on send failure.
 - Service worker notification policy updated to context-aware `renotify` behavior to prevent silent reminder replacements.
@@ -171,7 +171,7 @@ Practical implication:
 
 - Auth policy remains split across `src/proxy.ts` (server routing, `middleware.ts` delegates to it) and client bootstrap (`layout.tsx`).
 - Store domain and sync concerns remain tightly coupled in `store.ts` (1234 lines).
-- Dose persistence investigation is still open for live authenticated browser read-path verification if the user still sees lost intake state after production SHA `6e47068`. See `docs/dose-persistence-handoff-2026-04-25.md`.
+- Dose persistence investigation identified a production read-path truncation: one cloud pull returned exactly 1000 scheduled doses for an account with more than 3000 rows. The paginated cloud-pull fix must be deployed and verified in an authenticated browser. See `docs/dose-persistence-handoff-2026-04-25.md`.
 - Outbox remains device-local and can accumulate under prolonged failures.
 - **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled on project `hagypgvfkjkncznoctoq`, a user who created an email/password account and later signs in via Google with the same address can land in a duplicate empty account (data appears missing).
 

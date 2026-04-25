@@ -2,28 +2,30 @@
 
 Date: 2026-04-25
 Audience: next agent continuing the dose intake persistence investigation
-Status: current production write path verified; client restart/read-path verification still needs live authenticated browser confirmation
+Status: live authenticated browser reproduced the restart/read-path failure; current fix paginates cloud schedule/history pull before rolling-horizon regeneration
 
 ## 1. Executive summary
 
 The reported symptom is: after marking medication doses as taken and seeing the green sync checkmark, restarting the app makes intake information appear unsaved.
 
-Two fixes are now landed on `main` and deployed to production:
+Three persistence fixes are now relevant:
 
 | Commit | Purpose |
 |--------|---------|
 | `016d7e0` | Make dose actions durable across restart windows by queueing fallback outbox operations before direct sync completes and resolving scheduled-dose unique-slot conflicts. |
 | `e0123ff` | Scrub stale volatile dose state from Zustand hydration so old localStorage payloads cannot resurrect stale `scheduledDoses`, `doseRecords`, or `executionEvents` on boot. |
-| `6e47068` | Merge commit currently deployed to production at `https://medremind-app-two.vercel.app`. |
+| paginated cloud-pull fix | Paginate Supabase boot pull for `scheduled_doses` and `dose_records`; a single `.limit(10000)` request was still capped at 1000 rows in production. |
 
-Production `/api/version` was verified after deploy and returned:
+The old deployed production `/api/version` during the live browser reproduction returned:
 
 ```json
 {
-  "sha": "6e47068d926abf0a37141c9df55a37072d8e7cd2",
+  "sha": "10a05b635dd1f3c99c63e932dcaf516e1b35f3d6",
   "environment": "production"
 }
 ```
+
+After this fix is merged and deployed, verify `/api/version` returns the new merge SHA before retesting the UI.
 
 ## 2. Current source-of-truth files
 
@@ -122,6 +124,28 @@ Key file:
 
 - `src/lib/store/store.ts`
 
+### 4.4 Boot cloud pull truncated at 1000 scheduled doses
+
+Live Chrome DevTools verification on `https://medremind-app-two.vercel.app/app` reproduced the user symptom after the earlier fixes: marking a visible pending dose as taken showed a green synced state, but refreshing returned that row to pending.
+
+The database contained the canonical `taken` scheduled dose row and the new `dose_records` row. The problem was the read path:
+
+- production `scheduled_doses` count for the user was above 3000;
+- Settings "Restore from cloud" reported only `doses 1000`;
+- `pullStoreFromSupabase()` used one `.limit(10000)` request, but Supabase REST still returned only the server-capped first 1000 rows;
+- the missing future pending rows caused rolling-horizon regeneration to run, creating local pending rows with new ids;
+- the UI then displayed regenerated pending rows instead of the canonical cloud rows that already had `taken` status.
+
+Current behavior after the paginated cloud-pull fix:
+
+- `pullStoreFromSupabase()` reads `scheduled_doses` and `dose_records` in 1000-row `.range(...)` pages;
+- `scheduledDoses` and `doseRecords` summary counts should match cloud table counts for the authenticated user;
+- rolling-horizon regeneration should run only after a complete cloud pull, not after a silently truncated dataset.
+
+Key file:
+
+- `src/lib/supabase/cloudStore.ts`
+
 ## 5. Current client persistence model
 
 Local Zustand persistence stores only:
@@ -142,17 +166,18 @@ Schedule and history state after app boot must come from `pullStoreFromSupabase(
 
 ## 6. What remains to verify
 
-The remaining unknown is an authenticated browser/UI verification after `6e47068` is loaded.
+The remaining required verification is an authenticated browser/UI verification after the paginated cloud-pull fix is deployed.
 
 Verify the user's actual app instance, not a fresh anonymous DevTools tab:
 
-1. Confirm URL is `https://medremind-app-two.vercel.app` or another alias serving `6e47068`.
-2. Run `/api/version`; expected SHA is `6e47068d926abf0a37141c9df55a37072d8e7cd2` or newer.
+1. Confirm URL is `https://medremind-app-two.vercel.app` or another alias serving the new merge SHA after the fix lands.
+2. Run `/api/version`; expected SHA is the new merge SHA, not the old `10a05b635dd1f3c99c63e932dcaf516e1b35f3d6`.
 3. Confirm the authenticated user id in Supabase client session is `f9b36ee9-823a-4ec1-9648-e5a3e793e207`.
 4. Inspect `window.__medremindStore.getState()` after the app spinner clears.
-5. Confirm `scheduledDoses` includes the four `taken` rows above for `2026-04-25`.
-6. Confirm `selectActionableOccurrences('2026-04-25')` includes the taken rows if they belong to active protocols.
-7. Confirm the visible UI cards show `Taken` and the progress count includes them.
+5. Confirm Settings "Restore from cloud" reports the full scheduled-dose count, not exactly `doses 1000`.
+6. Confirm `scheduledDoses` includes the canonical `taken` rows above for `2026-04-25`.
+7. Mark one pending dose taken, wait for the green sync checkmark, refresh, and confirm the same dose remains taken.
+8. Confirm the visible UI cards show `Taken` and the progress count includes them.
 
 Useful browser-console probes in an authenticated session:
 
@@ -184,7 +209,7 @@ localStorage.getItem('medremind-sync-outbox-v1')
 If Supabase still contains `taken` rows but the UI does not show them, investigate in this order:
 
 1. **Wrong URL or stale alias:** the user may be opening an old preview URL rather than `https://medremind-app-two.vercel.app`.
-2. **Cloud pull failure:** `pullStoreFromSupabase()` can fail and app remains usable with local-only state; check console for `[cloud-pull-on-boot-failed]`.
+2. **Cloud pull failure or truncation:** `pullStoreFromSupabase()` can fail and app remains usable with local-only state; check console for `[cloud-pull-on-boot-failed]`. Also verify restore summary count is not exactly `doses 1000`.
 3. **Auth/session mismatch:** confirm actual authenticated `user.id`; a duplicate account was not found for `peter@alionuk.com`, but the live browser session still must be verified.
 4. **Cloud pull filtering:** `cloudStore.ts` drops scheduled rows if their `active_protocol_id` or `protocol_item_id` cannot be resolved into current in-memory `activeProtocols`/`protocols` maps.
 5. **Selector/UI filtering:** `/app` uses `selectActionableOccurrences` for today/future and `selectHistoryOccurrences` for past dates; active protocol status can hide non-history rows.
@@ -199,7 +224,7 @@ npm run build
 npm run test:e2e -- tests/e2e/smoke.spec.ts --grep "public smoke"
 ```
 
-Both passed after `e0123ff` and after merge to `main` at `6e47068`.
+Both passed locally after the paginated cloud-pull fix.
 
 Production deployment verification:
 
@@ -210,16 +235,10 @@ curl -fsS https://medremind-app-two.vercel.app/api/version
 Expected response contains:
 
 ```text
-6e47068d926abf0a37141c9df55a37072d8e7cd2
+the new merge SHA after the paginated cloud-pull fix lands
 ```
 
-GitHub Actions deploy run for `6e47068`:
-
-```text
-https://github.com/petermkey/medremind-app/actions/runs/24932276147
-```
-
-Status: success.
+After merge/push, use the latest GitHub Actions deploy run for the new merge SHA. The old production SHA during reproduction was `10a05b635dd1f3c99c63e932dcaf516e1b35f3d6`; do not retest against that build.
 
 ## 9. Safety notes for next agent
 

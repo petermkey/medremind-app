@@ -35,6 +35,13 @@ type SnapshotState = {
   drugs: Drug[];
 };
 
+type CloudRowsResult = {
+  data: Record<string, unknown>[];
+  error: { message: string } | null;
+};
+
+const CLOUD_PULL_PAGE_SIZE = 1000;
+
 function profileFromStoreForExport(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
   return {
@@ -89,6 +96,46 @@ function defaultNotificationSettings(): NotificationSettings {
   };
 }
 
+async function fetchAllUserRows(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  tableName: string,
+  userId: string,
+  orderBy: string[],
+): Promise<CloudRowsResult> {
+  const rows: Record<string, unknown>[] = [];
+  type CloudRangeQuery = {
+    order: (column: string, options: { ascending: boolean }) => CloudRangeQuery;
+    range: (from: number, to: number) => Promise<CloudRowsResult>;
+  };
+  const client = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          order: (column: string, options: { ascending: boolean }) => CloudRangeQuery;
+        };
+      };
+    };
+  };
+
+  for (let from = 0; ; from += CLOUD_PULL_PAGE_SIZE) {
+    let query = client
+      .from(tableName)
+      .select('*')
+      .eq('user_id', userId)
+      .order(orderBy[0] ?? 'id', { ascending: true });
+    for (const column of orderBy.slice(1)) {
+      query = query.order(column, { ascending: true });
+    }
+    const page = await query.range(from, from + CLOUD_PULL_PAGE_SIZE - 1);
+
+    if (page.error) return { data: rows, error: page.error };
+    rows.push(...(page.data ?? []));
+    if ((page.data ?? []).length < CLOUD_PULL_PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 export async function pullStoreFromSupabase(): Promise<PullSummary> {
   const supabase = getSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -101,16 +148,17 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     customDrugsRes,
     protocolsRes,
     activeRes,
-    scheduledRes,
-    recordsRes,
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('notification_settings').select('*').eq('user_id', user.id).maybeSingle(),
     supabase.from('drugs').select('*').eq('created_by', user.id).eq('is_custom', true),
     supabase.from('protocols').select('*').eq('owner_id', user.id),
     supabase.from('active_protocols').select('*').eq('user_id', user.id),
-    supabase.from('scheduled_doses').select('*').eq('user_id', user.id).limit(10000),
-    supabase.from('dose_records').select('*').eq('user_id', user.id).limit(10000),
+  ]);
+
+  const [scheduledRes, recordsRes] = await Promise.all([
+    fetchAllUserRows(supabase, 'scheduled_doses', user.id, ['scheduled_date', 'scheduled_time', 'id']),
+    fetchAllUserRows(supabase, 'dose_records', user.id, ['recorded_at', 'id']),
   ]);
 
   if (profileRes.error) {

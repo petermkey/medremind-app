@@ -83,6 +83,7 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 
 | Commit | What landed |
 |--------|------------|
+| paginated cloud-pull fix | fix(doses): paginate Supabase boot pull for `scheduled_doses` and `dose_records` so accounts above 1000 rows do not regenerate pending local doses after refresh |
 | `6e47068` | production merge: stale persisted dose-state hydration scrub, deployed to `medremind-app-two.vercel.app` |
 | `e0123ff` | fix(store): ignore stale `scheduledDoses`, `doseRecords`, and `executionEvents` from old localStorage payloads |
 | `016d7e0` | fix(doses): make dose action fallback outbox durable before direct sync settles and resolve cloud dose slot conflicts |
@@ -102,16 +103,17 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 
 ## 5b. Dose persistence restart-survival status (2026-04-25)
 
-Current production SHA verified at `https://medremind-app-two.vercel.app/api/version`: `6e47068d926abf0a37141c9df55a37072d8e7cd2`.
+Production SHA observed during the 2026-04-25 live browser reproduction at `https://medremind-app-two.vercel.app/api/version`: `10a05b635dd1f3c99c63e932dcaf516e1b35f3d6`. After the paginated pull fix lands, re-check `/api/version` before retesting.
 
 Latest fixes landed:
 
 - `016d7e0`: dose take/skip/snooze command fallback is queued before direct sync completes; unique scheduled-dose slot conflicts resolve to the canonical cloud row.
 - `e0123ff`: Zustand hydration whitelists persisted slices so stale localStorage cannot restore old `scheduledDoses`, `doseRecords`, or `executionEvents`.
+- Paginated cloud-pull fix: `pullStoreFromSupabase()` paginates `scheduled_doses` and `dose_records`. Live production showed one `.limit(10000)` request still returned exactly 1000 scheduled rows for a user with more than 3000 rows, causing rolling-horizon regeneration and visible pending rows after refresh.
 
-Production DB evidence for `peter@alionuk.com` after the first fix: write path is persisting dose intake rows. On `2026-04-25`, Supabase contained 38 scheduled doses, 4 `taken` scheduled rows, 12 `taken` dose records, and 8 successful post-deploy `take_command` sync operations with no post-deploy failures.
+Production DB evidence for `peter@alionuk.com` after the first fix: write path is persisting dose intake rows. On `2026-04-25`, Supabase contained 38 scheduled doses, 4 `taken` scheduled rows, 12 `taken` dose records, and successful post-deploy `take_command` sync operations with no post-deploy failures.
 
-If the symptom persists, continue with authenticated browser read-path verification, not a generic write-path assumption. Use `docs/dose-persistence-handoff-2026-04-25.md` as the focused continuation guide.
+If the symptom persists after the paginated pull fix is deployed, continue with authenticated browser read-path verification, not a generic write-path assumption. Use `docs/dose-persistence-handoff-2026-04-25.md` as the focused continuation guide.
 
 ## 6. Most important code surfaces
 

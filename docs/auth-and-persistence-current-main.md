@@ -161,7 +161,7 @@ Sequence on mount:
 5. If `profile.id !== user.id` (identity mismatch): `resetUserData()` to prevent cross-account bleed, then set new profile.
 6. `setProfile(user)`.
 7. If `!user.onboarded`: redirect to `/onboarding`.
-8. `pullWithRetry(3, 700ms backoff)` — cloud pull. Non-fatal on failure; local store remains usable.
+8. `pullWithRetry(3, 700ms backoff)` — cloud pull. Non-fatal on failure; local store remains usable. Large user-owned schedule/history tables are pulled with explicit range pagination in `src/lib/supabase/cloudStore.ts` because production Supabase REST can cap a single request at 1000 rows.
 9. Set `checking = false`.
 
 Render gates:
@@ -242,6 +242,8 @@ This sequence protects against silent data loss during pending writes on sign-ou
 Persisted Zustand store keys: `profile`, `notificationSettings`, `activeProtocols`, `protocols` (custom only). Seed templates are re-merged on hydration.
 
 Not persisted intentionally: `scheduledDoses`, `doseRecords`, and `executionEvents` (large or cloud-owned datasets; loaded from cloud on boot where applicable), `drugs` (seed set is merged during hydrate). Hydration also ignores stale copies of these volatile slices from older localStorage payloads.
+
+Cloud-owned schedule/history slices are loaded from Supabase on boot via `pullStoreFromSupabase()`. `scheduled_doses` and `dose_records` must remain paginated with `.range(...)`; using one `.limit(...)` request is unsafe for mature accounts because REST-side row caps can truncate the pull, after which rolling-horizon regeneration may create new local pending doses that hide canonical `taken` rows after refresh.
 
 Outbox:
 - Local key: `medremind-sync-outbox-v1`
