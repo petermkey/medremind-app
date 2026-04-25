@@ -30,6 +30,8 @@ import {
   enqueueSyncOperation,
   markSyncFailure,
   markSyncSuccess,
+  pumpOutbox,
+  removeQueuedSyncOperation,
   type SyncOperation,
 } from '@/lib/supabase/syncOutbox';
 
@@ -253,14 +255,22 @@ function buildLifecycleCommandOperationId(
 }
 
 function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
+  const queuedFallbackId = fallbackOp
+    ? enqueueSyncOperation(fallbackOp, { pump: false })
+    : null;
   const tracked = trackRealtimeSync(task);
   void tracked
     .then(() => {
+      if (queuedFallbackId) removeQueuedSyncOperation(queuedFallbackId);
       markSyncSuccess();
     })
     .catch((err: unknown) => {
       markSyncFailure(err);
-      if (fallbackOp) enqueueSyncOperation(fallbackOp);
+      if (queuedFallbackId) {
+        void pumpOutbox({ force: true });
+      } else if (fallbackOp) {
+        enqueueSyncOperation(fallbackOp);
+      }
     // Keep UX responsive; failed writes are queued for retry and logged for diagnostics.
     console.error('[realtime-sync]', err);
   });

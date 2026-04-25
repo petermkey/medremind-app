@@ -342,18 +342,29 @@ export function markSyncFailure(error: unknown) {
   emit();
 }
 
-export function enqueueSyncOperation(op: SyncOperation) {
-  if (!hasWindow()) return;
+export function enqueueSyncOperation(op: SyncOperation, options?: { pump?: boolean }): string | null {
+  if (!hasWindow()) return null;
   const queue = readQueue();
+  const id = crypto.randomUUID();
   queue.push({
     ...op,
-    id: crypto.randomUUID(),
+    id,
     attempts: 0,
     createdAt: Date.now(),
     nextAttemptAt: Date.now(),
   });
   writeQueue(queue);
-  void pumpOutbox();
+  if (options?.pump ?? true) void pumpOutbox();
+  return id;
+}
+
+export function removeQueuedSyncOperation(id: string) {
+  if (!hasWindow()) return;
+  const queue = readQueue();
+  const next = queue.filter(item => item.id !== id);
+  if (next.length === queue.length) return;
+  writeQueue(next);
+  scheduleNextPump(next);
 }
 
 export async function pumpOutbox(options?: { force?: boolean }) {
