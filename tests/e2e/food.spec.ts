@@ -103,8 +103,15 @@ async function finishOnboardingIfNeeded(page: Page) {
 async function loginAndOpenFood(page: Page) {
   await login(page);
   await finishOnboardingIfNeeded(page);
+  const foodEntriesResponse = page.waitForResponse(
+    response => response.url().includes('/rest/v1/food_entries') && response.request().method() === 'GET',
+    { timeout: 15_000 },
+  );
   await page.goto('/app/food');
   await expect(page.getByRole('heading', { name: 'Food' })).toBeVisible();
+  await foodEntriesResponse.catch(error => {
+    throw new Error(`Timed out waiting for initial food_entries load on /app/food: ${error}`);
+  });
   await waitForFoodEntriesLoad(page);
 }
 
@@ -130,6 +137,12 @@ async function uploadMealPhoto(page: Page, file = pngFile) {
   await page.locator('input[type="file"]').setInputFiles(file);
 }
 
+function foodCardByTitle(page: Page, title: string) {
+  return page.locator('.rounded-2xl').filter({
+    has: page.getByRole('heading', { name: title, exact: true }),
+  });
+}
+
 async function saveAnalyzedMealPhoto(
   page: Page,
   file: typeof pngFile,
@@ -139,19 +152,21 @@ async function saveAnalyzedMealPhoto(
 
   await uploadMealPhoto(page, file);
 
-  await expect(page.getByText('Draft', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: draft.title })).toBeVisible();
-  await expect(page.getByText(draft.summary)).toBeVisible();
-  await expect(page.getByText('Greek yogurt')).toBeVisible();
-  await expect(page.getByText(String(draft.nutrients.caloriesKcal))).toBeVisible();
-  await expect(page.getByText(`${draft.nutrients.proteinG}g`)).toBeVisible();
+  const draftCard = foodCardByTitle(page, draft.title);
+  await expect(draftCard.getByText('Draft', { exact: true })).toBeVisible();
+  await expect(draftCard.getByRole('heading', { name: draft.title, exact: true })).toBeVisible();
+  await expect(draftCard.getByText(draft.summary)).toBeVisible();
+  await expect(draftCard.getByText('Greek yogurt')).toBeVisible();
+  await expect(draftCard.getByText(String(draft.nutrients.caloriesKcal))).toBeVisible();
+  await expect(draftCard.getByText(`${draft.nutrients.proteinG}g`)).toBeVisible();
 
   await page.getByRole('button', { name: 'Save' }).click();
 
-  await expect(page.getByText('Draft', { exact: true })).not.toBeVisible();
-  await expect(page.getByRole('heading', { name: draft.title })).toBeVisible();
-  await expect(page.getByText('Photo · 88% confidence')).toBeVisible();
-  await expect(page.getByText('Greek yogurt')).toBeVisible();
+  await expect(draftCard.getByText('Draft', { exact: true })).not.toBeVisible();
+  const savedEntryCard = foodCardByTitle(page, draft.title);
+  await expect(savedEntryCard.getByRole('heading', { name: draft.title, exact: true })).toBeVisible();
+  await expect(savedEntryCard.getByText('Photo · 88% confidence')).toBeVisible();
+  await expect(savedEntryCard.getByText('Greek yogurt')).toBeVisible();
   await expect.poll(() => getTopDailyTotals(page)).toEqual({
     entryCount: baselineTotals.entryCount + 1,
     caloriesKcal: baselineTotals.caloriesKcal + draft.nutrients.caloriesKcal,
