@@ -5,6 +5,9 @@ URL: https://medremind-app-two.vercel.app/app
 Version endpoint: /api/version => sha 5e182e75dc9d31c0c8815a97228f40a951b30af9
 Supabase: https://hagypgvfkjkncznoctoq.supabase.co
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 > Historical production verification snapshot for this specific SHA. Current behavior source of truth is `docs/system-logic.md` and `docs/current-status.md`.
 
 ## Scope

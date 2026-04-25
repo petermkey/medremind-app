@@ -1,6 +1,6 @@
 # Auth and Persistence Behavior (Current Main)
 
-Date: 2026-03-21
+Date: 2026-04-17
 Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/restore, sign-out safety
 
 ---
@@ -9,11 +9,11 @@ Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/r
 
 | File | Status | Role |
 |------|--------|------|
-| `src/lib/supabase/auth.ts` | Committed (`codex/oauth-google-apple`) | All auth functions: sign-up, sign-in, sign-out, OAuth (Google only), resend, profile load |
-| `src/app/(auth)/login/page.tsx` | Committed (`codex/oauth-google-apple`) | Login UI with email/password + Google OAuth button |
-| `src/app/(auth)/register/page.tsx` | Committed (`codex/oauth-google-apple`) | Register UI with email/password + Google OAuth button |
-| `src/app/auth/callback/route.ts` | Committed (`codex/oauth-google-apple`) | OAuth PKCE code-exchange route handler |
-| `middleware.ts` (repo root) | Committed (`codex/oauth-google-apple`) | Delegates to `proxy()` — session refresh + route guard entry point |
+| `src/lib/supabase/auth.ts` | Committed (`main`) | All auth functions: sign-up, sign-in, sign-out, OAuth (Google only), resend, profile load |
+| `src/app/(auth)/login/page.tsx` | Committed (`main`) | Login UI with email/password + Google OAuth button |
+| `src/app/(auth)/register/page.tsx` | Committed (`main`) | Register UI with email/password + Google OAuth button |
+| `src/app/auth/callback/route.ts` | Committed (`main`) | OAuth PKCE code-exchange route handler |
+| `middleware.ts` (repo root) | Committed (`main`) | Delegates to `proxy()` — session refresh + route guard entry point |
 | `src/proxy.ts` | Committed | Server-side route guard (protects `/app*`, redirects authenticated users away from `/login`/`/register`) |
 | `src/app/app/layout.tsx` | Committed | Client-side app bootstrap gate (auth check, cloud pull, onboarding redirect) |
 | `src/lib/supabase/server.ts` | Committed | Server-side Supabase client factory (used by callback route) |
@@ -60,11 +60,11 @@ Scope: register/login/onboarding, OAuth, session bootstrap, cloud sync, import/r
 
 ---
 
-## 3. OAuth auth — Google only (committed, staging-verified)
+## 3. OAuth auth — Google only (committed on main)
 
-**Status:** Google OAuth is committed on branch `codex/oauth-google-apple` (PR #5 open against main). Google sign-in has been verified end-to-end in a real browser against the staging environment. Apple sign-in has been **removed** — no Apple button exists in the UI and the provider type is narrowed to `'google'` only in `auth.ts`.
+**Status:** Google OAuth is committed on `main`. Google sign-in has been verified end-to-end in a real browser against the staging environment. Apple sign-in has been **removed** — no Apple button exists in the UI and the provider type is narrowed to `'google'` only in `auth.ts`.
 
-Branch: `codex/oauth-google-apple` | PR #5 | Supabase project ref: `hagypgvfkjkncznoctoq`
+Supabase project ref: `hagypgvfkjkncznoctoq`
 Staging URL: `https://medremind-6m0wqxa7w-peter-7822s-projects.vercel.app`
 
 ### What is implemented
@@ -101,7 +101,7 @@ The callback route comment states: "The DB trigger guarantees a profiles row exi
 
 Runs on every request matching the pattern:
 ```
-/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)
+/((?!_next/static|_next/image|favicon.ico|manifest.json|icon-.*\\.png).*)
 ```
 
 Action: delegates entirely to `proxy()` from `src/proxy.ts`. `proxy()` creates a Supabase SSR client and calls `supabase.auth.getUser()`, which triggers cookie refresh on the response. Route protection also lives in `proxy()`.
@@ -199,7 +199,7 @@ Two layers:
 - Secondary auth gate; enforces onboarding redirect
 - Handles auth boot failure without infinite lock
 
-**`middleware.ts`** (repo root, committed on `codex/oauth-google-apple`):
+**`middleware.ts`** (repo root, committed on `main`):
 - Thin entry point — delegates entirely to `proxy()` from `src/proxy.ts`
 - `proxy()` handles both session refresh and route protection in one pass
 - Matcher: all routes except Next.js internals and static images
@@ -239,7 +239,9 @@ This sequence protects against silent data loss during pending writes on sign-ou
 
 ## 10. Local persistence and outbox model
 
-Persisted Zustand store keys: `profile`, `notificationSettings`, `protocols` (custom only), `activeProtocols`, `scheduledDoses`, `doseRecords`, `drugs` (custom only). Seed templates re-merged on hydration.
+Persisted Zustand store keys: `profile`, `notificationSettings`, `activeProtocols`, `protocols` (custom only). Seed templates are re-merged on hydration.
+
+Not persisted intentionally: `scheduledDoses` and `doseRecords` (large datasets; loaded from cloud on boot), `drugs` (seed set is merged during hydrate).
 
 Outbox:
 - Local key: `medremind-sync-outbox-v1`
@@ -292,7 +294,7 @@ The following auth behaviors are NOT implemented:
 
 ---
 
-## 15. OAuth verification state and readiness classification (2026-03-21, updated post-staging-verification)
+## 15. OAuth verification state and readiness classification (2026-04-17)
 
 ### Verified
 
@@ -345,4 +347,4 @@ All of the following must be completed before OAuth can go to production:
 | Staging | **VERIFIED WORKING** — Google OAuth verified end-to-end in browser |
 | Production | **Not ready** — account-linking unverified; production Supabase config not confirmed |
 
-PR #5 (`codex/oauth-google-apple` → `main`) is ready to merge pending account-linking verification. Merging without account-linking confirmation risks silent data loss for users who already have email/password accounts and attempt Google sign-in with the same address.
+OAuth is already merged to `main`; account-linking verification is still required before treating production rollout as safe.

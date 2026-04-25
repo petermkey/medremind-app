@@ -1,5 +1,8 @@
 # Sprint 4G D3 Planned Future Backfill Tooling
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 Date: 2026-03-19
 Status: landed tooling on `main` (operational execution pending in live environments)
 

@@ -2,6 +2,9 @@
 Date: 2026-03-18
 Owner: CTO / Backend Reliability / QA
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 > Historical incident closure pass. For current runtime logic and status, use `docs/system-logic.md` and `docs/current-status.md`.
 
 ## 1. Executive summary

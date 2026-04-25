@@ -1,5 +1,8 @@
 # Release Note — Swipe Targeting Fix (2026-03-18)
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 > Historical release note (point-in-time). Current source of truth is the current-main docs pack: `docs/agent-handoff-current-main.md`, `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`, and `docs/current-status-and-next-phase.md`.
 
 ## Bug

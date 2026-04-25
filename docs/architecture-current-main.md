@@ -1,11 +1,11 @@
 # Architecture (Current Main)
 
-Date: 2026-03-21 (updated post-OAuth staging verification)
-Source of truth: current `main` + branch `codex/oauth-google-apple` (PR #5 open, staging-verified)
+Date: 2026-04-17
+Source of truth: current `main`
 
 ## 1. Runtime stack and boundaries
 
-- Framework: Next.js App Router (`next@16`), React (`react@19`), TypeScript.
+- Framework: Next.js App Router (`next@16.2.2`), React (`react@19.2.4`), TypeScript (`v6`).
 - State: Zustand + `persist` in `src/lib/store/store.ts`.
 - Date/time logic: `date-fns`.
 - Cloud backend: Supabase auth + Postgres via browser/server clients.
@@ -15,9 +15,9 @@ Runtime boundaries:
 
 - App routes: `src/app/app/*`
 - Auth routes: `src/app/(auth)/*`
-- OAuth callback: `src/app/auth/callback/route.ts` (committed on `codex/oauth-google-apple`)
+- OAuth callback: `src/app/auth/callback/route.ts` (committed on `main`)
 - Route guard: `src/proxy.ts` (redirects `/app*` → `/login` when unauthenticated; redirects `/login`/`/register` → `/app` when authenticated)
-- Session refresh + route guard entry point: `middleware.ts` at repo root (committed on `codex/oauth-google-apple`, delegates entirely to `proxy()`)
+- Session refresh + route guard entry point: `middleware.ts` at repo root (committed on `main`, delegates entirely to `proxy()`)
 - App bootstrap/auth gate: `src/app/app/layout.tsx`
 - Sync/write model: `src/lib/supabase/realtimeSync.ts`
 - Retry/outbox: `src/lib/supabase/syncOutbox.ts`
@@ -30,7 +30,7 @@ Public/auth:
 - `/register`
 - `/login`
 - `/onboarding`
-- `/auth/callback` (OAuth PKCE exchange — committed on `codex/oauth-google-apple`)
+- `/auth/callback` (OAuth PKCE exchange — committed on `main`)
 
 Guarded app:
 
@@ -51,13 +51,13 @@ Two auth paths are implemented:
 - Login: `supabaseSignIn` → confirmation-required state or profile load → cloud pull → route by `onboarded`
 - Confirmation-aware: unconfirmed signups do not force onboarding; login surfaces resend with 30s cooldown
 
-**OAuth — Google only** (committed on `codex/oauth-google-apple`, staging-verified):
+**OAuth — Google only** (committed on `main`):
 - Login and register pages have a Google button wired to `signInWithOAuth('google')`. Apple sign-in removed permanently.
 - `signInWithOAuth` calls `supabase.auth.signInWithOAuth` with `redirectTo: /auth/callback`
 - `middleware.ts` delegates to `proxy()`, which handles both session refresh (PKCE cookie propagation) and route protection
 - `/auth/callback/route.ts` exchanges code for session, checks `profiles.onboarded`, redirects to `/app` or `/onboarding`
 - On OAuth failure: redirects to `/login?error=oauth`
-- Google OAuth verified end-to-end in real browser against staging. Account-linking unverified — production gate remains open.
+- Google OAuth verified end-to-end in real browser against staging and merged to `main`. Account-linking remains a production readiness gate.
 
 ## 4. Boot and auth gate architecture
 
@@ -147,10 +147,11 @@ Present:
 
 - PWA manifest + icons
 - standalone display metadata
+- service worker registration (`registerServiceWorker()`) for web push flow
 
 Not present:
 
-- explicit service-worker registration/runtime offline cache layer
+- full offline-first caching strategy for app data/shell
 
 ## 11. High-risk files
 

@@ -1,5 +1,8 @@
 # Sprint 4F C5 Lifecycle Validation and Parity Tooling
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 Date: 2026-03-19
 Status: landed read-only validation tooling on `main`
 

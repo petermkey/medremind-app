@@ -1,6 +1,6 @@
 # Agent Handoff (Current Main)
 
-Date: 2026-03-22
+Date: 2026-04-17
 Audience: agents continuing work from current `main`
 
 ## 1. Source-of-truth scope
@@ -13,11 +13,11 @@ Audience: agents continuing work from current `main`
 
 **Lifecycle contract note:** `src/lib/store/store.ts` is the current web implementation of the lifecycle model. It is not the contract. Do not treat Zustand store code as the authoritative specification for protocol states, dose states, persistence semantics, snooze lineage, or idempotency behavior. The lifecycle contract is the specification. Code discrepancies are bugs.
 
-## 2. OAuth state — branch `codex/oauth-google-apple` (PR #5 open against main)
+## 2. OAuth state on main
 
-OAuth changes are committed and CI is green. This section documents the current state of that branch.
+OAuth changes are merged to `main` and CI is green.
 
-### What is committed on `codex/oauth-google-apple`
+### What is committed on `main`
 
 | File | Change |
 |------|--------|
@@ -76,26 +76,17 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Local-first store with cloud sync and outbox retry.
 - Command-based lifecycle/dose sync with additive write-through coverage.
 - Selector-based lifecycle-aware read paths on key screens.
-- Auth: email/password + Google OAuth. Apple sign-in removed. Google OAuth committed on `codex/oauth-google-apple`, staging-verified.
+- Auth: email/password + Google OAuth. Apple sign-in removed. Google OAuth is on `main` and staging-verified.
 
-## 4. Recent landed features (last 5 commits on `codex/oauth-google-apple`)
-
-| Commit | What landed |
-|--------|------------|
-| `71f4975` | fix(build): force webpack bundler — generates `middleware.js.nft.json`, fixes Vercel CLI v50+ packaging |
-| `f1d0cce` | fix(ci): deploy from source (removes `--prebuilt`), fixes `middleware.js.nft.json` packaging failure |
-| `49bdb64` | docs(auth): remove stale middleware/proxy duplication note |
-| `e053921` | feat(auth): Google and Apple OAuth with callback route and route protection fix (Apple subsequently removed) |
-| `963aea1` | CI: production environment for main branch Vercel build |
-
-## 5. Recent landed features (on main as of 2026-03-22)
+## 4. Recent landed features (latest on main)
 
 | Commit | What landed |
 |--------|------------|
-| `4b76ca1` | fix(cron): remove cron from vercel.json (Hobby plan daily-only limit) — external cron-job.org job #7402449 fires every minute |
-| `b53501e` | fix(sync): cascade-delete dose_records → scheduled_doses before protocol_item (FK constraint fix) |
-| `32760f3` | fix(push): sync error UI with Retry now / Clear outbox buttons; WINDOW_MINUTES restored to 1 |
-| `3995947` | feat(icons): 16 dose-form icons + 9 route-of-admin icons; DoseForm type expanded from 10 → 16 values |
+| `51a8d13` | fix(import): resolve scheduled_doses upsert conflict on duplicate slot |
+| `8ef1a9e` | fix(doses): rolling horizon refresh on app boot |
+| `965ade9` | fix(doses): lift Supabase REST 1000-row default limit to 10000 |
+| `afd446b` | chore(deps): bump Next.js 16.2.2, React 19.2.4, TS 6, @types/node 25, Supabase 2.102 |
+| `d6b202d` | fix(sw): smart renotify policy — re-alert on new reminders, suppress duplicates |
 
 ## 5a. Push notification infrastructure
 
@@ -112,8 +103,8 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Outbox: `src/lib/supabase/syncOutbox.ts`
 - Auth functions: `src/lib/supabase/auth.ts`
 - App layout/boot gate: `src/app/app/layout.tsx`
-- Route guard: `src/proxy.ts` (server-side routing, committed on main) + `middleware.ts` (entry point, committed on `codex/oauth-google-apple`)
-- OAuth callback: `src/app/auth/callback/route.ts` (committed on `codex/oauth-google-apple`)
+- Route guard: `src/proxy.ts` (server-side routing, committed on main) + `middleware.ts` (entry point, committed on main)
+- OAuth callback: `src/app/auth/callback/route.ts` (committed on main)
 - Cloud pull/import/backup: `src/lib/supabase/cloudStore.ts`, `src/lib/supabase/importStore.ts`
 - Icon registry: `src/lib/icons.ts` — `DOSE_FORM_ICONS`, `ROUTE_ICONS`
 

@@ -1,5 +1,8 @@
 # Release Note: Logout Race Persistence Fix
 
+> **Historical document:** This is a point-in-time snapshot for audit and context only.
+> It does not override the current source-of-truth documents listed in `docs/system-logic.md`.
+
 Date: 2026-03-18
 Scope: activation + snooze persistence across logout/relogin
 

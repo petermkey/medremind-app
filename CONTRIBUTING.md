@@ -21,7 +21,7 @@ If behavior changes, update documentation in the same commit/PR:
 
 1. `docs/system-logic.md` (current logic source of truth)
 2. `docs/current-status.md` (maturity, risks, priorities)
-3. `docs/agent-handover.md` (onboarding and test focus)
+3. `docs/agent-handoff-current-main.md` (onboarding and execution context)
 4. `README.md` (user-facing capability summary)
 
 Point-in-time incident and verification reports may be kept for audit history, but should be clearly marked as historical.
