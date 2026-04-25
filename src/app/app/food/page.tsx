@@ -54,9 +54,9 @@ function currentDateForTimezone(timezone: string): string {
 
 function rangeAroundLocalDate(date: string): { fromIso: string; toIso: string } {
   const start = new Date(`${date}T00:00:00`);
-  start.setDate(start.getDate() - 1);
+  start.setDate(start.getDate() - 2);
   const end = new Date(`${date}T23:59:59.999`);
-  end.setDate(end.getDate() + 1);
+  end.setDate(end.getDate() + 2);
   return { fromIso: start.toISOString(), toIso: end.toISOString() };
 }
 
@@ -66,10 +66,10 @@ function formatAmount(value?: number, suffix = ''): string {
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}${suffix}`;
 }
 
-function formatEntryTime(value: string): string {
+function formatEntryTime(value: string, timezone: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown time';
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: timezone });
 }
 
 function confidenceLabel(value: number): string {
@@ -302,7 +302,7 @@ export default function FoodPage() {
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-xs font-semibold text-[#8B949E]">
-                      {formatEntryTime(entry.consumedAt)} · Photo · {confidenceLabel(entry.estimationConfidence)}
+                      {formatEntryTime(entry.consumedAt, timezone)} · Photo · {confidenceLabel(entry.estimationConfidence)}
                     </div>
                     <h3 className="mt-1 text-base font-extrabold text-[#F0F6FC]">{entry.title}</h3>
                     <p className="mt-1 text-sm text-[#C9D1D9]">{entry.summary}</p>
