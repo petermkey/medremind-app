@@ -22,6 +22,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function sanitizeExtendedNutrients(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) return undefined;
+  const sanitized: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const parsed = toNumber(raw);
+    if (parsed !== undefined) sanitized[key] = parsed;
+  }
+  return Object.keys(sanitized).length ? sanitized : undefined;
+}
+
+function sanitizeNutrients(nutrients: FoodNutrients): FoodNutrients {
+  return {
+    caloriesKcal: toNumber(nutrients.caloriesKcal),
+    proteinG: toNumber(nutrients.proteinG),
+    totalFatG: toNumber(nutrients.totalFatG),
+    saturatedFatG: toNumber(nutrients.saturatedFatG),
+    transFatG: toNumber(nutrients.transFatG),
+    carbsG: toNumber(nutrients.carbsG),
+    fiberG: toNumber(nutrients.fiberG),
+    sugarsG: toNumber(nutrients.sugarsG),
+    addedSugarsG: toNumber(nutrients.addedSugarsG),
+    sodiumMg: toNumber(nutrients.sodiumMg),
+    cholesterolMg: toNumber(nutrients.cholesterolMg),
+    extended: sanitizeExtendedNutrients(nutrients.extended),
+  };
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -43,14 +70,46 @@ function nutrientsFromRow(row: FoodRow): FoodNutrients {
     cholesterolMg: toNumber(row.cholesterol_mg),
   };
 
-  if (isRecord(row.extended_nutrients)) {
-    nutrients.extended = row.extended_nutrients as Record<string, number>;
-  }
+  nutrients.extended = sanitizeExtendedNutrients(row.extended_nutrients);
 
   return nutrients;
 }
 
+export function sanitizeFoodEntryForSync(entry: FoodEntry): FoodEntry {
+  return {
+    id: entry.id,
+    userId: entry.userId,
+    consumedAt: entry.consumedAt,
+    timezone: entry.timezone,
+    mealLabel: entry.mealLabel,
+    title: entry.title,
+    summary: entry.summary,
+    source: entry.source,
+    estimationConfidence: entry.estimationConfidence,
+    analysisModel: entry.analysisModel,
+    analysisSchemaVersion: entry.analysisSchemaVersion,
+    nutrients: sanitizeNutrients(entry.nutrients),
+    uncertainties: entry.uncertainties.map(value => String(value)),
+    components: entry.components.map(component => ({
+      id: component.id,
+      entryId: component.entryId,
+      userId: component.userId,
+      name: component.name,
+      category: component.category,
+      estimatedQuantity: toNumber(component.estimatedQuantity),
+      estimatedUnit: component.estimatedUnit,
+      gramsEstimate: toNumber(component.gramsEstimate),
+      confidence: component.confidence,
+      notes: component.notes,
+      sortOrder: component.sortOrder,
+    })),
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+  };
+}
+
 function entryRow(entry: FoodEntry) {
+  const nutrients = sanitizeNutrients(entry.nutrients);
   return {
     id: entry.id,
     user_id: entry.userId,
@@ -63,18 +122,18 @@ function entryRow(entry: FoodEntry) {
     estimation_confidence: entry.estimationConfidence,
     analysis_model: entry.analysisModel ?? null,
     analysis_schema_version: entry.analysisSchemaVersion,
-    calories_kcal: entry.nutrients.caloriesKcal ?? null,
-    protein_g: entry.nutrients.proteinG ?? null,
-    total_fat_g: entry.nutrients.totalFatG ?? null,
-    saturated_fat_g: entry.nutrients.saturatedFatG ?? null,
-    trans_fat_g: entry.nutrients.transFatG ?? null,
-    carbs_g: entry.nutrients.carbsG ?? null,
-    fiber_g: entry.nutrients.fiberG ?? null,
-    sugars_g: entry.nutrients.sugarsG ?? null,
-    added_sugars_g: entry.nutrients.addedSugarsG ?? null,
-    sodium_mg: entry.nutrients.sodiumMg ?? null,
-    cholesterol_mg: entry.nutrients.cholesterolMg ?? null,
-    extended_nutrients: entry.nutrients.extended ?? {},
+    calories_kcal: nutrients.caloriesKcal ?? null,
+    protein_g: nutrients.proteinG ?? null,
+    total_fat_g: nutrients.totalFatG ?? null,
+    saturated_fat_g: nutrients.saturatedFatG ?? null,
+    trans_fat_g: nutrients.transFatG ?? null,
+    carbs_g: nutrients.carbsG ?? null,
+    fiber_g: nutrients.fiberG ?? null,
+    sugars_g: nutrients.sugarsG ?? null,
+    added_sugars_g: nutrients.addedSugarsG ?? null,
+    sodium_mg: nutrients.sodiumMg ?? null,
+    cholesterol_mg: nutrients.cholesterolMg ?? null,
+    extended_nutrients: nutrients.extended ?? {},
     uncertainties: entry.uncertainties,
     created_at: entry.createdAt,
     updated_at: entry.updatedAt,
@@ -139,14 +198,35 @@ export async function syncFoodEntrySave(userId: string, entry: FoodEntry) {
     throw new Error('Food entry sync failed: entry user does not match authenticated user.');
   }
 
+  for (const component of entry.components) {
+    if (component.userId !== userId) {
+      throw new Error('Food entry sync failed: component user does not match authenticated user.');
+    }
+    if (component.entryId !== entry.id) {
+      throw new Error('Food entry sync failed: component entry does not match food entry.');
+    }
+  }
+
   const supabase = getSupabaseClient();
-  const { error: entryError } = await supabase.from('food_entries').upsert(entryRow(entry), { onConflict: 'id' });
+  const sanitizedEntry = sanitizeFoodEntryForSync(entry);
+  const { error: entryError } = await supabase.from('food_entries').upsert(entryRow(sanitizedEntry), { onConflict: 'id' });
   if (entryError) throw new Error(`Food entry sync failed: ${entryError.message}`);
 
-  if (entry.components.length > 0) {
+  const componentIds = sanitizedEntry.components.map(component => component.id);
+  const deleteQuery = supabase
+    .from('food_entry_components')
+    .delete()
+    .eq('entry_id', sanitizedEntry.id)
+    .eq('user_id', userId);
+  const { error: deleteError } = componentIds.length
+    ? await deleteQuery.not('id', 'in', `(${componentIds.join(',')})`)
+    : await deleteQuery;
+  if (deleteError) throw new Error(`Food entry components replace failed: ${deleteError.message}`);
+
+  if (sanitizedEntry.components.length > 0) {
     const { error: componentError } = await supabase
       .from('food_entry_components')
-      .upsert(entry.components.map(componentRow), { onConflict: 'id' });
+      .upsert(sanitizedEntry.components.map(componentRow), { onConflict: 'id' });
     if (componentError) throw new Error(`Food entry components sync failed: ${componentError.message}`);
   }
 }
@@ -167,6 +247,7 @@ export async function pullFoodEntriesForRange(
       .gte('consumed_at', fromIso)
       .lte('consumed_at', toIso)
       .order('consumed_at', { ascending: false })
+      .order('id', { ascending: true })
       .range(from, from + FOOD_PULL_PAGE_SIZE - 1);
 
     if (error) throw new Error(`Food entries pull failed: ${error.message}`);
@@ -186,7 +267,8 @@ export async function pullFoodEntriesForRange(
       .select('*')
       .eq('user_id', userId)
       .in('entry_id', ids)
-      .order('sort_order', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .order('id', { ascending: true });
 
     if (error) throw new Error(`Food entry components pull failed: ${error.message}`);
 
