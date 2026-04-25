@@ -18,7 +18,13 @@ export async function POST(request: Request) {
   }
 
   const contentLength = request.headers.get('content-length');
-  if (contentLength && Number(contentLength) > MAX_REQUEST_BYTES) {
+  const contentLengthBytes = contentLength === null ? NaN : Number(contentLength);
+
+  if (
+    !Number.isFinite(contentLengthBytes) ||
+    contentLengthBytes <= 0 ||
+    contentLengthBytes > MAX_REQUEST_BYTES
+  ) {
     return NextResponse.json({ error: 'Image is too large.' }, { status: 413 });
   }
 

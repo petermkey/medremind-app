@@ -106,11 +106,15 @@ const FOOD_ANALYSIS_SCHEMA = {
 export function getFoodAnalysisProvider(): FoodAnalysisProvider {
   const provider = process.env.FOOD_AI_PROVIDER;
 
+  if (!provider || provider === 'mock') {
+    return 'mock';
+  }
+
   if (provider === 'openai' || provider === 'openrouter' || provider === 'gemini') {
     return provider;
   }
 
-  return 'mock';
+  throw new Error('Unsupported FOOD_AI_PROVIDER.');
 }
 
 export async function analyzeFoodImage(input: FoodAnalysisInput): Promise<FoodAnalysisDraft> {
