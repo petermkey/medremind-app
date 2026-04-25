@@ -277,7 +277,15 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
       const itemId = String(row.protocol_item_id);
       const activeProtocol = activeAliasMap.get(sourceActiveId);
       const protocolItem = itemMap.get(itemId);
-      if (!activeProtocol || !protocolItem) return null;
+      if (!activeProtocol || !protocolItem) {
+        // Warn so boot-time drops are visible in the browser console for debugging.
+        // Common causes: duplicate active-protocol instance conflict, orphaned protocol item.
+        console.warn(
+          '[cloud-pull-dose-dropped]',
+          { id: String(row.id), date: String(row.scheduled_date), status: String(row.status), activeProtocolId: sourceActiveId, protocolItemId: itemId, missingActiveProtocol: !activeProtocol, missingProtocolItem: !protocolItem },
+        );
+        return null;
+      }
       return {
         id: String(row.id),
         userId: String(row.user_id),
