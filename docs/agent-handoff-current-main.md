@@ -1,6 +1,6 @@
 # Agent Handoff (Current Main)
 
-Date: 2026-04-17
+Date: 2026-04-25
 Audience: agents continuing work from current `main`
 
 ## 1. Source-of-truth scope
@@ -9,6 +9,7 @@ Audience: agents continuing work from current `main`
 - Process/governance source: `docs/project-rules-and-current-operating-model.md`.
 - **Lifecycle behavioral specification: `docs/lifecycle-contract-v1.md`** — authoritative, platform-neutral. Read before touching any lifecycle logic.
 - Behavior source: `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`, `docs/current-status.md`.
+- **Dose persistence continuation handoff: `docs/dose-persistence-handoff-2026-04-25.md`** — latest production evidence, fixes, and next debug steps for the restart-survival issue.
 - Historical snapshots in `docs/` are context only.
 
 **Lifecycle contract note:** `src/lib/store/store.ts` is the current web implementation of the lifecycle model. It is not the contract. Do not treat Zustand store code as the authoritative specification for protocol states, dose states, persistence semantics, snooze lineage, or idempotency behavior. The lifecycle contract is the specification. Code discrepancies are bugs.
@@ -82,11 +83,13 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 
 | Commit | What landed |
 |--------|------------|
+| `6e47068` | production merge: stale persisted dose-state hydration scrub, deployed to `medremind-app-two.vercel.app` |
+| `e0123ff` | fix(store): ignore stale `scheduledDoses`, `doseRecords`, and `executionEvents` from old localStorage payloads |
+| `016d7e0` | fix(doses): make dose action fallback outbox durable before direct sync settles and resolve cloud dose slot conflicts |
+| `6fd90dd` | fix(doses): recover missing scheduled dose rows before dose commands |
 | `51a8d13` | fix(import): resolve scheduled_doses upsert conflict on duplicate slot |
 | `8ef1a9e` | fix(doses): rolling horizon refresh on app boot |
 | `965ade9` | fix(doses): lift Supabase REST 1000-row default limit to 10000 |
-| `afd446b` | chore(deps): bump Next.js 16.2.2, React 19.2.4, TS 6, @types/node 25, Supabase 2.102 |
-| `d6b202d` | fix(sw): smart renotify policy — re-alert on new reminders, suppress duplicates |
 
 ## 5a. Push notification infrastructure
 
@@ -95,6 +98,20 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - **Fire window:** ±1 min around scheduled_time (adjusted for lead_time_min)
 - **Deduplication:** `notification_log` table (user_id + scheduled_dose_id unique)
 - **Delivery:** `web-push` via `/api/push/send` → `push_subscriptions` table
+
+
+## 5b. Dose persistence restart-survival status (2026-04-25)
+
+Current production SHA verified at `https://medremind-app-two.vercel.app/api/version`: `6e47068d926abf0a37141c9df55a37072d8e7cd2`.
+
+Latest fixes landed:
+
+- `016d7e0`: dose take/skip/snooze command fallback is queued before direct sync completes; unique scheduled-dose slot conflicts resolve to the canonical cloud row.
+- `e0123ff`: Zustand hydration whitelists persisted slices so stale localStorage cannot restore old `scheduledDoses`, `doseRecords`, or `executionEvents`.
+
+Production DB evidence for `peter@alionuk.com` after the first fix: write path is persisting dose intake rows. On `2026-04-25`, Supabase contained 38 scheduled doses, 4 `taken` scheduled rows, 12 `taken` dose records, and 8 successful post-deploy `take_command` sync operations with no post-deploy failures.
+
+If the symptom persists, continue with authenticated browser read-path verification, not a generic write-path assumption. Use `docs/dose-persistence-handoff-2026-04-25.md` as the focused continuation guide.
 
 ## 6. Most important code surfaces
 
