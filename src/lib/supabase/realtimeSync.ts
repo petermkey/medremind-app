@@ -87,6 +87,26 @@ function isUniqueViolation(error: { code?: string; message?: string } | null, co
   return Boolean(error.message?.includes(constraintName));
 }
 
+async function ensureCommandDoseRow(
+  userId: string,
+  dose: ScheduledDose,
+  patch?: { status?: ScheduledDose['status']; snoozedUntil?: string | null },
+) {
+  const supabase = getSupabaseClient();
+  const row = {
+    id: cloudDoseId(userId, dose.id),
+    user_id: userId,
+    active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
+    protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
+    scheduled_date: dose.scheduledDate,
+    scheduled_time: dose.scheduledTime,
+    status: patch?.status ?? dose.status,
+    snoozed_until: patch?.snoozedUntil ?? dose.snoozedUntil ?? null,
+  };
+  const { error } = await supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
+  if (error) throw new Error(`Ensure scheduled dose sync failed: ${error.message}`);
+}
+
 async function findNextAvailableDoseSlot(
   userId: string,
   doseId: string,
@@ -794,6 +814,8 @@ export async function syncTakeDoseCommand(
   );
 
   try {
+    await ensureCommandDoseRow(userId, dose);
+
     const { error: doseErr } = await supabase
       .from('scheduled_doses')
       .update({
@@ -893,6 +915,8 @@ export async function syncSkipDoseCommand(
   );
 
   try {
+    await ensureCommandDoseRow(userId, dose);
+
     const { error: doseErr } = await supabase
       .from('scheduled_doses')
       .update({
@@ -1018,6 +1042,11 @@ export async function syncSnoozeDoseCommand(
   };
 
   try {
+    await ensureCommandDoseRow(userId, dose, {
+      status: 'snoozed',
+      snoozedUntil: replacementDose?.snoozedUntil ?? null,
+    });
+
     const { error: originalErr } = await supabase
       .from('scheduled_doses')
       .update({
