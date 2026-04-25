@@ -8,6 +8,8 @@ export type FoodAnalysisProvider = 'mock' | 'openai' | 'openrouter' | 'gemini';
 const FOOD_ANALYSIS_PROMPT =
   'Estimate the visible food and drink in this image. Return only JSON matching the schema. Include approximate portions, nutrients, confidence, and uncertainties. Do not provide medical advice.';
 
+const PROVIDER_TIMEOUT_MS = 30_000;
+
 const FOOD_ANALYSIS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -31,40 +33,63 @@ const FOOD_ANALYSIS_SCHEMA = {
     },
     components: {
       type: 'array',
-      minItems: 1,
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'confidence'],
+        required: [
+          'name',
+          'category',
+          'estimatedQuantity',
+          'estimatedUnit',
+          'gramsEstimate',
+          'confidence',
+          'notes',
+        ],
         properties: {
           name: { type: 'string' },
-          category: { type: 'string' },
-          estimatedQuantity: { type: 'number' },
-          estimatedUnit: { type: 'string' },
-          gramsEstimate: { type: 'number' },
-          confidence: { type: 'number', minimum: 0, maximum: 1 },
-          notes: { type: 'string' },
+          category: { type: ['string', 'null'] },
+          estimatedQuantity: { type: ['number', 'null'] },
+          estimatedUnit: { type: ['string', 'null'] },
+          gramsEstimate: { type: ['number', 'null'] },
+          confidence: { type: 'number' },
+          notes: { type: ['string', 'null'] },
         },
       },
     },
     nutrients: {
       type: 'object',
       additionalProperties: false,
+      required: [
+        'caloriesKcal',
+        'proteinG',
+        'totalFatG',
+        'saturatedFatG',
+        'transFatG',
+        'carbsG',
+        'fiberG',
+        'sugarsG',
+        'addedSugarsG',
+        'sodiumMg',
+        'cholesterolMg',
+        'extended',
+      ],
       properties: {
-        caloriesKcal: { type: 'number' },
-        proteinG: { type: 'number' },
-        totalFatG: { type: 'number' },
-        saturatedFatG: { type: 'number' },
-        transFatG: { type: 'number' },
-        carbsG: { type: 'number' },
-        fiberG: { type: 'number' },
-        sugarsG: { type: 'number' },
-        addedSugarsG: { type: 'number' },
-        sodiumMg: { type: 'number' },
-        cholesterolMg: { type: 'number' },
+        caloriesKcal: { type: ['number', 'null'] },
+        proteinG: { type: ['number', 'null'] },
+        totalFatG: { type: ['number', 'null'] },
+        saturatedFatG: { type: ['number', 'null'] },
+        transFatG: { type: ['number', 'null'] },
+        carbsG: { type: ['number', 'null'] },
+        fiberG: { type: ['number', 'null'] },
+        sugarsG: { type: ['number', 'null'] },
+        addedSugarsG: { type: ['number', 'null'] },
+        sodiumMg: { type: ['number', 'null'] },
+        cholesterolMg: { type: ['number', 'null'] },
         extended: {
           type: 'object',
-          additionalProperties: { type: 'number' },
+          additionalProperties: false,
+          properties: {},
+          required: [],
         },
       },
     },
@@ -72,9 +97,9 @@ const FOOD_ANALYSIS_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
     },
-    estimationConfidence: { type: 'number', minimum: 0, maximum: 1 },
+    estimationConfidence: { type: 'number' },
     model: { type: 'string' },
-    schemaVersion: { type: 'string', const: 'food-analysis-v1' },
+    schemaVersion: { type: 'string', enum: ['food-analysis-v1'] },
   },
 } as const;
 
@@ -140,33 +165,36 @@ async function analyzeWithOpenAI(input: FoodAnalysisInput): Promise<FoodAnalysis
   }
 
   const model = process.env.OPENAI_FOOD_VISION_MODEL || 'gpt-4o-mini';
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: 'user',
-          content: [
-            { type: 'input_text', text: FOOD_ANALYSIS_PROMPT },
-            { type: 'input_image', image_url: input.imageDataUrl },
-          ],
-        },
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'food_analysis',
-          schema: FOOD_ANALYSIS_SCHEMA,
-          strict: true,
-        },
+  const response = await fetchWithTimeout(
+    'https://api.openai.com/v1/responses',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    }),
-  });
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: FOOD_ANALYSIS_PROMPT },
+              { type: 'input_image', image_url: input.imageDataUrl },
+            ],
+          },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'food_analysis',
+            schema: FOOD_ANALYSIS_SCHEMA,
+            strict: true,
+          },
+        },
+      }),
+    },
+  );
 
   if (!response.ok) {
     throw new Error('Food analysis failed.');
@@ -178,7 +206,7 @@ async function analyzeWithOpenAI(input: FoodAnalysisInput): Promise<FoodAnalysis
     throw new Error('Food analysis returned no structured output.');
   }
 
-  return validateFoodAnalysisDraft(parseStructuredOutput(outputText));
+  return validateProviderDraft(parseStructuredOutput(outputText), model);
 }
 
 async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnalysisDraft> {
@@ -188,35 +216,38 @@ async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnal
   }
 
   const model = process.env.OPENROUTER_FOOD_VISION_MODEL || 'google/gemini-2.5-flash';
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'MedRemind',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: FOOD_ANALYSIS_PROMPT },
-            { type: 'image_url', image_url: { url: input.imageDataUrl } },
-          ],
-        },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'food_analysis',
-          strict: true,
-          schema: FOOD_ANALYSIS_SCHEMA,
-        },
+  const response = await fetchWithTimeout(
+    'https://openrouter.ai/api/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'X-Title': 'MedRemind',
       },
-    }),
-  });
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: FOOD_ANALYSIS_PROMPT },
+              { type: 'image_url', image_url: { url: input.imageDataUrl } },
+            ],
+          },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'food_analysis',
+            strict: true,
+            schema: FOOD_ANALYSIS_SCHEMA,
+          },
+        },
+      }),
+    },
+  );
 
   if (!response.ok) {
     throw new Error('Food analysis failed.');
@@ -228,7 +259,7 @@ async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnal
     throw new Error('Food analysis returned no structured output.');
   }
 
-  return validateFoodAnalysisDraft(parseStructuredOutput(outputText));
+  return validateProviderDraft(parseStructuredOutput(outputText), model);
 }
 
 async function analyzeWithGemini(input: FoodAnalysisInput): Promise<FoodAnalysisDraft> {
@@ -238,12 +269,13 @@ async function analyzeWithGemini(input: FoodAnalysisInput): Promise<FoodAnalysis
   }
 
   const model = process.env.GEMINI_FOOD_VISION_MODEL || 'gemini-2.5-flash';
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+  const response = await fetchWithTimeout(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
         contents: [
@@ -262,7 +294,7 @@ async function analyzeWithGemini(input: FoodAnalysisInput): Promise<FoodAnalysis
         ],
         generationConfig: {
           responseMimeType: 'application/json',
-          responseSchema: FOOD_ANALYSIS_SCHEMA,
+          responseJsonSchema: FOOD_ANALYSIS_SCHEMA,
         },
       }),
     },
@@ -282,7 +314,36 @@ async function analyzeWithGemini(input: FoodAnalysisInput): Promise<FoodAnalysis
     throw new Error('Food analysis returned no structured output.');
   }
 
-  return validateFoodAnalysisDraft(parseStructuredOutput(outputText));
+  return validateProviderDraft(parseStructuredOutput(outputText), model);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error('Food analysis failed.');
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function validateProviderDraft(value: unknown, model: string): FoodAnalysisDraft {
+  const draft = validateFoodAnalysisDraft(value);
+
+  return {
+    ...draft,
+    model,
+  };
 }
 
 function extractOpenAIOutputText(payload: unknown): string | null {
@@ -331,7 +392,7 @@ function extractBase64Data(dataUrl: string): string {
   const markerIndex = dataUrl.indexOf(marker);
 
   if (markerIndex === -1) {
-    throw new Error('Food analysis returned no structured output.');
+    throw new Error('Invalid image data URL.');
   }
 
   return dataUrl.slice(markerIndex + marker.length);
@@ -339,4 +400,11 @@ function extractBase64Data(dataUrl: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'AbortError' || error.name === 'TimeoutError')
+  );
 }
