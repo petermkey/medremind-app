@@ -1,6 +1,8 @@
 'use client';
 
 import type { ActiveProtocol, DoseRecord, Protocol, ScheduledDose } from '@/types';
+import type { FoodEntry } from '@/types/food';
+import { sanitizeFoodEntryForSync, syncFoodEntrySave } from './foodSync';
 import {
   syncActivation,
   syncActiveStatus,
@@ -36,7 +38,8 @@ type SyncKind =
   | 'completeCommand'
   | 'archiveCommand'
   | 'endProtocolFromToday'
-  | 'removeDose';
+  | 'removeDose'
+  | 'foodEntrySave';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -112,6 +115,7 @@ type SyncPayloadMap = {
     userId: string;
     doseId: string;
   };
+  foodEntrySave: { userId: string; entry: FoodEntry };
 };
 
 export type SyncOperation =
@@ -130,7 +134,8 @@ export type SyncOperation =
   | { kind: 'completeCommand'; payload: SyncPayloadMap['completeCommand'] }
   | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] }
   | { kind: 'endProtocolFromToday'; payload: SyncPayloadMap['endProtocolFromToday'] }
-  | { kind: 'removeDose'; payload: SyncPayloadMap['removeDose'] };
+  | { kind: 'removeDose'; payload: SyncPayloadMap['removeDose'] }
+  | { kind: 'foodEntrySave'; payload: SyncPayloadMap['foodEntrySave'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -189,7 +194,7 @@ function readQueue(): StoredSyncOperation[] {
 
 function writeQueue(items: StoredSyncOperation[]) {
   if (!hasWindow()) return;
-  localStorage.setItem(KEY, JSON.stringify(items));
+  localStorage.setItem(KEY, JSON.stringify(items.map(normalizeStoredSyncOperation)));
   status.pending = items.length;
   emit();
 }
@@ -231,83 +236,104 @@ function isFutureDoseOperation(op: SyncOperation): boolean {
   return false;
 }
 
+function normalizeSyncOperation(op: SyncOperation): SyncOperation {
+  if (op.kind !== 'foodEntrySave') return op;
+  return {
+    kind: 'foodEntrySave',
+    payload: {
+      userId: op.payload.userId,
+      entry: sanitizeFoodEntryForSync(op.payload.entry),
+    },
+  };
+}
+
+function normalizeStoredSyncOperation(item: StoredSyncOperation): StoredSyncOperation {
+  return {
+    ...item,
+    ...normalizeSyncOperation(item),
+  };
+}
+
 async function executeOperation(op: SyncOperation) {
-  if (isFutureDoseOperation(op)) {
-    console.warn('[sync-outbox] dropped future dose operation', op.kind);
+  const normalizedOp = normalizeSyncOperation(op);
+  if (isFutureDoseOperation(normalizedOp)) {
+    console.warn('[sync-outbox] dropped future dose operation', normalizedOp.kind);
     return;
   }
-  switch (op.kind) {
+  switch (normalizedOp.kind) {
     case 'protocolUpsert':
-      return syncProtocolUpsert(op.payload.userId, op.payload.protocol);
+      return syncProtocolUpsert(normalizedOp.payload.userId, normalizedOp.payload.protocol);
     case 'protocolItemDelete':
-      return syncProtocolItemDelete(op.payload.userId, op.payload.protocolId, op.payload.itemId);
+      return syncProtocolItemDelete(normalizedOp.payload.userId, normalizedOp.payload.protocolId, normalizedOp.payload.itemId);
     case 'protocolDelete':
-      return syncProtocolDelete(op.payload.userId, op.payload.protocolId);
+      return syncProtocolDelete(normalizedOp.payload.userId, normalizedOp.payload.protocolId);
     case 'activation':
-      return syncActivation(op.payload.userId, op.payload.active, op.payload.doses);
+      return syncActivation(normalizedOp.payload.userId, normalizedOp.payload.active, normalizedOp.payload.doses);
     case 'activeStatus':
-      return syncActiveStatus(op.payload.userId, op.payload.activeId, op.payload.patch);
+      return syncActiveStatus(normalizedOp.payload.userId, normalizedOp.payload.activeId, normalizedOp.payload.patch);
     case 'regeneratedDoses':
-      return syncRegeneratedDoses(op.payload.userId, op.payload.active, op.payload.fromDate, op.payload.newDoses);
+      return syncRegeneratedDoses(normalizedOp.payload.userId, normalizedOp.payload.active, normalizedOp.payload.fromDate, normalizedOp.payload.newDoses);
     case 'doseAction':
-      return syncDoseAction(op.payload.userId, op.payload.dose, op.payload.patch, op.payload.record);
+      return syncDoseAction(normalizedOp.payload.userId, normalizedOp.payload.dose, normalizedOp.payload.patch, normalizedOp.payload.record);
     case 'takeCommand':
       return syncTakeDoseCommand(
-        op.payload.userId,
-        op.payload.dose,
-        op.payload.record,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.dose,
+        normalizedOp.payload.record,
+        normalizedOp.payload.clientOperationId,
       );
     case 'skipCommand':
       return syncSkipDoseCommand(
-        op.payload.userId,
-        op.payload.dose,
-        op.payload.record,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.dose,
+        normalizedOp.payload.record,
+        normalizedOp.payload.clientOperationId,
       );
     case 'snoozeCommand':
       return syncSnoozeDoseCommand(
-        op.payload.userId,
-        op.payload.dose,
-        op.payload.replacementDose,
-        op.payload.record,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.dose,
+        normalizedOp.payload.replacementDose,
+        normalizedOp.payload.record,
+        normalizedOp.payload.clientOperationId,
       );
     case 'pauseCommand':
       return syncPauseProtocolCommand(
-        op.payload.userId,
-        op.payload.activeId,
-        op.payload.pausedAt,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.activeId,
+        normalizedOp.payload.pausedAt,
+        normalizedOp.payload.clientOperationId,
       );
     case 'resumeCommand':
       return syncResumeProtocolCommand(
-        op.payload.userId,
-        op.payload.activeId,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.activeId,
+        normalizedOp.payload.clientOperationId,
       );
     case 'completeCommand':
       return syncCompleteProtocolCommand(
-        op.payload.userId,
-        op.payload.activeId,
-        op.payload.completedAt,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.activeId,
+        normalizedOp.payload.completedAt,
+        normalizedOp.payload.clientOperationId,
       );
     case 'archiveCommand':
       return syncArchiveProtocolCommand(
-        op.payload.userId,
-        op.payload.protocol,
-        op.payload.activeIds,
-        op.payload.clientOperationId,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.protocol,
+        normalizedOp.payload.activeIds,
+        normalizedOp.payload.clientOperationId,
       );
     case 'endProtocolFromToday':
       return syncEndProtocolFromTodayCommand(
-        op.payload.userId,
-        op.payload.activeProtocolId,
-        op.payload.today,
+        normalizedOp.payload.userId,
+        normalizedOp.payload.activeProtocolId,
+        normalizedOp.payload.today,
       );
     case 'removeDose':
-      return syncRemoveDoseCommand(op.payload.userId, op.payload.doseId);
+      return syncRemoveDoseCommand(normalizedOp.payload.userId, normalizedOp.payload.doseId);
+    case 'foodEntrySave':
+      return syncFoodEntrySave(normalizedOp.payload.userId, normalizedOp.payload.entry);
     default:
       return Promise.resolve();
   }
@@ -346,8 +372,9 @@ export function enqueueSyncOperation(op: SyncOperation, options?: { pump?: boole
   if (!hasWindow()) return null;
   const queue = readQueue();
   const id = crypto.randomUUID();
+  const normalizedOp = normalizeSyncOperation(op);
   queue.push({
-    ...op,
+    ...normalizedOp,
     id,
     attempts: 0,
     createdAt: Date.now(),

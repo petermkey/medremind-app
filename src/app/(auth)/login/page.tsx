@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useFoodStore } from '@/lib/store/foodStore';
 import { useStore } from '@/lib/store/store';
 import { isEmailConfirmationRequiredError, resendSignupConfirmationEmail, signInWithOAuth, supabaseSignIn } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
@@ -64,6 +65,7 @@ function LoginForm() {
       return;
     }
     store.resetUserData();
+    useFoodStore.getState().resetFoodEntries();
     store.setProfile(profile);
     try {
       await pullStoreFromSupabase();

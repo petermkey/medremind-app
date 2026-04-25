@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 
 const NAV = [
   { href: '/app',           icon: '📋', label: 'Schedule' },
+  { href: '/app/food',      icon: '🍽️', label: 'Food'     },
   { href: '/app/meds',      icon: '💊', label: 'Meds'     },
   { href: '/app/protocols', icon: '📁', label: 'Protocols' },
   { href: '/app/progress',  icon: '📊', label: 'Progress'  },
@@ -22,12 +23,12 @@ export function BottomNav() {
             key={href}
             href={href}
             className={[
-              'flex flex-col items-center gap-1 text-[10px] font-semibold px-3 py-1 rounded-xl transition-colors duration-200',
+              'flex min-w-0 flex-1 flex-col items-center gap-1 text-[9px] font-semibold px-1 py-1 rounded-xl transition-colors duration-200',
               active ? 'text-[#3B82F6]' : 'text-[#8B949E] hover:text-[#F0F6FC]',
             ].join(' ')}
           >
-            <span className="text-[22px] leading-none">{icon}</span>
-            {label}
+            <span className="text-[20px] leading-none">{icon}</span>
+            <span className="truncate">{label}</span>
           </Link>
         );
       })}

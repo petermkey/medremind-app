@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useFoodStore } from '@/lib/store/foodStore';
 import { useStore } from '@/lib/store/store';
 import { resendSignupConfirmationEmail, signInWithOAuth, supabaseSignUp } from '@/lib/supabase/auth';
 import { Button } from '@/components/ui/Button';
@@ -84,6 +85,7 @@ export default function RegisterPage() {
     }
 
     store.resetUserData();
+    useFoodStore.getState().resetFoodEntries();
     store.setProfile(profile);
     router.push('/onboarding');
   }
