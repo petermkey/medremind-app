@@ -31,6 +31,8 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
   - snooze options: `1 hour`, `this evening`, `tomorrow`, `next week`
 - Progress view:
   - adherence summary, weekly bars, heatmap with 30/60/90-day toggle
+- Food diary:
+  - authenticated `/app/food` diary with daily totals, photo upload, AI-assisted food analysis drafts, and Supabase-backed saved entries
 - Settings:
   - export snapshot
   - backup current state to cloud
@@ -94,6 +96,14 @@ Optional:
 - `RESEND_API_KEY`
 - `NEXT_PUBLIC_APP_URL`
 
+Food photo analysis (server-side):
+
+- `FOOD_AI_PROVIDER`: unset or `mock` for mock mode; `openai`; `openrouter`; `gemini`
+- `OPENAI_API_KEY` and optional `OPENAI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openai`
+- `OPENROUTER_API_KEY` and optional `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`
+- `GEMINI_API_KEY` and optional `GEMINI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=gemini`
+- `NEXT_PUBLIC_APP_URL` is also used as the OpenRouter `HTTP-Referer`; it remains the optional app URL above.
+
 ## Available Scripts
 
 - `npm run dev`
@@ -106,6 +116,8 @@ Optional:
 - `npm run test:e2e`
 - `npm run test:e2e:headed`
 - `npm run test:e2e:install`
+
+Authenticated E2E specs, including `tests/e2e/food.spec.ts`, require `E2E_EMAIL`, `E2E_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 ## CI/CD and Runtime Pipelines
 
