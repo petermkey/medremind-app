@@ -22,8 +22,32 @@ function addOptional(a: number | undefined, b: number | undefined): number | und
   return Math.round(((a ?? 0) + (b ?? 0)) * 100) / 100;
 }
 
+function cleanTimezone(timezone: unknown): string | undefined {
+  if (typeof timezone !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = timezone.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: trimmed });
+    return trimmed;
+  } catch {
+    return undefined;
+  }
+}
+
 function getResolvedTimezone(timezone?: string): string {
-  return timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const providedTimezone = cleanTimezone(timezone);
+  if (providedTimezone) {
+    return providedTimezone;
+  }
+
+  const systemTimezone = cleanTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  return systemTimezone ?? 'UTC';
 }
 
 function formatLocalDate(value: string, timezone: string): string | null {
@@ -68,12 +92,7 @@ export function filterFoodEntriesForLocalDate(
   const resolvedTimezone = getResolvedTimezone(timezone);
 
   return entries.filter((entry) => {
-    const entryTimezone = entry.timezone || resolvedTimezone;
-
-    try {
-      return formatLocalDate(entry.consumedAt, entryTimezone) === date;
-    } catch {
-      return formatLocalDate(entry.consumedAt, resolvedTimezone) === date;
-    }
+    const entryTimezone = cleanTimezone(entry.timezone || resolvedTimezone) ?? resolvedTimezone;
+    return formatLocalDate(entry.consumedAt, entryTimezone) === date;
   });
 }

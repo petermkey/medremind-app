@@ -40,20 +40,40 @@ function cleanOptionalString(value: unknown): string | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
-function cleanNumber(value: unknown): number | undefined {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+function cleanNumericValue(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value !== 'string') {
     return undefined;
   }
 
-  return Math.round(value * 100) / 100;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function cleanNumber(value: unknown): number | undefined {
+  const parsed = cleanNumericValue(value);
+  if (parsed === undefined || parsed < 0) {
+    return undefined;
+  }
+
+  return Math.round(parsed * 100) / 100;
 }
 
 function cleanConfidence(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
+  const parsed = cleanNumericValue(value);
+  if (parsed === undefined) {
     return 0;
   }
 
-  const clamped = Math.min(1, Math.max(0, value));
+  const clamped = Math.min(1, Math.max(0, parsed));
   return Math.round(clamped * 100) / 100;
 }
 
