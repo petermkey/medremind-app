@@ -12,8 +12,23 @@ import {
   removeQueuedSyncOperation,
 } from '@/lib/supabase/syncOutbox';
 
+const NUTRIENT_KEYS = [
+  'caloriesKcal',
+  'proteinG',
+  'totalFatG',
+  'saturatedFatG',
+  'transFatG',
+  'carbsG',
+  'fiberG',
+  'sugarsG',
+  'addedSugarsG',
+  'sodiumMg',
+  'cholesterolMg',
+] as const satisfies readonly (keyof Omit<FoodEntry['nutrients'], 'extended'>)[];
+
 export interface FoodStoreState {
   entries: FoodEntry[];
+  currentUserId: string | null;
   loading: boolean;
   error: string | null;
   loadEntriesForRange(userId: string, fromIso: string, toIso: string): Promise<void>;
@@ -25,11 +40,49 @@ export interface FoodStoreState {
   }): FoodEntry;
   entriesForDate(date: string, timezone?: string): FoodEntry[];
   totalsForDate(date: string, timezone?: string): FoodDailyTotals;
+  resetFoodEntries(): void;
 }
 
 function clampConfidence(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.round(Math.min(1, Math.max(0, value)) * 100) / 100;
+}
+
+function copyOptionalNumber(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function copyOptionalString(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function copyNutrients(nutrients: FoodEntry['nutrients']): FoodEntry['nutrients'] {
+  const copy: FoodEntry['nutrients'] = {};
+
+  for (const key of NUTRIENT_KEYS) {
+    const value = copyOptionalNumber(nutrients[key]);
+    if (value !== undefined) copy[key] = value;
+  }
+
+  if (nutrients.extended) {
+    const extended: Record<string, number> = {};
+    for (const [key, value] of Object.entries(nutrients.extended)) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        extended[key] = value;
+      }
+    }
+    if (Object.keys(extended).length > 0) copy.extended = extended;
+  }
+
+  return copy;
+}
+
+function copyUncertainties(uncertainties: string[]): string[] {
+  return uncertainties
+    .map(value => value.trim())
+    .filter(value => value.length > 0);
 }
 
 function sortNewestFirst(entries: FoodEntry[]): FoodEntry[] {
@@ -57,15 +110,29 @@ function syncFoodFireAndForget(userId: string, entry: FoodEntry) {
 
 export const useFoodStore = create<FoodStoreState>((set, get) => ({
   entries: [],
+  currentUserId: null,
   loading: false,
   error: null,
 
   async loadEntriesForRange(userId, fromIso, toIso) {
-    set({ loading: true, error: null });
+    set(state => ({
+      currentUserId: userId,
+      entries: state.entries.filter(entry => entry.userId === userId),
+      loading: true,
+      error: null,
+    }));
     try {
       const incoming = await pullFoodEntriesForRange(userId, fromIso, toIso);
       set(state => {
-        const entriesById = new Map(state.entries.map(entry => [entry.id, entry]));
+        if (state.currentUserId !== userId) {
+          return {};
+        }
+
+        const entriesById = new Map(
+          state.entries
+            .filter(entry => entry.userId === userId)
+            .map(entry => [entry.id, entry]),
+        );
         for (const entry of incoming) {
           entriesById.set(entry.id, entry);
         }
@@ -75,10 +142,14 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
         };
       });
     } catch (error) {
-      set({
-        loading: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      set(state => (
+        state.currentUserId === userId
+          ? {
+              loading: false,
+              error: error instanceof Error ? error.message : String(error),
+            }
+          : {}
+      ));
     }
   },
 
@@ -97,19 +168,19 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
       estimationConfidence: clampConfidence(draft.estimationConfidence),
       analysisModel: draft.model,
       analysisSchemaVersion: draft.schemaVersion,
-      nutrients: draft.nutrients,
-      uncertainties: draft.uncertainties,
+      nutrients: copyNutrients(draft.nutrients),
+      uncertainties: copyUncertainties(draft.uncertainties),
       components: draft.components.map((component, index) => ({
         id: uuid(),
         entryId,
         userId,
-        name: component.name,
-        category: component.category,
-        estimatedQuantity: component.estimatedQuantity,
-        estimatedUnit: component.estimatedUnit,
-        gramsEstimate: component.gramsEstimate,
+        name: String(component.name).trim(),
+        category: copyOptionalString(component.category),
+        estimatedQuantity: copyOptionalNumber(component.estimatedQuantity),
+        estimatedUnit: copyOptionalString(component.estimatedUnit),
+        gramsEstimate: copyOptionalNumber(component.gramsEstimate),
         confidence: clampConfidence(component.confidence),
-        notes: component.notes,
+        notes: copyOptionalString(component.notes),
         sortOrder: index,
       })),
       createdAt: now,
@@ -117,7 +188,11 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
     };
 
     set(state => ({
-      entries: [entry, ...state.entries.filter(existing => existing.id !== entry.id)],
+      currentUserId: userId,
+      entries: [
+        entry,
+        ...state.entries.filter(existing => existing.userId === userId && existing.id !== entry.id),
+      ],
     }));
 
     syncFoodFireAndForget(userId, entry);
@@ -125,10 +200,23 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
   },
 
   entriesForDate(date, timezone) {
-    return sortNewestFirst(filterFoodEntriesForLocalDate(get().entries, date, timezone));
+    const { currentUserId, entries } = get();
+    const scopedEntries = currentUserId
+      ? entries.filter(entry => entry.userId === currentUserId)
+      : entries;
+    return sortNewestFirst(filterFoodEntriesForLocalDate(scopedEntries, date, timezone));
   },
 
   totalsForDate(date, timezone) {
     return sumFoodNutrients(get().entriesForDate(date, timezone));
+  },
+
+  resetFoodEntries() {
+    set({
+      entries: [],
+      currentUserId: null,
+      loading: false,
+      error: null,
+    });
   },
 }));
