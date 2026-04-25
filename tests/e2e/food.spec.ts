@@ -1,0 +1,160 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const e2eEmail = process.env.E2E_EMAIL;
+const e2ePassword = process.env.E2E_PASSWORD;
+const hasAuthCreds = Boolean(e2eEmail && e2ePassword);
+
+const foodDraft = {
+  title: 'E2E Photo Meal',
+  summary: 'Greek yogurt with berries and granola.',
+  mealLabel: 'breakfast',
+  components: [
+    {
+      name: 'Greek yogurt',
+      category: 'dairy',
+      estimatedQuantity: 1,
+      estimatedUnit: 'bowl',
+      gramsEstimate: 180,
+      confidence: 0.91,
+      notes: 'Plain yogurt base.',
+    },
+    {
+      name: 'Mixed berries',
+      category: 'fruit',
+      estimatedQuantity: 0.5,
+      estimatedUnit: 'cup',
+      gramsEstimate: 75,
+      confidence: 0.83,
+    },
+  ],
+  nutrients: {
+    caloriesKcal: 321,
+    proteinG: 22,
+    totalFatG: 8,
+    carbsG: 41,
+    fiberG: 6,
+    sugarsG: 18,
+    sodiumMg: 95,
+  },
+  uncertainties: ['Granola portion estimated from visible volume.'],
+  estimationConfidence: 0.88,
+  model: 'e2e-food-analysis',
+  schemaVersion: 'food-analysis-v1',
+};
+
+const pngFile = {
+  name: 'meal.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    'base64',
+  ),
+};
+
+const webpFile = {
+  name: 'meal.webp',
+  mimeType: 'image/webp',
+  buffer: Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AA/vuUAAA=', 'base64'),
+};
+
+async function login(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(e2eEmail!);
+  await page.getByLabel('Password').fill(e2ePassword!);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(/\/(app|onboarding)(\/|$)/, { timeout: 30_000 });
+}
+
+async function finishOnboardingIfNeeded(page: Page) {
+  if (!page.url().includes('/onboarding')) return;
+
+  const nameInput = page.getByLabel('Your name');
+  if (await nameInput.isVisible()) {
+    await nameInput.fill('E2E User');
+    await page.getByRole('button', { name: 'Continue →' }).click();
+  }
+
+  if (page.url().includes('/onboarding')) {
+    const skip = page.getByRole('button', { name: 'Skip for now' });
+    if (await skip.isVisible()) {
+      await skip.click();
+    }
+  }
+
+  if (page.url().includes('/onboarding')) {
+    const getStarted = page.getByRole('button', { name: 'Get started →' });
+    if (await getStarted.isVisible()) {
+      await getStarted.click();
+    }
+  }
+
+  await page.waitForURL('/app', { timeout: 30_000 });
+}
+
+async function loginAndOpenFood(page: Page) {
+  await login(page);
+  await finishOnboardingIfNeeded(page);
+  await page.goto('/app/food');
+  await expect(page.getByRole('heading', { name: 'Food' })).toBeVisible();
+}
+
+async function mockFoodAnalysis(page: Page, draft = foodDraft) {
+  await page.route('**/api/food/analyze-photo', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ draft }),
+    });
+  });
+}
+
+async function uploadMealPhoto(page: Page, file = pngFile) {
+  await page.locator('input[type="file"]').setInputFiles(file);
+}
+
+test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
+  test.skip(!hasAuthCreds, 'Set E2E_EMAIL and E2E_PASSWORD to run food diary tests.');
+
+  test.describe.configure({ mode: 'serial' });
+
+  test('analyzes a meal photo, saves the draft, and shows the entry in daily totals', async ({ page }) => {
+    await mockFoodAnalysis(page);
+    await loginAndOpenFood(page);
+
+    await uploadMealPhoto(page, pngFile);
+
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: foodDraft.title })).toBeVisible();
+    await expect(page.getByText(foodDraft.summary)).toBeVisible();
+    await expect(page.getByText('Greek yogurt')).toBeVisible();
+    await expect(page.getByText('321')).toBeVisible();
+    await expect(page.getByText('22g')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByText('Draft', { exact: true })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: foodDraft.title })).toBeVisible();
+    await expect(page.getByText('Photo · 88% confidence')).toBeVisible();
+    await expect(page.getByText('Greek yogurt')).toBeVisible();
+    await expect(page.getByText(/entries$/)).toBeVisible();
+  });
+
+  test('cancels an analyzed draft without adding a diary entry', async ({ page }) => {
+    const cancelledDraft = {
+      ...foodDraft,
+      title: `Cancelled E2E Meal ${Date.now()}`,
+      summary: 'This draft should not be saved.',
+    };
+
+    await mockFoodAnalysis(page, cancelledDraft);
+    await loginAndOpenFood(page);
+
+    await uploadMealPhoto(page, webpFile);
+
+    await expect(page.getByRole('heading', { name: cancelledDraft.title })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(page.getByRole('heading', { name: cancelledDraft.title })).not.toBeVisible();
+    await expect(page.getByText(cancelledDraft.summary)).not.toBeVisible();
+  });
+});
