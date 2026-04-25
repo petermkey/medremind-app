@@ -105,6 +105,15 @@ async function loginAndOpenFood(page: Page) {
   await finishOnboardingIfNeeded(page);
   await page.goto('/app/food');
   await expect(page.getByRole('heading', { name: 'Food' })).toBeVisible();
+  await waitForFoodEntriesLoad(page);
+}
+
+async function waitForFoodEntriesLoad(page: Page) {
+  const entriesHeading = page.getByRole('heading', { name: 'Entries' });
+  await expect(entriesHeading).toBeVisible();
+  await expect(
+    entriesHeading.locator('xpath=..').getByText('Loading…', { exact: true }),
+  ).toBeHidden();
 }
 
 async function mockFoodAnalysis(page: Page, draft = foodDraft) {
