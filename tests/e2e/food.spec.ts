@@ -51,6 +51,15 @@ const pngFile = {
   ),
 };
 
+const jpegFile = {
+  name: 'meal.jpg',
+  mimeType: 'image/jpeg',
+  buffer: Buffer.from(
+    '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/ASP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/ASP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Al//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IV//2gAMAwEAAgADAAAAEP/EFBQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EFBQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EFBABAQAAAAAAAAAAAAAAAAAAARD/2gAIAQEAAT8QH//Z',
+    'base64',
+  ),
+};
+
 const webpFile = {
   name: 'meal.webp',
   mimeType: 'image/webp',
@@ -171,6 +180,23 @@ test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
       carbsG: baselineTotals.carbsG + foodDraft.nutrients.carbsG,
       totalFatG: baselineTotals.totalFatG + foodDraft.nutrients.totalFatG,
     });
+  });
+
+  test('analyzes a JPEG meal photo with the mocked draft response', async ({ page }) => {
+    const jpegDraft = {
+      ...foodDraft,
+      title: 'E2E JPEG Photo Meal',
+      summary: 'JPEG upload draft analysis.',
+    };
+
+    await mockFoodAnalysis(page, jpegDraft);
+    await loginAndOpenFood(page);
+
+    await uploadMealPhoto(page, jpegFile);
+
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: jpegDraft.title })).toBeVisible();
+    await expect(page.getByText(jpegDraft.summary)).toBeVisible();
   });
 
   test('cancels an analyzed draft without adding a diary entry', async ({ page }) => {
