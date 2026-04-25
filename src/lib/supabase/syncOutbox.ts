@@ -1,6 +1,8 @@
 'use client';
 
 import type { ActiveProtocol, DoseRecord, Protocol, ScheduledDose } from '@/types';
+import type { FoodEntry } from '@/types/food';
+import { syncFoodEntrySave } from './foodSync';
 import {
   syncActivation,
   syncActiveStatus,
@@ -36,7 +38,8 @@ type SyncKind =
   | 'completeCommand'
   | 'archiveCommand'
   | 'endProtocolFromToday'
-  | 'removeDose';
+  | 'removeDose'
+  | 'foodEntrySave';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -112,6 +115,7 @@ type SyncPayloadMap = {
     userId: string;
     doseId: string;
   };
+  foodEntrySave: { userId: string; entry: FoodEntry };
 };
 
 export type SyncOperation =
@@ -130,7 +134,8 @@ export type SyncOperation =
   | { kind: 'completeCommand'; payload: SyncPayloadMap['completeCommand'] }
   | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] }
   | { kind: 'endProtocolFromToday'; payload: SyncPayloadMap['endProtocolFromToday'] }
-  | { kind: 'removeDose'; payload: SyncPayloadMap['removeDose'] };
+  | { kind: 'removeDose'; payload: SyncPayloadMap['removeDose'] }
+  | { kind: 'foodEntrySave'; payload: SyncPayloadMap['foodEntrySave'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -308,6 +313,8 @@ async function executeOperation(op: SyncOperation) {
       );
     case 'removeDose':
       return syncRemoveDoseCommand(op.payload.userId, op.payload.doseId);
+    case 'foodEntrySave':
+      return syncFoodEntrySave(op.payload.userId, op.payload.entry);
     default:
       return Promise.resolve();
   }
