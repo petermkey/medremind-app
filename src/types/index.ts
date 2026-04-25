@@ -1,5 +1,7 @@
 // ─── Core domain types ────────────────────────────────────────────────
 
+export type * from './food';
+
 export type DoseForm =
   | 'tablet' | 'capsule' | 'softgel' | 'injection' | 'cream' | 'drops'
   | 'powder' | 'liquid' | 'patch' | 'inhaler' | 'spray' | 'eye_drops'
