@@ -91,20 +91,39 @@ async function ensureCommandDoseRow(
   userId: string,
   dose: ScheduledDose,
   patch?: { status?: ScheduledDose['status']; snoozedUntil?: string | null },
-) {
+): Promise<string> {
   const supabase = getSupabaseClient();
+  const cDoseId = cloudDoseId(userId, dose.id);
+  const cActiveId = cloudActiveId(userId, dose.activeProtocolId);
+  const cItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
   const row = {
-    id: cloudDoseId(userId, dose.id),
+    id: cDoseId,
     user_id: userId,
-    active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
-    protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
+    active_protocol_id: cActiveId,
+    protocol_item_id: cItemId,
     scheduled_date: dose.scheduledDate,
     scheduled_time: dose.scheduledTime,
     status: patch?.status ?? dose.status,
     snoozed_until: patch?.snoozedUntil ?? dose.snoozedUntil ?? null,
   };
   const { error } = await supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
-  if (error) throw new Error(`Ensure scheduled dose sync failed: ${error.message}`);
+  if (!error) return cDoseId;
+
+  if (isDoseSlotConflict(error.message)) {
+    const { data: existing, error: lookupErr } = await supabase
+      .from('scheduled_doses')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('active_protocol_id', cActiveId)
+      .eq('protocol_item_id', cItemId)
+      .eq('scheduled_date', dose.scheduledDate)
+      .eq('scheduled_time', dose.scheduledTime)
+      .maybeSingle();
+    if (lookupErr) throw new Error(`Ensure scheduled dose lookup failed: ${lookupErr.message}`);
+    if (existing?.id) return String(existing.id);
+  }
+
+  throw new Error(`Ensure scheduled dose sync failed: ${error.message}`);
 }
 
 async function findNextAvailableDoseSlot(
@@ -793,7 +812,7 @@ export async function syncTakeDoseCommand(
   clientOperationId: string,
 ): Promise<TakeCommandResult> {
   const supabase = getSupabaseClient();
-  const cDoseId = cloudDoseId(userId, dose.id);
+  let cDoseId = cloudDoseId(userId, dose.id);
   const cRecordId = cloudRecordId(userId, record.id);
   const commandPayload = {
     doseId: dose.id,
@@ -814,7 +833,7 @@ export async function syncTakeDoseCommand(
   );
 
   try {
-    await ensureCommandDoseRow(userId, dose);
+    cDoseId = await ensureCommandDoseRow(userId, dose);
 
     const { error: doseErr } = await supabase
       .from('scheduled_doses')
@@ -894,7 +913,7 @@ export async function syncSkipDoseCommand(
   clientOperationId: string,
 ): Promise<TakeCommandResult> {
   const supabase = getSupabaseClient();
-  const cDoseId = cloudDoseId(userId, dose.id);
+  let cDoseId = cloudDoseId(userId, dose.id);
   const cRecordId = cloudRecordId(userId, record.id);
   const commandPayload = {
     doseId: dose.id,
@@ -915,7 +934,7 @@ export async function syncSkipDoseCommand(
   );
 
   try {
-    await ensureCommandDoseRow(userId, dose);
+    cDoseId = await ensureCommandDoseRow(userId, dose);
 
     const { error: doseErr } = await supabase
       .from('scheduled_doses')
@@ -996,10 +1015,10 @@ export async function syncSnoozeDoseCommand(
   clientOperationId: string,
 ): Promise<TakeCommandResult> {
   const supabase = getSupabaseClient();
-  const cDoseId = cloudDoseId(userId, dose.id);
+  let cDoseId = cloudDoseId(userId, dose.id);
   const cRecordId = cloudRecordId(userId, record.id);
   // When replacementDose is null, the snooze reuses an existing scheduled dose — no new row needed.
-  const cReplacementDoseId = replacementDose ? cloudDoseId(userId, replacementDose.id) : cDoseId;
+  let cReplacementDoseId = replacementDose ? cloudDoseId(userId, replacementDose.id) : cDoseId;
   const cReplacementActiveId = replacementDose ? cloudActiveId(userId, replacementDose.activeProtocolId) : cloudActiveId(userId, dose.activeProtocolId);
   const cReplacementItemId = replacementDose
     ? cloudProtocolItemId(userId, replacementDose.activeProtocol.protocolId, replacementDose.protocolItemId)
@@ -1042,10 +1061,11 @@ export async function syncSnoozeDoseCommand(
   };
 
   try {
-    await ensureCommandDoseRow(userId, dose, {
+    cDoseId = await ensureCommandDoseRow(userId, dose, {
       status: 'snoozed',
       snoozedUntil: replacementDose?.snoozedUntil ?? null,
     });
+    if (!replacementDose) cReplacementDoseId = cDoseId;
 
     const { error: originalErr } = await supabase
       .from('scheduled_doses')
