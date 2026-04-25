@@ -1,6 +1,6 @@
 # MedRemind Current Status
 
-Date: 2026-04-17
+Date: 2026-04-25
 Owner: engineering runtime status on current `main`
 
 > **Lifecycle contract:** `docs/lifecycle-contract-v1.md` is the authoritative behavioral specification
@@ -55,6 +55,8 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Import upsert conflict handling for `scheduled_doses` hardened in `importStore.ts`.
 - Push cron reliability improved with stale-claim recovery and Pass B rollback on send failure.
 - Service worker notification policy updated to context-aware `renotify` behavior to prevent silent reminder replacements.
+- Dose command persistence hardened for restart-survival: fallback outbox operations are queued before direct sync settles, direct sync success removes the fallback, and scheduled-dose unique-slot conflicts resolve to the canonical cloud row.
+- Zustand hydration now scrubs stale volatile dose state from older localStorage payloads; `scheduledDoses`, `doseRecords`, and `executionEvents` must not be restored from local persistence.
 
 ### Dose card UX (landed 2026-03-21)
 
@@ -169,6 +171,7 @@ Practical implication:
 
 - Auth policy remains split across `src/proxy.ts` (server routing, `middleware.ts` delegates to it) and client bootstrap (`layout.tsx`).
 - Store domain and sync concerns remain tightly coupled in `store.ts` (1234 lines).
+- Dose persistence investigation is still open for live authenticated browser read-path verification if the user still sees lost intake state after production SHA `6e47068`. See `docs/dose-persistence-handoff-2026-04-25.md`.
 - Outbox remains device-local and can accumulate under prolonged failures.
 - **OAuth account-linking is unverified.** If Supabase "Allow automatic linking" is not enabled on project `hagypgvfkjkncznoctoq`, a user who created an email/password account and later signs in via Google with the same address can land in a duplicate empty account (data appears missing).
 
