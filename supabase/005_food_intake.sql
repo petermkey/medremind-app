@@ -30,7 +30,8 @@ create table if not exists food_entries (
   extended_nutrients jsonb not null default '{}'::jsonb,
   uncertainties jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint food_entries_id_user_id_key unique (id, user_id)
 );
 
 alter table food_entries enable row level security;
@@ -43,9 +44,14 @@ create policy "Owner access" on food_entries
 create index if not exists idx_food_entries_user_consumed_at
   on food_entries(user_id, consumed_at desc);
 
+drop trigger if exists food_entries_updated_at on food_entries;
+create trigger food_entries_updated_at
+  before update on food_entries
+  for each row execute function public.set_updated_at();
+
 create table if not exists food_entry_components (
   id uuid primary key default gen_random_uuid(),
-  entry_id uuid not null references food_entries(id) on delete cascade,
+  entry_id uuid not null,
   user_id uuid not null references profiles(id) on delete cascade,
   name text not null,
   category text,
@@ -56,7 +62,9 @@ create table if not exists food_entry_components (
     check (confidence >= 0 and confidence <= 1),
   notes text,
   sort_order int not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint food_entry_components_entry_owner_fk
+    foreign key (entry_id, user_id) references food_entries(id, user_id) on delete cascade
 );
 
 alter table food_entry_components enable row level security;
