@@ -9,6 +9,7 @@ import {
   enqueueSyncOperation,
   markSyncFailure,
   markSyncSuccess,
+  pumpOutbox,
   removeQueuedSyncOperation,
 } from '@/lib/supabase/syncOutbox';
 
@@ -105,6 +106,7 @@ function syncFoodFireAndForget(userId: string, entry: FoodEntry) {
     })
     .catch((error: unknown) => {
       markSyncFailure(error);
+      void pumpOutbox({ force: true });
     });
 }
 
