@@ -112,6 +112,32 @@ async function uploadMealPhoto(page: Page, file = pngFile) {
   await page.locator('input[type="file"]').setInputFiles(file);
 }
 
+async function getTopDailyTotals(page: Page) {
+  const topTotals = page.locator('.flex-shrink-0').filter({
+    has: page.getByRole('heading', { name: 'Food' }),
+  }).first();
+
+  await expect(topTotals).toBeVisible();
+
+  const parseNumber = async (locator: ReturnType<Page['locator']>) => {
+    const text = await locator.innerText();
+    return Number(text.replace(/[^\d.-]/g, ''));
+  };
+  const nutrientValue = (label: string) => parseNumber(
+    topTotals.locator('.grid').first().locator(':scope > div').filter({
+      has: page.getByText(label, { exact: true }),
+    }).locator('div').first(),
+  );
+
+  return {
+    entryCount: await parseNumber(topTotals.getByText(/^\d+ entries$/)),
+    caloriesKcal: await nutrientValue('kcal'),
+    proteinG: await nutrientValue('Protein'),
+    carbsG: await nutrientValue('Carbs'),
+    totalFatG: await nutrientValue('Fat'),
+  };
+}
+
 test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
   test.skip(!hasAuthCreds, 'Set E2E_EMAIL and E2E_PASSWORD to run food diary tests.');
 
@@ -120,6 +146,8 @@ test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
   test('analyzes a meal photo, saves the draft, and shows the entry in daily totals', async ({ page }) => {
     await mockFoodAnalysis(page);
     await loginAndOpenFood(page);
+
+    const baselineTotals = await getTopDailyTotals(page);
 
     await uploadMealPhoto(page, pngFile);
 
@@ -136,7 +164,13 @@ test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
     await expect(page.getByRole('heading', { name: foodDraft.title })).toBeVisible();
     await expect(page.getByText('Photo · 88% confidence')).toBeVisible();
     await expect(page.getByText('Greek yogurt')).toBeVisible();
-    await expect(page.getByText(/entries$/)).toBeVisible();
+    await expect.poll(() => getTopDailyTotals(page)).toEqual({
+      entryCount: baselineTotals.entryCount + 1,
+      caloriesKcal: baselineTotals.caloriesKcal + foodDraft.nutrients.caloriesKcal,
+      proteinG: baselineTotals.proteinG + foodDraft.nutrients.proteinG,
+      carbsG: baselineTotals.carbsG + foodDraft.nutrients.carbsG,
+      totalFatG: baselineTotals.totalFatG + foodDraft.nutrients.totalFatG,
+    });
   });
 
   test('cancels an analyzed draft without adding a diary entry', async ({ page }) => {
