@@ -121,6 +121,37 @@ async function uploadMealPhoto(page: Page, file = pngFile) {
   await page.locator('input[type="file"]').setInputFiles(file);
 }
 
+async function saveAnalyzedMealPhoto(
+  page: Page,
+  file: typeof pngFile,
+  draft: typeof foodDraft,
+) {
+  const baselineTotals = await getTopDailyTotals(page);
+
+  await uploadMealPhoto(page, file);
+
+  await expect(page.getByText('Draft', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: draft.title })).toBeVisible();
+  await expect(page.getByText(draft.summary)).toBeVisible();
+  await expect(page.getByText('Greek yogurt')).toBeVisible();
+  await expect(page.getByText(String(draft.nutrients.caloriesKcal))).toBeVisible();
+  await expect(page.getByText(`${draft.nutrients.proteinG}g`)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByText('Draft', { exact: true })).not.toBeVisible();
+  await expect(page.getByRole('heading', { name: draft.title })).toBeVisible();
+  await expect(page.getByText('Photo · 88% confidence')).toBeVisible();
+  await expect(page.getByText('Greek yogurt')).toBeVisible();
+  await expect.poll(() => getTopDailyTotals(page)).toEqual({
+    entryCount: baselineTotals.entryCount + 1,
+    caloriesKcal: baselineTotals.caloriesKcal + draft.nutrients.caloriesKcal,
+    proteinG: baselineTotals.proteinG + draft.nutrients.proteinG,
+    carbsG: baselineTotals.carbsG + draft.nutrients.carbsG,
+    totalFatG: baselineTotals.totalFatG + draft.nutrients.totalFatG,
+  });
+}
+
 async function getTopDailyTotals(page: Page) {
   const topTotals = page.locator('.flex-shrink-0').filter({
     has: page.getByRole('heading', { name: 'Food' }),
@@ -152,52 +183,28 @@ test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
 
   test.describe.configure({ mode: 'serial' });
 
-  test('analyzes a meal photo, saves the draft, and shows the entry in daily totals', async ({ page }) => {
-    await mockFoodAnalysis(page);
-    await loginAndOpenFood(page);
+  const supportedPhotoFormats = [
+    { label: 'PNG', file: pngFile },
+    { label: 'JPEG', file: jpegFile },
+    { label: 'WebP', file: webpFile },
+  ] as const;
 
-    const baselineTotals = await getTopDailyTotals(page);
+  for (const { label, file } of supportedPhotoFormats) {
+    test(`analyzes a ${label} meal photo, saves the draft, and shows the entry in daily totals`, async ({
+      page,
+    }, testInfo) => {
+      const uniqueSuffix = `${label.toLowerCase()}-${testInfo.workerIndex}-${Date.now()}`;
+      const draft = {
+        ...foodDraft,
+        title: `E2E ${label} Photo Meal ${uniqueSuffix}`,
+        summary: `${label} upload draft analysis ${uniqueSuffix}.`,
+      };
 
-    await uploadMealPhoto(page, pngFile);
-
-    await expect(page.getByText('Draft', { exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: foodDraft.title })).toBeVisible();
-    await expect(page.getByText(foodDraft.summary)).toBeVisible();
-    await expect(page.getByText('Greek yogurt')).toBeVisible();
-    await expect(page.getByText('321')).toBeVisible();
-    await expect(page.getByText('22g')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await expect(page.getByText('Draft', { exact: true })).not.toBeVisible();
-    await expect(page.getByRole('heading', { name: foodDraft.title })).toBeVisible();
-    await expect(page.getByText('Photo · 88% confidence')).toBeVisible();
-    await expect(page.getByText('Greek yogurt')).toBeVisible();
-    await expect.poll(() => getTopDailyTotals(page)).toEqual({
-      entryCount: baselineTotals.entryCount + 1,
-      caloriesKcal: baselineTotals.caloriesKcal + foodDraft.nutrients.caloriesKcal,
-      proteinG: baselineTotals.proteinG + foodDraft.nutrients.proteinG,
-      carbsG: baselineTotals.carbsG + foodDraft.nutrients.carbsG,
-      totalFatG: baselineTotals.totalFatG + foodDraft.nutrients.totalFatG,
+      await mockFoodAnalysis(page, draft);
+      await loginAndOpenFood(page);
+      await saveAnalyzedMealPhoto(page, file, draft);
     });
-  });
-
-  test('analyzes a JPEG meal photo with the mocked draft response', async ({ page }) => {
-    const jpegDraft = {
-      ...foodDraft,
-      title: 'E2E JPEG Photo Meal',
-      summary: 'JPEG upload draft analysis.',
-    };
-
-    await mockFoodAnalysis(page, jpegDraft);
-    await loginAndOpenFood(page);
-
-    await uploadMealPhoto(page, jpegFile);
-
-    await expect(page.getByText('Draft', { exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: jpegDraft.title })).toBeVisible();
-    await expect(page.getByText(jpegDraft.summary)).toBeVisible();
-  });
+  }
 
   test('cancels an analyzed draft without adding a diary entry', async ({ page }) => {
     const cancelledDraft = {
@@ -209,7 +216,7 @@ test.describe('food diary (requires E2E_EMAIL and E2E_PASSWORD)', () => {
     await mockFoodAnalysis(page, cancelledDraft);
     await loginAndOpenFood(page);
 
-    await uploadMealPhoto(page, webpFile);
+    await uploadMealPhoto(page, pngFile);
 
     await expect(page.getByRole('heading', { name: cancelledDraft.title })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
