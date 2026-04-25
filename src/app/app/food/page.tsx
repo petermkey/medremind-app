@@ -17,9 +17,22 @@ const PRIMARY_NUTRIENTS = [
   { key: 'totalFatG', label: 'Fat', unit: 'g' },
 ] as const;
 
+function isValidTimezoneCandidate(timezone?: string): timezone is string {
+  const candidate = timezone?.trim();
+  if (!candidate) return false;
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getResolvedTimezone(timezone?: string): string {
-  const candidate = timezone?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return candidate || 'UTC';
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const candidates = [timezone?.trim(), browserTimezone?.trim()];
+  return candidates.find(isValidTimezoneCandidate) ?? 'UTC';
 }
 
 function currentDateForTimezone(timezone: string): string {
