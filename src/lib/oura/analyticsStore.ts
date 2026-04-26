@@ -106,6 +106,25 @@ export type DailyHealthFeatureInput = {
   sourcePayloadHashes?: JsonValue;
 };
 
+type DailyHealthFeatureUpsertPayload = {
+  user_id: string;
+  date: string;
+  sleep_score?: number | null;
+  readiness_score?: number | null;
+  activity_score?: number | null;
+  stress_summary?: JsonValue;
+  spo2_average?: number | null;
+  resting_heart_rate?: number | null;
+  hrv_average?: number | null;
+  steps?: number | null;
+  active_calories?: number | null;
+  workout_count?: number | null;
+  bedtime_start?: string | null;
+  bedtime_end?: string | null;
+  data_quality?: JsonValue;
+  source_payload_hashes?: JsonValue;
+};
+
 function getServiceClient() {
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -330,28 +349,63 @@ export function getOuraRawRetentionCutoffDate(now = new Date(), retentionDays = 
   return cutoff.toISOString().slice(0, 10);
 }
 
+export function buildDailyHealthFeatureUpsertPayload(
+  input: DailyHealthFeatureInput,
+): DailyHealthFeatureUpsertPayload {
+  const payload: DailyHealthFeatureUpsertPayload = {
+    user_id: input.userId,
+    date: input.date,
+  };
+
+  if (input.sleepScore !== undefined) payload.sleep_score = input.sleepScore;
+  if (input.readinessScore !== undefined) payload.readiness_score = input.readinessScore;
+  if (input.activityScore !== undefined) payload.activity_score = input.activityScore;
+  if (input.stressSummary !== undefined) payload.stress_summary = input.stressSummary;
+  if (input.spo2Average !== undefined) payload.spo2_average = input.spo2Average;
+  if (input.restingHeartRate !== undefined) payload.resting_heart_rate = input.restingHeartRate;
+  if (input.hrvAverage !== undefined) payload.hrv_average = input.hrvAverage;
+  if (input.steps !== undefined) payload.steps = input.steps;
+  if (input.activeCalories !== undefined) payload.active_calories = input.activeCalories;
+  if (input.workoutCount !== undefined) payload.workout_count = input.workoutCount;
+  if (input.bedtimeStart !== undefined) payload.bedtime_start = input.bedtimeStart;
+  if (input.bedtimeEnd !== undefined) payload.bedtime_end = input.bedtimeEnd;
+  if (input.dataQuality !== undefined) payload.data_quality = input.dataQuality;
+  if (input.sourcePayloadHashes !== undefined) {
+    payload.source_payload_hashes = input.sourcePayloadHashes;
+  }
+
+  return payload;
+}
+
 export async function upsertDailyHealthFeature(input: DailyHealthFeatureInput): Promise<void> {
   const supabase = getServiceClient();
+  const payload = buildDailyHealthFeatureUpsertPayload(input);
+  const { user_id: _userId, date: _date, ...updates } = payload;
+
+  if (Object.keys(updates).length > 0) {
+    const { count, error } = await supabase
+      .from('daily_health_features')
+      .update(updates, { count: 'exact' })
+      .eq('user_id', input.userId)
+      .eq('date', input.date);
+
+    if (error) throw error;
+    if (count && count > 0) return;
+  }
+
   const { error } = await supabase
     .from('daily_health_features')
-    .upsert({
-      user_id: input.userId,
-      date: input.date,
-      sleep_score: input.sleepScore ?? null,
-      readiness_score: input.readinessScore ?? null,
-      activity_score: input.activityScore ?? null,
-      stress_summary: input.stressSummary ?? null,
-      spo2_average: input.spo2Average ?? null,
-      resting_heart_rate: input.restingHeartRate ?? null,
-      hrv_average: input.hrvAverage ?? null,
-      steps: input.steps ?? null,
-      active_calories: input.activeCalories ?? null,
-      workout_count: input.workoutCount ?? null,
-      bedtime_start: input.bedtimeStart ?? null,
-      bedtime_end: input.bedtimeEnd ?? null,
-      data_quality: input.dataQuality ?? {},
-      source_payload_hashes: input.sourcePayloadHashes ?? {},
-    }, { onConflict: 'user_id,date' });
+    .insert(payload);
 
-  if (error) throw error;
+  if (!error) return;
+  if (error.code !== '23505') throw error;
+  if (Object.keys(updates).length === 0) return;
+
+  const { error: retryError } = await supabase
+    .from('daily_health_features')
+    .update(updates)
+    .eq('user_id', input.userId)
+    .eq('date', input.date);
+
+  if (retryError) throw retryError;
 }

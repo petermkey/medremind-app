@@ -84,8 +84,8 @@ create unique index if not exists idx_oura_raw_documents_identity_hash
     connection_id,
     endpoint,
     coalesce(oura_document_id, ''),
-    coalesce(local_date::text, ''),
-    coalesce(start_datetime::text, ''),
+    coalesce(local_date, '-infinity'::date),
+    coalesce(start_datetime, '-infinity'::timestamptz),
     payload_hash
   );
 
