@@ -45,3 +45,19 @@ import {
     sleep_score: null,
   });
 }
+
+{
+  buildDailyHealthFeatureUpsertPayload({
+    userId: 'user-1',
+    date: '2026-04-26',
+    // @ts-expect-error dataQuality maps to a not-null jsonb object column.
+    dataQuality: null,
+  });
+
+  buildDailyHealthFeatureUpsertPayload({
+    userId: 'user-1',
+    date: '2026-04-26',
+    // @ts-expect-error sourcePayloadHashes maps to a not-null jsonb object column.
+    sourcePayloadHashes: null,
+  });
+}

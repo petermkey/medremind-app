@@ -24,6 +24,8 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+type JsonObject = { [key: string]: JsonValue };
+
 export type OuraSyncRun = {
   id: string;
   user_id: string;
@@ -102,8 +104,8 @@ export type DailyHealthFeatureInput = {
   workoutCount?: number | null;
   bedtimeStart?: string | null;
   bedtimeEnd?: string | null;
-  dataQuality?: JsonValue;
-  sourcePayloadHashes?: JsonValue;
+  dataQuality?: JsonObject;
+  sourcePayloadHashes?: JsonObject;
 };
 
 type DailyHealthFeatureUpsertPayload = {
@@ -121,8 +123,8 @@ type DailyHealthFeatureUpsertPayload = {
   workout_count?: number | null;
   bedtime_start?: string | null;
   bedtime_end?: string | null;
-  data_quality?: JsonValue;
-  source_payload_hashes?: JsonValue;
+  data_quality?: JsonObject;
+  source_payload_hashes?: JsonObject;
 };
 
 function getServiceClient() {
