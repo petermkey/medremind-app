@@ -1,7 +1,54 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, eachDayOfInterval, format, subDays } from 'date-fns';
+import { Button } from '@/components/ui/Button';
 import { useStore } from '@/lib/store/store';
+
+type MedicationStatus = {
+  counts?: {
+    mapItems: number;
+    rules: number;
+    clinicianReviewFlags: number;
+    dailyExposures: number;
+  };
+  lastRun?: {
+    status?: string;
+    updatedAt?: string | null;
+    lastError?: string | null;
+  } | null;
+  error?: string;
+};
+
+type Consent = {
+  enabled: boolean;
+  includesMedicationPatterns: boolean;
+  includesHealthData: boolean;
+  acknowledgedNoMedChanges: boolean;
+};
+
+type CorrelationCard = {
+  title: string;
+  body: string;
+  strength: string;
+  direction: string;
+  recommendationKind: string;
+  r: number;
+  n: number;
+  generatedAt: string;
+};
+
+type CorrelationResponse = {
+  consent: Consent;
+  cards: CorrelationCard[];
+  error?: string;
+};
+
+const DEFAULT_CONSENT: Consent = {
+  enabled: false,
+  includesMedicationPatterns: false,
+  includesHealthData: false,
+  acknowledgedNoMedChanges: false,
+};
 
 function pctToColor(pct: number) {
   if (pct === 0) return '#1C2333';
@@ -135,6 +182,12 @@ export default function ProgressPage() {
   } = useStore();
   const [calendarRange, setCalendarRange] = useState<30 | 60 | 90>(30);
   const [isMobile, setIsMobile] = useState(false);
+  const [medicationStatus, setMedicationStatus] = useState<MedicationStatus | null>(null);
+  const [correlations, setCorrelations] = useState<CorrelationResponse>({ consent: DEFAULT_CONSENT, cards: [] });
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [refreshingMedication, setRefreshingMedication] = useState(false);
+  const [refreshingCorrelations, setRefreshingCorrelations] = useState(false);
+  const [analyticsMessage, setAnalyticsMessage] = useState('');
 
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
@@ -145,6 +198,96 @@ export default function ProgressPage() {
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([
+      fetch('/api/medication-knowledge/status')
+        .then((response) => response.json())
+        .catch(() => ({ error: 'Medication knowledge unavailable.' })),
+      fetch('/api/insights/correlations')
+        .then((response) => response.json())
+        .catch(() => ({ consent: DEFAULT_CONSENT, cards: [], error: 'Progress analytics unavailable.' })),
+    ]).then(([medicationData, correlationData]) => {
+      if (cancelled) return;
+      setMedicationStatus(medicationData);
+      setCorrelations({
+        consent: correlationData.consent ?? DEFAULT_CONSENT,
+        cards: correlationData.cards ?? [],
+        error: correlationData.error,
+      });
+    }).finally(() => {
+      if (!cancelled) setAnalyticsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const consentReady = useMemo(() => (
+    correlations.consent.enabled
+    && correlations.consent.includesMedicationPatterns
+    && correlations.consent.includesHealthData
+    && correlations.consent.acknowledgedNoMedChanges
+  ), [correlations.consent]);
+
+  async function saveConsent(nextConsent: Consent) {
+    setAnalyticsMessage('');
+    const response = await fetch('/api/insights/correlations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ consent: nextConsent, refresh: false }),
+    });
+    const data = await response.json();
+    setCorrelations({
+      consent: data.consent ?? nextConsent,
+      cards: data.cards ?? [],
+      error: response.ok ? undefined : data.error,
+    });
+    if (!response.ok) setAnalyticsMessage(data.error ?? 'Consent update failed.');
+  }
+
+  async function refreshMedicationKnowledge() {
+    setRefreshingMedication(true);
+    setAnalyticsMessage('');
+    try {
+      const response = await fetch('/api/medication-knowledge/refresh', { method: 'POST' });
+      const data = await response.json();
+      setMedicationStatus((current) => ({
+        ...current,
+        counts: {
+          mapItems: data.counts?.mapItems ?? current?.counts?.mapItems ?? 0,
+          rules: data.counts?.rules ?? current?.counts?.rules ?? 0,
+          clinicianReviewFlags: current?.counts?.clinicianReviewFlags ?? 0,
+          dailyExposures: data.counts?.dailyExposures ?? current?.counts?.dailyExposures ?? 0,
+        },
+        lastRun: data.lastRun ?? current?.lastRun ?? null,
+        error: response.ok ? undefined : data.error,
+      }));
+      setAnalyticsMessage(response.ok ? 'Medication context refreshed.' : data.error ?? 'Medication context refresh failed.');
+    } finally {
+      setRefreshingMedication(false);
+    }
+  }
+
+  async function refreshCorrelations() {
+    setRefreshingCorrelations(true);
+    setAnalyticsMessage('');
+    try {
+      const response = await fetch('/api/insights/correlations', { method: 'POST' });
+      const data = await response.json();
+      setCorrelations({
+        consent: data.consent ?? correlations.consent,
+        cards: data.cards ?? [],
+        error: response.ok ? undefined : data.error,
+      });
+      setAnalyticsMessage(response.ok ? 'Progress analytics refreshed.' : data.error ?? 'Progress analytics refresh failed.');
+    } finally {
+      setRefreshingCorrelations(false);
+    }
+  }
 
   const futureDays = Math.floor(calendarRange / 3);
   const pastDays = calendarRange - 1 - futureDays;
@@ -356,7 +499,98 @@ export default function ProgressPage() {
           ))}
         </div>
 
-        {/* ── 4. LAST 7 DAYS (weekly rings — unchanged) ── */}
+        {/* ── 4. HEALTH AND MEDICATION PATTERNS ── */}
+        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest">Health & Medication Patterns</div>
+              <div className="mt-1 text-xs leading-relaxed text-[#8B949E]">
+                Oura connection and health sync are managed in Settings.
+              </div>
+            </div>
+            <a href="/app/settings" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+              Settings
+            </a>
+          </div>
+
+          {analyticsLoading ? (
+            <p className="text-sm text-[#8B949E]">Loading analytics...</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#0D1117] p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-[#F0F6FC]">
+                    {medicationStatus?.counts?.mapItems ?? 0} medication map item(s)
+                  </div>
+                  <div className="mt-1 text-xs text-[#8B949E]">
+                    {medicationStatus?.counts?.rules ?? 0} rule card(s), {medicationStatus?.counts?.clinicianReviewFlags ?? 0} clinician-review flag(s)
+                  </div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={refreshMedicationKnowledge} loading={refreshingMedication}>
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-xl bg-[#0D1117] p-3">
+                <ConsentToggle
+                  label="Medication pattern analysis"
+                  checked={correlations.consent.enabled && correlations.consent.includesMedicationPatterns}
+                  onChange={(checked) => saveConsent({
+                    ...correlations.consent,
+                    enabled: checked || correlations.consent.includesHealthData,
+                    includesMedicationPatterns: checked,
+                  })}
+                />
+                <ConsentToggle
+                  label="Health-data analysis"
+                  checked={correlations.consent.enabled && correlations.consent.includesHealthData}
+                  onChange={(checked) => saveConsent({
+                    ...correlations.consent,
+                    enabled: checked || correlations.consent.includesMedicationPatterns,
+                    includesHealthData: checked,
+                  })}
+                />
+                <ConsentToggle
+                  label="I understand these patterns support clinician review and do not change medication instructions."
+                  checked={correlations.consent.acknowledgedNoMedChanges}
+                  onChange={(checked) => saveConsent({
+                    ...correlations.consent,
+                    enabled: checked || correlations.consent.enabled,
+                    acknowledgedNoMedChanges: checked,
+                  })}
+                />
+                <Button size="sm" onClick={refreshCorrelations} loading={refreshingCorrelations} disabled={!consentReady}>
+                  Refresh patterns
+                </Button>
+              </div>
+
+              {analyticsMessage && <p className="text-xs text-[#8B949E]">{analyticsMessage}</p>}
+              {medicationStatus?.error && <p className="text-xs text-[#FCA5A5]">{medicationStatus.error}</p>}
+              {correlations.error && <p className="text-xs text-[#FCA5A5]">{correlations.error}</p>}
+
+              {correlations.cards.length === 0 ? (
+                <p className="text-sm leading-relaxed text-[#8B949E]">
+                  No pattern cards yet. Enable consent and refresh after medication context, food, hydration, and health summaries are available.
+                </p>
+              ) : correlations.cards.map((card) => (
+                <article key={`${card.title}-${card.generatedAt}`} className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-bold text-[#F0F6FC]">{card.title}</h2>
+                    <span className="rounded-full bg-[rgba(59,130,246,0.12)] px-2 py-1 text-[10px] font-bold uppercase text-[#93C5FD]">
+                      {card.strength}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-[#C9D1D9]">{card.body}</p>
+                  <p className="mt-3 text-xs text-[#8B949E]">
+                    Direction: {card.direction} · r {card.r.toFixed(2)} · paired days {card.n}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── 5. LAST 7 DAYS (weekly rings — unchanged) ── */}
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
           <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">Last 7 Days</div>
           <div className="grid grid-cols-7 gap-2">
@@ -380,7 +614,7 @@ export default function ProgressPage() {
           )}
         </div>
 
-        {/* ── 5. MONTHLY PATTERN (heatmap cells) ── */}
+        {/* ── 6. MONTHLY PATTERN (heatmap cells) ── */}
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest">Monthly Pattern</div>
@@ -453,7 +687,7 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        {/* ── 6. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
+        {/* ── 7. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
         {sortedActiveProtocols.length > 0 && (
           <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
             <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">By Protocol</div>
@@ -486,5 +720,20 @@ export default function ProgressPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function ConsentToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex items-center justify-between gap-3 text-left"
+    >
+      <span className="text-sm font-semibold leading-relaxed text-[#F0F6FC]">{label}</span>
+      <span className={`relative h-6 w-12 flex-shrink-0 rounded-full transition-colors ${checked ? 'bg-[#3B82F6]' : 'bg-[#1C2333]'}`}>
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${checked ? 'left-6' : 'left-0.5'}`} />
+      </span>
+    </button>
   );
 }

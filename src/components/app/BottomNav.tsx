@@ -7,7 +7,6 @@ const NAV = [
   { href: '/app/food',      icon: '🍽️', label: 'Food'     },
   { href: '/app/meds',      icon: '💊', label: 'Meds'     },
   { href: '/app/protocols', icon: '📁', label: 'Protocols' },
-  { href: '/app/insights',  icon: '🧭', label: 'Insights' },
   { href: '/app/progress',  icon: '📊', label: 'Progress'  },
   { href: '/app/settings',  icon: '⚙️', label: 'Settings'  },
 ];

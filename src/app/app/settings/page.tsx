@@ -433,8 +433,8 @@ export default function SettingsPage() {
                 Sync
               </Button>
             </div>
-            <a href="/app/insights" className="text-xs font-semibold text-[#3B82F6] hover:underline">
-              Open Insights
+            <a href="/app/progress" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+              Open Progress analytics
             </a>
           </div>
         </Section>
