@@ -44,6 +44,90 @@ Use a hybrid model:
 
 This gives deterministic behavior for the classes MedRemind cares about most while avoiding brittle parsing of free-text labels for every product.
 
+## AI Model Stack
+
+AI should be used as an interpretation and summarization layer, not as the source of truth for medication facts. The source of truth remains structured first-party app data, curated rules, RxNorm/RxClass identifiers, DailyMed/openFDA label references, and Oura/food/hydration records.
+
+Use OpenRouter as the AI provider for this layer. The app should call the OpenRouter OpenAI-compatible Chat Completions endpoint:
+
+- `OPENROUTER_API_BASE_URL`: default `https://openrouter.ai/api/v1`.
+- `OPENROUTER_API_KEY`: required for AI-assisted pipelines.
+- `OPENROUTER_HTTP_REFERER`: default `NEXT_PUBLIC_APP_URL`.
+- `OPENROUTER_APP_TITLE`: default `MedRemind`.
+
+Use model aliases through environment variables so the stack can be upgraded without schema changes:
+
+- `MED_KNOWLEDGE_FAST_MODEL`: default `google/gemini-2.5-flash`.
+- `MED_KNOWLEDGE_REASONING_MODEL`: default `anthropic/claude-sonnet-4.5`.
+- `MED_KNOWLEDGE_SECOND_OPINION_MODEL`: default `google/gemini-2.5-pro`.
+- `MED_KNOWLEDGE_NANO_MODEL`: default `google/gemini-2.5-flash-lite`.
+- `MED_KNOWLEDGE_LONG_CONTEXT_MODEL`: default `qwen/qwen3.6-plus`.
+- `MED_KNOWLEDGE_AUTO_FALLBACK_MODEL`: default `openrouter/auto`.
+
+Provider routing rules:
+
+- Use `require_parameters: true` for requests that require `response_format` / `structured_outputs`.
+- Use strict `response_format: { type: "json_schema", json_schema: { strict: true, ... } }` where the chosen model supports it.
+- Use OpenRouter `models` fallback arrays for non-critical tasks only; do not fallback silently for medication safety validation.
+- Include `HTTP-Referer` and `X-OpenRouter-Title` headers for app attribution.
+- Store returned `model`, `usage`, and selected provider metadata in `ai_runs` when available.
+
+The planned OpenRouter usage is:
+
+1. **Fast classification and extraction**
+   - Model: `MED_KNOWLEDGE_FAST_MODEL`, default `google/gemini-2.5-flash`.
+   - API: OpenRouter Chat Completions with strict structured outputs.
+   - Input: normalized medication name, candidate RxNorm/RxClass matches, curated class list, label section snippets.
+   - Output: strict JSON `MedicationClassificationCandidate`.
+   - Use cases: ambiguous custom drug classification, supplement class mapping, extraction of lifestyle-relevant label facts into a controlled schema.
+
+2. **High-confidence clinical/lifestyle reasoning review**
+   - Model: `MED_KNOWLEDGE_REASONING_MODEL`, default `anthropic/claude-sonnet-4.5`.
+   - API: OpenRouter Chat Completions with strict structured outputs and `require_parameters: true`.
+   - Input: deterministic features, matched rules, evidence references, Oura/food/hydration aggregate summaries, correlation results.
+   - Output: strict JSON `InsightDraftReview`.
+   - Use cases: resolving conflicting rules, explaining why an insight is or is not strong enough, choosing clinician-review vs lifestyle prompt language.
+
+3. **Second-opinion review for high-risk medication-adjacent cards**
+   - Model: `MED_KNOWLEDGE_SECOND_OPINION_MODEL`, default `google/gemini-2.5-pro`.
+   - API: OpenRouter Chat Completions with strict structured outputs.
+   - Input: candidate card, evidence references, deterministic rule trace, safety validator result.
+   - Output: strict JSON `SecondOpinionReview`.
+   - Use cases: independent review before persisting high-severity clinician-review cards.
+
+4. **Low-cost routing and deduplication**
+   - Model: `MED_KNOWLEDGE_NANO_MODEL`, default `google/gemini-2.5-flash-lite`.
+   - API: OpenRouter Chat Completions with structured outputs when supported.
+   - Input: existing card titles/bodies and a new candidate card.
+   - Output: strict JSON `InsightDeduplicationDecision`.
+   - Use cases: grouping similar insights, classifying a candidate into nutrition/hydration/activity/sleep/stress/medication-review buckets, short copy variants.
+
+5. **Long-context evidence summarization**
+   - Model: `MED_KNOWLEDGE_LONG_CONTEXT_MODEL`, default `qwen/qwen3.6-plus`.
+   - API: OpenRouter Chat Completions with structured outputs and long-context input limits.
+   - Input: compacted DailyMed/openFDA label sections, RxNorm/RxClass metadata, curated rule candidates.
+   - Output: strict JSON `EvidenceSummary`.
+   - Use cases: summarizing large label sections into evidence cards that still cite source section names and URLs.
+
+6. **Evidence retrieval and semantic matching**
+   - Primary approach: deterministic lexical matching by RxCUI, ingredient, class code, alias, and content hash.
+   - Optional AI-assisted approach: OpenRouter model-based reranking of a small candidate set using `MED_KNOWLEDGE_FAST_MODEL`.
+   - Do not rely on OpenRouter for embeddings in the first slice unless a selected OpenRouter-compatible embedding endpoint is explicitly added. If vector search is needed before then, defer embeddings or use Supabase text search plus deterministic aliases.
+
+7. **Existing food photo analysis**
+   - Prefer the existing OpenRouter provider path for AI food analysis.
+   - The medication knowledge layer consumes confirmed food entries and nutrients, not raw food-photo model output.
+
+All model outputs must be treated as proposed structured data. They must pass deterministic validation before persistence:
+
+- Schema validation through OpenRouter structured outputs where supported.
+- Medication safety language validator.
+- Evidence reference requirement for medication-related claims.
+- Confidence thresholding.
+- No direct prescription medication-change actions.
+
+OpenRouter's API supports OpenAI-compatible chat completions, app attribution headers, usage reporting, provider/model routing, and structured outputs for compatible models. Because model support changes over time, implementation must check OpenRouter model metadata for `structured_outputs` / `response_format` support during model selection and fail closed when a required parameter is unavailable.
+
 ## Source Systems
 
 ### RxNorm and RxClass
@@ -128,6 +212,65 @@ The correlation engine needs a daily feature map:
 - `medication_class_exposure_score`
 - `medication_review_signal_count`
 
+### Evidence Document Entity
+
+Store external evidence as normalized, versioned references:
+
+- `evidence_id`
+- `source`: rxnorm, rxclass, dailymed, openfda, curated_rule, clinical_advisory.
+- `source_url`
+- `source_version`
+- `source_retrieved_at`
+- `title`
+- `section_name`
+- `content_hash`
+- `content_excerpt`
+- `retrieval_strategy`: lexical, model_rerank, vector.
+- `embedding_model`
+- `embedding_vector`
+- `review_status`: unreviewed, curated, rejected.
+
+The app should store excerpts and metadata needed for explainability. It should not blindly persist large raw labels unless a retention policy is defined.
+
+### AI Run Entity
+
+Every AI-assisted classification or insight review should be auditable:
+
+- `ai_run_id`
+- `user_id`
+- `pipeline_name`
+- `model`
+- `model_version`
+- `provider`
+- `openrouter_generation_id`
+- `usage_prompt_tokens`
+- `usage_completion_tokens`
+- `usage_total_tokens`
+- `input_hash`
+- `output_json`
+- `source_evidence_ids`
+- `validation_status`
+- `validation_errors`
+- `created_at`
+
+Do not store raw prompts containing more user data than needed. Store input hashes and compact structured summaries where possible.
+
+### Sync and Job Entity
+
+Longer-running processing should be idempotent and resumable:
+
+- `job_id`
+- `user_id`
+- `job_type`: medication_map_refresh, medication_normalization, evidence_refresh, daily_feature_build, insight_generation.
+- `status`: queued, running, completed, failed, cancelled.
+- `idempotency_key`
+- `input_window_start`
+- `input_window_end`
+- `attempt_count`
+- `last_error`
+- `created_at`
+- `updated_at`
+
 ## First-Party Medication Map Reader
 
 The map reader should derive the user's medication context from current app state and Supabase rows:
@@ -141,6 +284,228 @@ The map reader should derive the user's medication context from current app stat
 7. Recent misses, snoozes, and late actions.
 
 The output should be independent from UI components and usable by both background jobs and API routes.
+
+## Processing Pipelines
+
+### Pipeline 1: Medication Map Refresh
+
+Trigger moments:
+
+- User creates or edits a protocol item.
+- User activates, pauses, resumes, completes, or archives a protocol.
+- User imports/restores a snapshot.
+- Nightly background refresh for active users.
+- Manual "refresh medication intelligence" action in Settings or Insights.
+
+Steps:
+
+1. Read active protocols and medication items from Supabase.
+2. Join linked `drugs` rows and custom drug fields.
+3. Build canonical medication exposure records by active protocol, item, dose, route, schedule, and start/end dates.
+4. Upsert medication map rows with stable idempotency keys.
+5. Queue normalization jobs for new or changed medication identities.
+
+Storage:
+
+- Supabase `medication_map_items`.
+- Derived daily exposure rows in `daily_medication_exposures`.
+
+### Pipeline 2: Drug Normalization
+
+Trigger moments:
+
+- New medication map item.
+- Drug name/generic/route/dose form changes.
+- Scheduled periodic refresh for low-confidence mappings.
+
+Steps:
+
+1. Try exact seed-drug match by `drugId`.
+2. Try deterministic name/generic matching against local aliases.
+3. Query RxNorm by name/generic name.
+4. Query RxClass for class membership when RxCUI exists.
+5. If multiple candidates remain, call `MED_KNOWLEDGE_FAST_MODEL` with candidate list and require strict JSON classification.
+6. Persist normalized match, confidence, source, and ambiguity notes.
+7. Unknown drugs remain usable but marked low-confidence.
+
+Storage:
+
+- Supabase `medication_normalizations`.
+- Supabase `medication_knowledge_records`.
+- `ai_runs` only when AI disambiguation is used.
+
+### Pipeline 3: Evidence Refresh
+
+Trigger moments:
+
+- New normalized medication/class.
+- Curated rule version changes.
+- Weekly scheduled refresh for evidence cache.
+- Manual admin refresh.
+
+Steps:
+
+1. Fetch RxNorm/RxClass metadata.
+2. Fetch DailyMed/openFDA label sections where available.
+3. Extract only relevant sections: warnings, precautions, adverse reactions, drug interactions, dosage/administration, patient counseling information.
+4. Chunk and hash evidence excerpts.
+5. Index evidence by source, ingredient aliases, class labels, section names, and content hash.
+6. Optionally rerank a small evidence candidate set with `MED_KNOWLEDGE_FAST_MODEL`.
+7. Link evidence to curated rules and medication knowledge records.
+
+Storage:
+
+- Supabase `medication_evidence_documents`.
+- Supabase text-search indexes for the MVP.
+- Supabase vector column or `pgvector` companion table only if an embedding provider is explicitly added later.
+- Evidence refresh jobs and `content_hash` values for idempotency.
+
+### Pipeline 4: Curated Rule Evaluation
+
+Trigger moments:
+
+- Medication map refresh completed.
+- Food, hydration, Oura, or dose data changes for the current day.
+- Daily scheduled insight build.
+
+Steps:
+
+1. Load active medication knowledge profile.
+2. Load curated rules applicable by class, ingredient, route, dose form, or local drug id.
+3. Evaluate deterministic triggers first.
+4. Produce lifestyle implications and medication exposure features.
+5. Pass only eligible candidates to AI review when explanation quality or conflict resolution is needed.
+6. Validate all output through medication safety guardrails.
+
+Storage:
+
+- Supabase `medication_rule_evaluations`.
+- Derived flags in `daily_medication_exposures`.
+- Insight candidates in `correlation_insight_cards` only after validation.
+
+### Pipeline 5: Daily Lifestyle Snapshot Build
+
+Trigger moments:
+
+- Daily scheduled job after Oura sync.
+- User confirms food entry.
+- User logs water.
+- User records a dose action.
+- User requests insight generation.
+
+Steps:
+
+1. Pull medication exposure features.
+2. Pull food daily totals.
+3. Pull water totals.
+4. Pull dose adherence and timing facts.
+5. Pull Oura daily summaries and selected time-series aggregates.
+6. Build a complete day-level feature vector.
+7. Upsert into daily snapshot table by `(user_id, local_date)`.
+
+Storage:
+
+- Supabase `daily_lifestyle_snapshots`.
+- Oura raw normalized daily tables from the Oura integration layer.
+- Food and hydration tables already present in the app.
+
+### Pipeline 6: Correlation and AI Insight Review
+
+Trigger moments:
+
+- Nightly after snapshot build.
+- User requests 30/60/90-day insight refresh.
+- Significant medication map change.
+
+Steps:
+
+1. Load 30/60/90-day snapshots.
+2. Compute deterministic statistics and thresholds.
+3. Generate candidate insight cards.
+4. Use `MED_KNOWLEDGE_REASONING_MODEL` only for high-value explanation review, conflict resolution, and safe phrasing.
+5. Use `MED_KNOWLEDGE_SECOND_OPINION_MODEL` for high-severity medication-adjacent cards.
+6. Use `MED_KNOWLEDGE_NANO_MODEL` for deduplication and bucket routing when needed.
+7. Enforce structured output schema through OpenRouter `response_format`.
+8. Run medication safety validator.
+9. Persist approved cards with evidence and model provenance.
+
+Storage:
+
+- Supabase `correlation_insight_cards`.
+- Supabase `ai_runs`.
+- Dismissal and feedback fields on insight cards.
+
+## Synchronization and Storage Model
+
+The system should distinguish source data, normalized data, derived features, and generated insights.
+
+### Source Data
+
+Owned by existing systems:
+
+- Medication protocols, scheduled doses, and dose records in MedRemind/Supabase.
+- Food entries and components in MedRemind/Supabase.
+- Water entries and nutrition targets in MedRemind/Supabase.
+- Oura OAuth tokens and Oura API pulls through the Oura integration layer.
+
+Source data is never overwritten by the medication knowledge layer.
+
+### Normalized Data
+
+Stored in Supabase:
+
+- Medication map items.
+- RxNorm/RxClass mappings.
+- Medication knowledge records.
+- Evidence documents and evidence embeddings.
+
+Normalized data is updated by idempotent jobs and should carry confidence/source metadata.
+
+### Derived Features
+
+Stored in Supabase:
+
+- Daily medication exposures.
+- Daily lifestyle snapshots.
+- Rule evaluations.
+
+Derived features can be rebuilt from source and normalized data. They should use upsert keys and deterministic windows.
+
+### Generated Insights
+
+Stored in Supabase:
+
+- Correlation insight cards.
+- AI run audit rows.
+- User dismissals/feedback.
+
+Generated insights are product artifacts. They should not mutate protocols, schedules, dose records, food entries, or Oura data.
+
+### Processing Timing
+
+Use these timing rules:
+
+- **On write:** When user changes medication protocol, food, water, or dose status, enqueue a narrow refresh for affected dates.
+- **On Oura sync:** After Oura daily pull completes, rebuild affected daily snapshots and queue insight refresh.
+- **Nightly:** Run full refresh for active users over the last 90 days.
+- **On demand:** User can manually refresh Insights; this should reuse existing snapshots where fresh and queue missing work.
+- **On model/rule version change:** Re-run rule evaluation and insight review without re-pulling source data.
+
+### Freshness Targets
+
+- Medication map: within 1 minute of protocol edits.
+- Food/water/dose-derived snapshot: within 1 minute of user action.
+- Oura-derived snapshot: after Oura sync completes.
+- Insight cards: immediate for manual refresh, otherwise nightly.
+- Evidence refresh: weekly or on new medication/class discovery.
+
+### Failure Handling
+
+- Jobs must be idempotent by user, job type, date window, and source version.
+- Failed jobs store `last_error` and `attempt_count`.
+- AI failures should degrade to deterministic insight cards where possible.
+- External evidence lookup failures should keep the previous curated/evidence cache.
+- Unsafe medication wording fails closed and is not persisted.
 
 ## Rule Examples
 
@@ -244,6 +609,7 @@ Flow:
 4. Daily feature builder adds medication features to lifestyle/Oura/food/hydration snapshots.
 5. Correlation engine ranks patterns across 30/60/90-day windows.
 6. Insight generator emits cards with evidence, confidence, and safe recommendation kind.
+7. AI review optionally improves structured explanations, but only after deterministic correlation and rule candidates exist.
 
 Medication features should be computed before statistical correlation so the engine can answer questions like:
 
@@ -287,6 +653,11 @@ The first implementation should include:
 6. Daily medication exposure feature builder.
 7. Integration points for the correlation engine.
 8. A simple Medication Intelligence debug/admin surface or API endpoint for reviewing matched classes and generated features.
+9. AI model configuration via environment variables.
+10. Structured Outputs schemas for classification, rule explanation, and insight review.
+11. AI run audit table and validation pipeline.
+12. Job table for idempotent sync/processing.
+13. OpenRouter client wrapper for chat completions, model aliases, provider routing, strict structured outputs, and generation usage capture.
 
 ## Deferred Scope
 
@@ -299,6 +670,10 @@ Do not implement these in the first slice:
 - Autonomous protocol changes.
 - Direct medication stop/pause/reschedule recommendations.
 - International drug terminology beyond RxNorm-backed matching.
+- Fine-tuning custom models.
+- Realtime voice coaching.
+- Fully automated model-driven rule creation without human review.
+- OpenRouter embedding/vector retrieval unless a specific embedding endpoint is selected later.
 
 ## Risks
 
@@ -307,6 +682,8 @@ Do not implement these in the first slice:
 - Label text is not directly equivalent to personalized advice.
 - Correlation is not causation, especially across 30-90 days.
 - Medication-related wording can drift into unsafe advice if not constrained by typed recommendation kinds and tests.
+- AI outputs can be plausible but wrong if not constrained by source-grounded schemas and deterministic validators.
+- External model costs can spike if nightly jobs send large raw labels or raw user histories through OpenRouter.
 
 ## Success Criteria
 
@@ -316,6 +693,8 @@ Do not implement these in the first slice:
 - Medication-change output is limited to clinician-review flags.
 - Curated rule output is explainable and links back to evidence references.
 - Custom/unknown drugs produce low-confidence profile entries rather than silent failure.
+- AI model usage is explicit by pipeline, routed through OpenRouter, configurable by environment, and auditable through `ai_runs`.
+- Sync jobs are idempotent and derived features can be rebuilt without modifying source records.
 
 ## Open Product Decisions
 
@@ -323,3 +702,13 @@ Do not implement these in the first slice:
 2. Whether medication analysis opt-in should live in Settings or in the Insights onboarding flow.
 3. Whether RxNorm lookup should happen synchronously on medication creation or asynchronously in a background enrichment job.
 4. Whether curated rules should ship as TypeScript constants first or as Supabase-managed rows from the beginning.
+5. Whether evidence retrieval should remain lexical/model-reranked or add a dedicated embedding provider later.
+6. Whether nightly processing should run from Vercel cron, external cron-job.org, or a Supabase scheduled job.
+7. Whether AI-generated explanations should be shown immediately or require an internal review flag in early beta.
+8. Whether `openrouter/auto` is allowed for any production pipeline, or only for development/non-critical fallback.
+
+## Reference Notes
+
+- OpenRouter API docs: use `POST https://openrouter.ai/api/v1/chat/completions` with OpenAI-compatible request/response shapes, app attribution headers, model routing, provider preferences, and usage reporting.
+- OpenRouter Structured Outputs docs: compatible models can enforce JSON Schema through `response_format: { type: "json_schema" }`; set `require_parameters: true` when strict structured output support is required.
+- OpenRouter model metadata should be checked before selecting a default model because supported model slugs and parameters change over time.
