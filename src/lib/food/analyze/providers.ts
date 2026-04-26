@@ -1,5 +1,9 @@
 import type { FoodAnalysisDraft } from '@/types/food';
 import { validateFoodAnalysisDraft } from '@/lib/food/analysisSchema';
+import {
+  getOpenRouterFoodVisionModels,
+  shouldFallbackOpenRouterFoodModel,
+} from './openRouterModels';
 
 export type FoodAnalysisInput = { imageDataUrl: string; imageType: string };
 
@@ -219,8 +223,38 @@ async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnal
     throw new Error('OPENROUTER_API_KEY is required for FOOD_AI_PROVIDER=openrouter.');
   }
 
-  const model = process.env.OPENROUTER_FOOD_VISION_MODEL || 'google/gemini-2.5-flash';
-  const response = await fetchWithTimeout(
+  const models = getOpenRouterFoodVisionModels();
+
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    const response = await fetchOpenRouterFoodAnalysis(input, apiKey, model);
+
+    if (!response.ok) {
+      if (shouldFallbackOpenRouterFoodModel(response.status, model, models[index + 1])) {
+        continue;
+      }
+
+      throw new Error('Food analysis failed.');
+    }
+
+    const payload = await response.json();
+    const outputText = payload?.choices?.[0]?.message?.content;
+    if (typeof outputText !== 'string' || outputText.trim().length === 0) {
+      throw new Error('Food analysis returned no structured output.');
+    }
+
+    return validateProviderDraft(parseStructuredOutput(outputText), model);
+  }
+
+  throw new Error('Food analysis failed.');
+}
+
+function fetchOpenRouterFoodAnalysis(
+  input: FoodAnalysisInput,
+  apiKey: string,
+  model: string,
+): Promise<Response> {
+  return fetchWithTimeout(
     'https://openrouter.ai/api/v1/chat/completions',
     {
       method: 'POST',
@@ -252,18 +286,6 @@ async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnal
       }),
     },
   );
-
-  if (!response.ok) {
-    throw new Error('Food analysis failed.');
-  }
-
-  const payload = await response.json();
-  const outputText = payload?.choices?.[0]?.message?.content;
-  if (typeof outputText !== 'string' || outputText.trim().length === 0) {
-    throw new Error('Food analysis returned no structured output.');
-  }
-
-  return validateProviderDraft(parseStructuredOutput(outputText), model);
 }
 
 async function analyzeWithGemini(input: FoodAnalysisInput): Promise<FoodAnalysisDraft> {
