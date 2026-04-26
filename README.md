@@ -43,6 +43,11 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
   - restore from cloud
   - import from local snapshot payload
   - flush sync now
+- Oura integration backend:
+  - OAuth connect and callback routes
+  - encrypted server-side token storage
+  - connection status endpoint
+  - daily sleep/readiness/activity/SpO2/stress fetch endpoint
 
 ## Critical Runtime Rules (Current)
 
@@ -70,6 +75,7 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 - `scripts/check-lifecycle-consistency.mjs` - D4 consistency checker
 - `supabase/005_food_intake.sql` - food diary tables
 - `supabase/006_nutrition_targets_and_hydration.sql` - nutrition target profile and water entry tables
+- `supabase/007_oura_integrations.sql` - encrypted server-side Oura integration records
 
 ## Quick Start
 
@@ -111,6 +117,20 @@ Food photo analysis (server-side):
 - `OPENROUTER_FOOD_VISION_FALLBACK_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to paid `google/gemini-2.5-flash` when the free model/provider is temporarily unavailable
 - `GEMINI_API_KEY` and optional `GEMINI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=gemini`
 - `NEXT_PUBLIC_APP_URL` is also used as the OpenRouter `HTTP-Referer`; it remains the optional app URL above.
+
+Oura integration (server-side):
+
+- `OURA_CLIENT_ID`
+- `OURA_CLIENT_SECRET`
+- `OURA_REDIRECT_URI`
+- `OURA_TOKEN_ENCRYPTION_KEY`: 32 UTF-8 bytes or base64-encoded 32 bytes
+- `OURA_SCOPES`: defaults to `email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health`
+- `OURA_AUTHORIZATION_URL`: optional; defaults to `https://cloud.ouraring.com/oauth/authorize`
+- `OURA_TOKEN_URL`: optional; defaults to `https://api.ouraring.com/oauth/token`
+- `OURA_API_BASE_URL`: optional; defaults to `https://api.ouraring.com`
+- `OURA_PERSONAL_ACCESS_TOKEN`: optional local smoke-test token; do not use for multi-user production access
+
+Apply `supabase/007_oura_integrations.sql` before using the OAuth callback route. The `user_integrations` table is intentionally server-only: browser clients should call the Oura API routes rather than reading token rows directly.
 
 ## Available Scripts
 
