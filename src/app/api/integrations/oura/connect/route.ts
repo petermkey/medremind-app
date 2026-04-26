@@ -1,9 +1,7 @@
-import { randomBytes } from 'node:crypto';
-
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getOuraServerConfig } from '@/lib/oura/config';
-import { buildOuraAuthorizationUrl } from '@/lib/oura/oauth';
+import { buildOuraAuthorizationUrl, createOuraOAuthState } from '@/lib/oura/oauth';
 import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -25,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Oura integration is not configured.' }, { status: 500 });
   }
 
-  const state = randomBytes(32).toString('base64url');
+  const state = createOuraOAuthState({ userId: data.user.id });
   const authorizationUrl = buildOuraAuthorizationUrl({
     authorizationUrl: config.authorizationUrl,
     clientId: config.clientId,
