@@ -31,6 +31,8 @@ type OuraDailyCollections = {
   dailyActivity: Map<string, Record<string, unknown>>;
   dailySpO2: Map<string, Record<string, unknown>>;
   dailyStress: Map<string, Record<string, unknown>>;
+  heartHealth: Map<string, Record<string, unknown>>;
+  workouts: Map<string, unknown[]>;
 };
 
 function toDateInput(value: string | null): string | null {
@@ -82,6 +84,21 @@ function groupDailyData(response: OuraCollectionResponse): Map<string, Record<st
     if (localDate && record) {
       grouped.set(localDate, record);
     }
+  }
+
+  return grouped;
+}
+
+function groupWorkoutData(response: OuraCollectionResponse): Map<string, unknown[]> {
+  const grouped = new Map<string, unknown[]>();
+
+  for (const item of response.data ?? []) {
+    const localDate = getLocalDate(item);
+    if (!localDate) continue;
+
+    const existing = grouped.get(localDate) ?? [];
+    existing.push(item);
+    grouped.set(localDate, existing);
   }
 
   return grouped;
@@ -140,12 +157,14 @@ async function fetchOuraDailyCollections(
   accessToken: string,
   range: { start_date: string; end_date: string },
 ): Promise<OuraDailyCollections> {
-  const [dailySleep, readiness, activity, spo2, stress] = await Promise.all([
+  const [dailySleep, readiness, activity, spo2, stress, heartHealth, workouts] = await Promise.all([
     fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_sleep', range),
     fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_readiness', range),
     fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
     fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_spo2', range),
     fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_stress', range),
+    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/heart_health', range),
+    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
   ]);
 
   return {
@@ -154,6 +173,8 @@ async function fetchOuraDailyCollections(
     dailyActivity: groupDailyData(activity),
     dailySpO2: groupDailyData(spo2),
     dailyStress: groupDailyData(stress),
+    heartHealth: groupDailyData(heartHealth),
+    workouts: groupWorkoutData(workouts),
   };
 }
 
@@ -179,6 +200,8 @@ async function syncOuraSnapshots(
       dailyActivity: collections.dailyActivity.get(localDate),
       dailyStress: collections.dailyStress.get(localDate),
       dailySpO2: collections.dailySpO2.get(localDate),
+      heartHealth: collections.heartHealth.get(localDate),
+      workouts: collections.workouts.get(localDate),
     }),
   );
 

@@ -17,6 +17,7 @@ export type ExternalHealthDailySnapshot = {
   breathingDisturbanceIndex: number | null;
   vo2Max: number | null;
   restingHeartRate: number | null;
+  hrvBalance: string | null;
   resilienceLevel: string | null;
   workoutCount: number;
   rawPayload: Record<string, unknown>;

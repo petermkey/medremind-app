@@ -31,6 +31,7 @@ function toSnapshotRow(snapshot: ExternalHealthDailySnapshot) {
     breathing_disturbance_index: snapshot.breathingDisturbanceIndex,
     vo2_max: snapshot.vo2Max,
     resting_heart_rate: snapshot.restingHeartRate,
+    hrv_balance: snapshot.hrvBalance,
     resilience_level: snapshot.resilienceLevel,
     workout_count: snapshot.workoutCount,
     raw_payload: snapshot.rawPayload,

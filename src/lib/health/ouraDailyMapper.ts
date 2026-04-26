@@ -17,12 +17,20 @@ type OuraDailyPayload = {
     spo2_percentage?: { average?: number | null } | null;
     breathing_disturbance_index?: number | null;
   } | null;
-  heartHealth?: { vo2_max?: number | null } | null;
+  heartHealth?: {
+    vo2_max?: number | null;
+    hrv_balance?: string | null;
+    resilience_level?: string | null;
+  } | null;
   workouts?: unknown[] | null;
 };
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 export function mapOuraDailyPayloadToHealthSnapshot(
@@ -45,7 +53,8 @@ export function mapOuraDailyPayloadToHealthSnapshot(
     breathingDisturbanceIndex: numberOrNull(input.dailySpO2?.breathing_disturbance_index),
     vo2Max: numberOrNull(input.heartHealth?.vo2_max),
     restingHeartRate: null,
-    resilienceLevel: null,
+    hrvBalance: stringOrNull(input.heartHealth?.hrv_balance),
+    resilienceLevel: stringOrNull(input.heartHealth?.resilience_level),
     workoutCount: Array.isArray(input.workouts) ? input.workouts.length : 0,
     rawPayload: input as unknown as Record<string, unknown>,
   };
