@@ -650,14 +650,33 @@ export default function FoodPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={analyzing}
+              className={[
+                'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
+                analyzing
+                  ? 'cursor-not-allowed bg-[#30363D] text-[#8B949E]'
+                  : 'bg-[#3B82F6] text-white hover:bg-[#2563EB]',
+              ].join(' ')}
+            >
+              {analyzing ? 'Analyzing' : 'Capture'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              capture="environment"
+              className="sr-only"
+              onChange={handleFileChange}
+              disabled={analyzing}
+            />
+            <button
+              type="button"
               onClick={startEditingTargets}
               className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]"
             >
-              {targetProfile ? 'Edit targets' : 'Set targets'}
+              {targetProfile ? 'Targets' : 'Set targets'}
             </button>
-            <div className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[#161B22] px-3 py-1.5 text-xs font-semibold text-[#8B949E]">
-              {totals.entryCount} entries
-            </div>
           </div>
         </div>
 
@@ -726,45 +745,21 @@ export default function FoodPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-5">
-        <div className="mb-4 rounded-2xl border border-[rgba(59,130,246,0.22)] bg-[rgba(59,130,246,0.08)] p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-[rgba(59,130,246,0.16)] text-2xl">
-              🍽️
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-[#F0F6FC]">Add a meal photo</div>
-              <div className="mt-0.5 text-xs text-[#8B949E]">Saves to {activeDate === today ? 'today' : format(new Date(`${activeDate}T12:00:00`), 'MMM d')}</div>
-            </div>
-            <label className={[
-              'cursor-pointer rounded-xl px-3 py-2 text-xs font-bold transition-colors',
-              analyzing
-                ? 'pointer-events-none bg-[#30363D] text-[#8B949E]'
-                : 'bg-[#3B82F6] text-white hover:bg-[#2563EB]',
-            ].join(' ')}>
-              {analyzing ? 'Analyzing' : 'Capture'}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                capture="environment"
-                className="sr-only"
-                onChange={handleFileChange}
-                disabled={analyzing}
-              />
-            </label>
+        {(analyzing || analysisError) && (
+          <div className="mb-4 rounded-xl border border-[rgba(59,130,246,0.22)] bg-[rgba(59,130,246,0.08)] px-3 py-2">
+            {analyzing && (
+              <div className="flex items-center gap-2 text-xs font-medium text-[#8B949E]">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#3B82F6] border-t-transparent" />
+                Analyzing meal photo...
+              </div>
+            )}
+            {analysisError && (
+              <div className="rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+                {analysisError}
+              </div>
+            )}
           </div>
-          {analyzing && (
-            <div className="mt-4 flex items-center gap-2 text-xs font-medium text-[#8B949E]">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#3B82F6] border-t-transparent" />
-              Analyzing meal photo...
-            </div>
-          )}
-          {analysisError && (
-            <div className="mt-4 rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
-              {analysisError}
-            </div>
-          )}
-        </div>
+        )}
 
         {draft && (
           <div className="mb-5 rounded-2xl border border-[rgba(16,185,129,0.28)] bg-[rgba(16,185,129,0.08)] p-4">
@@ -814,7 +809,9 @@ export default function FoodPage() {
 
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-bold text-[#F0F6FC]">Entries</h2>
-          {loading && <div className="text-xs font-medium text-[#8B949E]">Loading...</div>}
+          <div className="text-xs font-medium text-[#8B949E]">
+            {loading ? 'Loading...' : `${totals.entryCount} entries`}
+          </div>
         </div>
 
         {entries.length === 0 ? (
@@ -950,18 +947,18 @@ function TargetCard({
   target: number;
 }) {
   return (
-    <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-3">
+    <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-2.5">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-[11px] font-bold text-[#8B949E]">{label}</div>
+        <div className="text-[10px] font-bold text-[#8B949E]">{label}</div>
         <div className="text-[10px] font-semibold text-[#8B949E]">{progressPercent(consumed, target)}%</div>
       </div>
-      <div className="mt-1 text-sm font-extrabold text-[#F0F6FC]">
+      <div className="mt-0.5 text-[13px] font-extrabold text-[#F0F6FC]">
         {consumed.toLocaleString()} / {target.toLocaleString()} {unit}
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#0D1117]">
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0D1117]">
         <div className="h-full rounded-full bg-[#3B82F6]" style={{ width: `${progressPercent(consumed, target)}%` }} />
       </div>
-      <div className="mt-1.5 text-[10px] font-semibold text-[#8B949E]">{remainingLabel(consumed, target, unit)}</div>
+      <div className="mt-1 text-[10px] font-semibold text-[#8B949E]">{remainingLabel(consumed, target, unit)}</div>
     </div>
   );
 }
@@ -978,25 +975,25 @@ function WaterTracker({
   onAdd: (amountMl: number) => void;
 }) {
   return (
-    <div className="mt-2 rounded-2xl border border-[rgba(56,189,248,0.24)] bg-[rgba(56,189,248,0.08)] p-3">
+    <div className="mt-2 rounded-xl border border-[rgba(56,189,248,0.24)] bg-[rgba(56,189,248,0.08)] p-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <div className="text-sm font-bold text-[#F0F6FC]">Water</div>
+            <div className="text-[13px] font-bold text-[#F0F6FC]">Water</div>
             {loading && <div className="text-[10px] font-semibold text-[#8B949E]">Loading...</div>}
           </div>
-          <div className="mt-1 text-xs font-semibold text-[#C9D1D9]">
+          <div className="mt-0.5 text-[11px] font-semibold text-[#C9D1D9]">
             {waterDisplay(consumedMl)} / {waterDisplay(targetMl)} - {remainingLabel(consumedMl, targetMl, 'ml')}
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#0D1117]">
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0D1117]">
             <div className="h-full rounded-full bg-[#38BDF8]" style={{ width: `${progressPercent(consumedMl, targetMl)}%` }} />
           </div>
         </div>
         <div className="flex flex-shrink-0 gap-2">
-          <button type="button" onClick={() => onAdd(250)} className="rounded-xl bg-[#0EA5E9] px-3 py-2 text-xs font-bold text-white">
+          <button type="button" onClick={() => onAdd(250)} className="rounded-xl bg-[#0EA5E9] px-2.5 py-1.5 text-xs font-bold text-white">
             +250 ml
           </button>
-          <button type="button" onClick={() => onAdd(500)} className="rounded-xl bg-[#0369A1] px-3 py-2 text-xs font-bold text-white">
+          <button type="button" onClick={() => onAdd(500)} className="rounded-xl bg-[#0369A1] px-2.5 py-1.5 text-xs font-bold text-white">
             +500 ml
           </button>
         </div>
@@ -1087,7 +1084,7 @@ function FoodEntryCard({
 
       <div
         className={[
-          'rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4 transition-all duration-200',
+          'rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-3 transition-all duration-200',
           swiped ? '-translate-x-[92px]' : '',
         ].join(' ')}
       >
@@ -1127,10 +1124,10 @@ function FoodEntryCard({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-4 gap-2">
+          <div className="mt-2.5 grid grid-cols-4 gap-1.5">
             {ENTRY_NUTRIENTS.filter(item => item.key !== 'caloriesKcal').map(item => (
-              <div key={item.key} className="rounded-xl bg-[#0D1117] p-2">
-                <div className="text-sm font-bold text-[#F0F6FC]">{formatAmount(nutrientValue(entry.nutrients, item.key), item.unit)}</div>
+              <div key={item.key} className="rounded-xl bg-[#0D1117] p-1.5">
+                <div className="text-[13px] font-bold text-[#F0F6FC]">{formatAmount(nutrientValue(entry.nutrients, item.key), item.unit)}</div>
                 <div className="mt-0.5 text-[10px] text-[#8B949E]">{item.label}</div>
               </div>
             ))}

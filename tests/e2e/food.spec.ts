@@ -349,7 +349,7 @@ async function ensureNutritionTargetProfile(page: Page) {
   }
 
   await expect(page.getByRole('heading', { name: 'Food' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Edit targets' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Targets' })).toBeVisible();
   await expect(page.getByText('Calories', { exact: true }).first()).toBeVisible();
 }
 
@@ -553,6 +553,14 @@ test.describe('food diary (requires authenticated Supabase E2E env)', () => {
     });
   }
 
+  test('shows compact food command bar without the standalone meal photo card', async ({ page }) => {
+    await loginAndOpenFood(page);
+
+    await expect(page.getByRole('button', { name: 'Capture' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Targets/ })).toBeVisible();
+    await expect(page.getByText('Add a meal photo')).not.toBeVisible();
+  });
+
   test('moves between yesterday and today with date-scoped diary entries', async ({ page }, testInfo) => {
     const uniqueSuffix = `date-${testInfo.workerIndex}-${Date.now()}`;
     const yesterdayDraft = {
@@ -567,7 +575,7 @@ test.describe('food diary (requires authenticated Supabase E2E env)', () => {
     const previousDayButtonName = await previousDayButtonNameFromDateStrip(page);
     const todayBaselineTotals = await getDailyTargetProgress(page);
     await page.getByRole('button', { name: previousDayButtonName }).click();
-    await expect(page.getByText(/Saves to /)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Capture' })).toBeVisible();
     const yesterdayBaselineTotals = await getDailyTargetProgress(page);
     await saveAnalyzedMealPhoto(page, pngFile, yesterdayDraft);
     await expect(page.getByRole('heading', { name: yesterdayDraft.title, exact: true })).toBeVisible();
