@@ -78,6 +78,7 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - Command-based lifecycle/dose sync with additive write-through coverage.
 - Selector-based lifecycle-aware read paths on key screens.
 - Auth: email/password + Google OAuth. Apple sign-in removed. Google OAuth is on `main` and staging-verified.
+- Health and medication insights: Oura integration, external health snapshots, Medication Knowledge Layer, OpenRouter model routing, and consent-gated correlation insights are landed.
 
 ## 4. Recent landed features (latest on main)
 
@@ -101,7 +102,31 @@ Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 - **Delivery:** `web-push` via `/api/push/send` → `push_subscriptions` table
 
 
-## 5b. Dose persistence restart-survival status (2026-04-25)
+## 5b. Health and medication insights status (2026-04-26)
+
+Landed surfaces:
+
+- Oura integration routes under `/api/integrations/oura`: `connect`, `callback`, `status`, `daily`, and `disconnect`.
+- Oura tokens are encrypted server-side in `user_integrations` via `supabase/007_oura_integrations.sql`; browser routes must never receive tokens.
+- External health snapshot boundary: `supabase/008_external_health_snapshots.sql`, `src/lib/health/*`, and `/api/integrations/health/sync`. It is source-compatible for Oura now and Apple Health later. Sync responses return counts only.
+- Medication Knowledge Layer: `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence handling.
+- OpenRouter routing boundary is server-side only. Do not log prompts, evidence excerpts, or user identifiers. Structured outputs require `provider.require_parameters`.
+- Correlation insight engine: `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations`.
+- UI/API surfaces include `/app/insights`, `/app/insights/medications`, `/api/medication-knowledge/status`, `/api/medication-knowledge/refresh`, settings integration controls, and bottom-nav Insights.
+
+Safety and consent requirements:
+
+- User consent is required before correlation insight generation and before insight read-card visibility.
+- Correlation evidence is aggregate only.
+- Never produce direct medication-change instructions. The product may flag patterns and recommend clinician review, but must not tell users to start, stop, increase, decrease, or reschedule medication.
+
+Verification commands:
+
+- `npm run test:med-knowledge`
+- `npm run test:correlation`
+
+
+## 5c. Dose persistence restart-survival status (2026-04-25)
 
 Production SHA observed during the 2026-04-25 live browser reproduction at `https://medremind-app-two.vercel.app/api/version`: `10a05b635dd1f3c99c63e932dcaf516e1b35f3d6`. After the paginated pull fix lands, re-check `/api/version` before retesting.
 

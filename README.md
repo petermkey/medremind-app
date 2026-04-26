@@ -44,10 +44,14 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
   - import from local snapshot payload
   - flush sync now
 - Oura integration backend:
-  - OAuth connect and callback routes
+  - OAuth connect, callback, status, daily sync, and disconnect routes
   - encrypted server-side token storage
-  - connection status endpoint
   - daily sleep/readiness/activity/SpO2/stress fetch endpoint
+- Health and medication insights:
+  - external health snapshot boundary for Oura now and Apple Health later
+  - medication knowledge safety/rules/features layer
+  - correlation insights surfaced under `/app/insights`
+  - user consent required before generating or showing correlation insight cards
 
 ## Critical Runtime Rules (Current)
 
@@ -76,6 +80,9 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 - `supabase/005_food_intake.sql` - food diary tables
 - `supabase/006_nutrition_targets_and_hydration.sql` - nutrition target profile and water entry tables
 - `supabase/007_oura_integrations.sql` - encrypted server-side Oura integration records
+- `supabase/008_external_health_snapshots.sql` - source-compatible external health snapshots
+- `supabase/009_medication_knowledge.sql` - medication knowledge records
+- `supabase/010_correlation_insights.sql` - aggregate medication/health correlation insights
 
 ## Quick Start
 
@@ -113,8 +120,8 @@ Food photo analysis (server-side):
 - `FOOD_AI_PROVIDER`: unset or `mock` for mock mode; `openai`; `openrouter`; `gemini`
 - `OPENAI_API_KEY` and optional `OPENAI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openai`
 - `OPENROUTER_API_KEY` for `FOOD_AI_PROVIDER=openrouter`
-- `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to free `google/gemma-4-31b-it:free`
-- `OPENROUTER_FOOD_VISION_FALLBACK_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to paid `google/gemini-2.5-flash` when the free model/provider is temporarily unavailable
+- `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`
+- `OPENROUTER_FOOD_VISION_FALLBACK_MODEL` for `FOOD_AI_PROVIDER=openrouter`
 - `GEMINI_API_KEY` and optional `GEMINI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=gemini`
 - `NEXT_PUBLIC_APP_URL` is also used as the OpenRouter `HTTP-Referer`; it remains the optional app URL above.
 
@@ -123,14 +130,25 @@ Oura integration (server-side):
 - `OURA_CLIENT_ID`
 - `OURA_CLIENT_SECRET`
 - `OURA_REDIRECT_URI`
-- `OURA_TOKEN_ENCRYPTION_KEY`: 32 UTF-8 bytes or base64-encoded 32 bytes
-- `OURA_SCOPES`: defaults to `email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health`
-- `OURA_AUTHORIZATION_URL`: optional; defaults to `https://cloud.ouraring.com/oauth/authorize`
-- `OURA_TOKEN_URL`: optional; defaults to `https://api.ouraring.com/oauth/token`
-- `OURA_API_BASE_URL`: optional; defaults to `https://api.ouraring.com`
-- `OURA_PERSONAL_ACCESS_TOKEN`: optional local smoke-test token; do not use for multi-user production access
+- `OURA_TOKEN_ENCRYPTION_KEY`
+- `OURA_SCOPES` supports Oura OAuth scopes: `email personal daily heartrate tag workout session spo2`.
 
 Apply `supabase/007_oura_integrations.sql` before using the OAuth callback route. The `user_integrations` table is intentionally server-only: browser clients should call the Oura API routes rather than reading token rows directly.
+
+Medication Knowledge and correlation insights (server-side):
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_API_BASE_URL`
+- `OPENROUTER_HTTP_REFERER`
+- `OPENROUTER_APP_TITLE`
+- `MED_KNOWLEDGE_FAST_MODEL`
+- `MED_KNOWLEDGE_REASONING_MODEL`
+- `MED_KNOWLEDGE_SECOND_OPINION_MODEL`
+- `MED_KNOWLEDGE_NANO_MODEL`
+- `MED_KNOWLEDGE_LONG_CONTEXT_MODEL`
+- `MED_KNOWLEDGE_AUTO_FALLBACK_MODEL`
+
+OpenRouter configuration is used only behind server routes. The medication knowledge safety layer must not emit direct medication-change instructions.
 
 ## Available Scripts
 
@@ -144,6 +162,8 @@ Apply `supabase/007_oura_integrations.sql` before using the OAuth callback route
 - `npm run test:e2e`
 - `npm run test:e2e:headed`
 - `npm run test:e2e:install`
+- `npm run test:med-knowledge`
+- `npm run test:correlation`
 
 Authenticated E2E specs, including `tests/e2e/food.spec.ts`, require `E2E_EMAIL`, `E2E_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 

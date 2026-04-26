@@ -20,3 +20,25 @@ test('decryptOuraToken rejects ciphertext encrypted with another key', () => {
     /Unable to decrypt Oura token/,
   );
 });
+
+test('encryptOuraToken accepts exactly 32 UTF-8 bytes or base64-decoded bytes', () => {
+  const utf8Key = 'é'.repeat(16);
+  const base64Key = Buffer.from('0123456789abcdef0123456789abcdef', 'utf8').toString('base64');
+
+  const utf8Encrypted = encryptOuraToken('secret-token', utf8Key);
+  const base64Encrypted = encryptOuraToken('secret-token', base64Key);
+
+  assert.equal(decryptOuraToken(utf8Encrypted, utf8Key), 'secret-token');
+  assert.equal(decryptOuraToken(base64Encrypted, base64Key), 'secret-token');
+});
+
+test('encryptOuraToken rejects invalid encryption key lengths', () => {
+  assert.throws(
+    () => encryptOuraToken('secret-token', 'short-key'),
+    /OURA_TOKEN_ENCRYPTION_KEY must be 32 UTF-8 bytes or base64-encoded 32 bytes/,
+  );
+  assert.throws(
+    () => encryptOuraToken('secret-token', 'é'.repeat(15)),
+    /OURA_TOKEN_ENCRYPTION_KEY must be 32 UTF-8 bytes or base64-encoded 32 bytes/,
+  );
+});

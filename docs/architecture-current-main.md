@@ -21,6 +21,10 @@ Runtime boundaries:
 - App bootstrap/auth gate: `src/app/app/layout.tsx`
 - Sync/write model: `src/lib/supabase/realtimeSync.ts`
 - Retry/outbox: `src/lib/supabase/syncOutbox.ts`
+- Oura integration routes: `src/app/api/integrations/oura/*`
+- External health boundary: `src/lib/health/*`, `/api/integrations/health/sync`
+- Medication knowledge boundary: `src/lib/medKnowledge/*`
+- Correlation insight boundary: `src/lib/correlation/*`, `/api/insights/correlations`
 
 ## 2. Routing model
 
@@ -35,6 +39,8 @@ Public/auth:
 Guarded app:
 
 - `/app`
+- `/app/insights`
+- `/app/insights/medications`
 - `/app/protocols`
 - `/app/protocols/new`
 - `/app/protocols/[id]`
@@ -153,7 +159,34 @@ Not present:
 
 - full offline-first caching strategy for app data/shell
 
-## 11. High-risk files
+## 11. Health and medication insight architecture
+
+Oura integration:
+
+- Routes live under `/api/integrations/oura`: `connect`, `callback`, `status`, `daily`, and `disconnect`.
+- `supabase/007_oura_integrations.sql` creates `user_integrations` for encrypted server-side token storage.
+- Browser routes never receive Oura tokens; they use the integration API routes.
+
+External health snapshot boundary:
+
+- `supabase/008_external_health_snapshots.sql` stores normalized external health snapshots.
+- `src/lib/health/*` and `/api/integrations/health/sync` form the source-compatible ingestion boundary for Oura now and Apple Health later.
+- Sync responses return counts only, not raw health payloads.
+
+Medication Knowledge Layer:
+
+- `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` hold medication knowledge types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence handling.
+- The safety layer blocks direct medication-change language. The app must not instruct users to start, stop, increase, decrease, or reschedule medications.
+- OpenRouter model routing is server-side only. Do not log prompts, evidence excerpts, or user identifiers.
+- Structured model outputs require `provider.require_parameters`.
+
+Correlation insight engine:
+
+- `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations` generate and read aggregate medication/health correlations.
+- User consent is required before generation and before correlation cards are visible.
+- Evidence shown or persisted for insights is aggregate only.
+
+## 12. High-risk files
 
 - `src/lib/store/store.ts` — domain logic + sync wiring + selectors, 1234 lines
 - `src/lib/supabase/realtimeSync.ts` — all cloud command paths
@@ -162,5 +195,7 @@ Not present:
 - `src/lib/supabase/importStore.ts` — import idempotency via deterministic ID mapping
 - `src/lib/supabase/cloudStore.ts` — cloud pull and snapshot
 - `src/lib/supabase/syncOutbox.ts` — retry/outbox
+- `src/lib/medKnowledge/*` — medication knowledge safety, model routing, evidence, and structured output handling
+- `src/lib/correlation/*` — consent-gated aggregate insight generation
 
 Changes in these files require focused validation and docs updates in the same slice.

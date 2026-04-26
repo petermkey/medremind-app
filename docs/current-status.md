@@ -83,6 +83,17 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Hydration supports quick-add manual water entries and daily water progress.
 - Food delete now requires confirmation, removes the entry from the selected-day diary, and updates the day totals.
 
+### Health and medication insights (landed 2026-04-26)
+
+- Oura OAuth backend routes are under `/api/integrations/oura`: `connect`, `callback`, `status`, `daily`, and `disconnect`.
+- Oura tokens are encrypted server-side in `user_integrations` via `supabase/007_oura_integrations.sql` and are never returned to browser routes.
+- External health data is normalized through `supabase/008_external_health_snapshots.sql`, `src/lib/health/*`, and `/api/integrations/health/sync`; the boundary is source-compatible for Oura now and Apple Health later. Sync responses expose counts only.
+- Medication Knowledge Layer is backed by `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence modules.
+- OpenRouter model routing is server-side only. Prompts, evidence excerpts, and user identifiers must not be logged; structured outputs require `provider.require_parameters`.
+- Correlation insight generation is backed by `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations`.
+- User consent is required before correlation generation and before read-card visibility. Correlation evidence is aggregate only.
+- Safety rule: MedRemind must not provide direct medication-change instructions. Insights should route users toward clinician review rather than telling them to start, stop, increase, decrease, or reschedule medication.
+
 ### Lifecycle and schedule
 
 - Fixed-duration validation and inclusive activation `endDate` behavior.
@@ -144,6 +155,13 @@ Food/nutrition schema additions:
 
 - `supabase/005_food_intake.sql`: `food_entries` and `food_entry_components`
 - `supabase/006_nutrition_targets_and_hydration.sql`: `nutrition_target_profiles` and `water_entries`
+
+Health/insights schema additions:
+
+- `supabase/007_oura_integrations.sql`: encrypted server-side Oura integration records
+- `supabase/008_external_health_snapshots.sql`: source-compatible external health snapshots
+- `supabase/009_medication_knowledge.sql`: Medication Knowledge Layer persistence
+- `supabase/010_correlation_insights.sql`: aggregate correlation insight persistence
 
 ## 4. Remaining work categories
 

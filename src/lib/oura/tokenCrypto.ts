@@ -16,7 +16,7 @@ function parseEncryptionKey(rawKey: string): Buffer {
     throw new Error('OURA_TOKEN_ENCRYPTION_KEY is required');
   }
 
-  if (rawKey.length === 32) {
+  if (Buffer.byteLength(rawKey, 'utf8') === 32) {
     return Buffer.from(rawKey, 'utf8');
   }
 
@@ -26,6 +26,10 @@ function parseEncryptionKey(rawKey: string): Buffer {
   }
 
   throw new Error('OURA_TOKEN_ENCRYPTION_KEY must be 32 UTF-8 bytes or base64-encoded 32 bytes');
+}
+
+export function assertValidOuraTokenEncryptionKey(rawKey: string): void {
+  parseEncryptionKey(rawKey);
 }
 
 export function encryptOuraToken(token: string, rawKey: string): string {

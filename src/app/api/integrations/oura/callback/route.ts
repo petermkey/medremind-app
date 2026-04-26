@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { exchangeOuraAuthorizationCode } from '@/lib/oura/client';
 import { getOuraServerConfig } from '@/lib/oura/config';
+import { validateOuraOAuthState } from '@/lib/oura/oauth';
 import { fetchOuraPersonalInfo, saveOuraConnection } from '@/lib/oura/tokenStore';
 import { createClient } from '@/lib/supabase/server';
 
@@ -30,6 +31,12 @@ export async function GET(request: NextRequest) {
 
   if (error || !data.user) {
     const response = NextResponse.redirect(new URL('/login?error=oauth', request.nextUrl.origin));
+    response.cookies.delete(STATE_COOKIE);
+    return response;
+  }
+
+  if (!validateOuraOAuthState({ state, expectedState, userId: data.user.id })) {
+    const response = NextResponse.redirect(redirectToSettings(request, 'error'));
     response.cookies.delete(STATE_COOKIE);
     return response;
   }

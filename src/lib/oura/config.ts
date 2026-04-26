@@ -1,9 +1,10 @@
-import { parseOuraScopes } from './oauth';
+import { supportedOuraScopes } from './oauth';
+import { assertValidOuraTokenEncryptionKey } from './tokenCrypto';
 
 const DEFAULT_AUTHORIZATION_URL = 'https://cloud.ouraring.com/oauth/authorize';
 const DEFAULT_TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 const DEFAULT_API_BASE_URL = 'https://api.ouraring.com';
-const DEFAULT_SCOPES = 'email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health';
+const DEFAULT_SCOPES = 'email personal daily heartrate tag workout session spo2';
 
 export type OuraServerConfig = {
   authorizationUrl: string;
@@ -25,6 +26,9 @@ function requireEnv(env: NodeJS.ProcessEnv, key: string): string {
 }
 
 export function getOuraServerConfig(env: NodeJS.ProcessEnv = process.env): OuraServerConfig {
+  const tokenEncryptionKey = requireEnv(env, 'OURA_TOKEN_ENCRYPTION_KEY');
+  assertValidOuraTokenEncryptionKey(tokenEncryptionKey);
+
   return {
     authorizationUrl: env.OURA_AUTHORIZATION_URL ?? DEFAULT_AUTHORIZATION_URL,
     tokenUrl: env.OURA_TOKEN_URL ?? DEFAULT_TOKEN_URL,
@@ -32,8 +36,8 @@ export function getOuraServerConfig(env: NodeJS.ProcessEnv = process.env): OuraS
     clientId: requireEnv(env, 'OURA_CLIENT_ID'),
     clientSecret: requireEnv(env, 'OURA_CLIENT_SECRET'),
     redirectUri: requireEnv(env, 'OURA_REDIRECT_URI'),
-    scopes: parseOuraScopes(env.OURA_SCOPES ?? DEFAULT_SCOPES),
-    tokenEncryptionKey: requireEnv(env, 'OURA_TOKEN_ENCRYPTION_KEY'),
+    scopes: supportedOuraScopes(env.OURA_SCOPES ?? DEFAULT_SCOPES),
+    tokenEncryptionKey,
   };
 }
 
