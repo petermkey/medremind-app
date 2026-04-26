@@ -216,3 +216,47 @@ test('buildDailyMedicationExposure counts review signals only for active map ite
 
   assert.equal(exposure.medicationReviewSignalCount, 1);
 });
+
+test('buildDailyMedicationExposure ignores same-day dose signals for inactive map items', () => {
+  const exposure = buildDailyMedicationExposure({
+    userId: 'u-1',
+    localDate: '2026-04-20',
+    mapItems: [
+      {
+        id: 'map-inactive',
+        userId: 'u-1',
+        activeProtocolId: 'ap-1',
+        protocolItemId: 'pi-1',
+        displayName: 'Prior medication',
+        genericName: null,
+        frequencyType: 'daily',
+        times: ['07:00'],
+        withFood: 'any',
+        startDate: '2026-03-01',
+        endDate: '2026-03-31',
+        status: 'active',
+        sourceHash: 'h-1',
+      },
+    ],
+    normalizations: [],
+    doseSignals: [
+      {
+        medicationMapItemId: 'map-inactive',
+        scheduledDate: '2026-04-20',
+        scheduledTime: '07:00',
+        status: 'taken',
+        recordedAt: '2026-04-20T08:00:00.000Z',
+      },
+      {
+        medicationMapItemId: 'map-inactive',
+        scheduledDate: '2026-04-20',
+        scheduledTime: '19:00',
+        status: 'skipped',
+      },
+    ],
+    reviewSignals: [],
+  });
+
+  assert.equal(exposure.lateMedicationCount, 0);
+  assert.equal(exposure.missedMedicationCount, 0);
+});

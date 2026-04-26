@@ -23,6 +23,7 @@ export function buildDailyMedicationExposure(input: BuildDailyMedicationExposure
   const activeItems = input.mapItems.filter((item) => isActiveOnDate(item, input.localDate));
   const activeItemIds = new Set(activeItems.flatMap((item) => [item.id, item.protocolItemId]).filter(Boolean) as string[]);
   const localDoseSignals = (input.doseSignals ?? []).filter((signal) => signal.scheduledDate === input.localDate);
+  const activeLocalDoseSignals = localDoseSignals.filter((signal) => activeItemIds.has(signal.medicationMapItemId));
   const activeReviewSignals = (input.reviewSignals ?? []).filter((signal) => activeItemIds.has(signal.medicationMapItemId));
   const classFlags = activeItems.map((item) => classifyMedication(item, normalizationsByMapItemId.get(item.id ?? item.protocolItemId)));
   const glp1Items = activeItems.filter((item, index) => classFlags[index].glp1);
@@ -41,8 +42,8 @@ export function buildDailyMedicationExposure(input: BuildDailyMedicationExposure
     hasThyroidMedActive: classFlags.some((flags) => flags.thyroid),
     hasSsriActive: classFlags.some((flags) => flags.ssri),
     withFoodMismatchCount: countWithFoodMismatches(localDoseSignals, activeItems),
-    lateMedicationCount: countLateMedicationSignals(localDoseSignals),
-    missedMedicationCount: localDoseSignals.filter((signal) => ['skipped', 'missed', 'overdue'].includes(signal.status)).length,
+    lateMedicationCount: countLateMedicationSignals(activeLocalDoseSignals),
+    missedMedicationCount: activeLocalDoseSignals.filter((signal) => ['skipped', 'missed', 'overdue'].includes(signal.status)).length,
     medicationClassExposureScore: activeClassCount,
     medicationReviewSignalCount: activeReviewSignals.filter((signal) => signal.recommendationKind === 'clinician_review').length,
     sourcePayload: {
