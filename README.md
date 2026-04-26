@@ -131,7 +131,7 @@ Oura integration (server-side):
 - `OURA_CLIENT_SECRET`
 - `OURA_REDIRECT_URI`
 - `OURA_TOKEN_ENCRYPTION_KEY`
-- `OURA_SCOPES`
+- `OURA_SCOPES` supports Oura OAuth scopes: `email personal daily heartrate tag workout session spo2`.
 
 Apply `supabase/007_oura_integrations.sql` before using the OAuth callback route. The `user_integrations` table is intentionally server-only: browser clients should call the Oura API routes rather than reading token rows directly.
 

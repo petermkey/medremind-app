@@ -5,6 +5,7 @@ import {
   buildOuraAuthorizationUrl,
   createOuraOAuthState,
   parseOuraScopes,
+  supportedOuraScopes,
   validateOuraOAuthState,
 } from './oauth.ts';
 
@@ -34,6 +35,13 @@ test('buildOuraAuthorizationUrl creates the Oura authorization-code URL', () => 
   );
   assert.equal(url.searchParams.get('scope'), 'daily heartrate spo2');
   assert.equal(url.searchParams.get('state'), 'state-123');
+});
+
+test('supportedOuraScopes removes unsupported Oura scopes', () => {
+  assert.deepEqual(
+    supportedOuraScopes('email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health'),
+    ['email', 'personal', 'daily', 'heartrate', 'tag', 'workout', 'session', 'spo2'],
+  );
 });
 
 test('createOuraOAuthState includes a nonce and user binding', () => {

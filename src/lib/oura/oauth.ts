@@ -22,6 +22,7 @@ export type OuraOAuthStateValidationInput = {
 };
 
 const OURA_OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const SUPPORTED_OURA_SCOPES = new Set(['email', 'personal', 'daily', 'heartrate', 'tag', 'workout', 'session', 'spo2']);
 
 function toBase64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
@@ -43,6 +44,15 @@ function createUserBinding(userId: string, issuedAt: string, nonce: string): str
 
 export function parseOuraScopes(scopeString: string): string[] {
   return scopeString.split(/\s+/).map((scope) => scope.trim()).filter(Boolean);
+}
+
+export function supportedOuraScopes(scopeString: string): string[] {
+  const scopes = parseOuraScopes(scopeString).filter((scope) => SUPPORTED_OURA_SCOPES.has(scope));
+  if (scopes.length === 0) {
+    throw new Error('OURA_SCOPES must include at least one supported Oura scope.');
+  }
+
+  return scopes;
 }
 
 export function buildOuraAuthorizationUrl(input: OuraAuthorizationUrlInput): URL {
