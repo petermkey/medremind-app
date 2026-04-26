@@ -112,7 +112,8 @@ Landed surfaces:
 - Medication Knowledge Layer: `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence handling.
 - OpenRouter routing boundary is server-side only. Do not log prompts, evidence excerpts, or user identifiers. Structured outputs require `provider.require_parameters`.
 - Correlation insight engine: `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations`.
-- UI/API surfaces include `/app/insights`, `/app/insights/medications`, `/api/medication-knowledge/status`, `/api/medication-knowledge/refresh`, settings integration controls, and bottom-nav Insights.
+- UI/API surfaces include Progress analytics cards in `/app/progress`, `/api/medication-knowledge/status`, `/api/medication-knowledge/refresh`, settings integration controls, and `/api/insights/correlations`.
+- `/app/insights` and `/app/insights/medications` are compatibility redirects to `/app/progress`; they are not primary product surfaces and are not in bottom navigation.
 
 Safety and consent requirements:
 

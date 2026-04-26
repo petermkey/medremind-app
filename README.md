@@ -50,7 +50,8 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 - Health and medication insights:
   - external health snapshot boundary for Oura now and Apple Health later
   - medication knowledge safety/rules/features layer
-  - correlation insights surfaced under `/app/insights`
+  - consent-gated correlation patterns surfaced in `/app/progress`
+  - Oura connection and health sync controls surfaced in `/app/settings`
   - user consent required before generating or showing correlation insight cards
 
 ## Critical Runtime Rules (Current)

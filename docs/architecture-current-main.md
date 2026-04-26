@@ -39,13 +39,13 @@ Public/auth:
 Guarded app:
 
 - `/app`
-- `/app/insights`
-- `/app/insights/medications`
 - `/app/protocols`
 - `/app/protocols/new`
 - `/app/protocols/[id]`
 - `/app/meds`
 - `/app/progress`
+- `/app/insights` (compatibility redirect to `/app/progress`)
+- `/app/insights/medications` (compatibility redirect to `/app/progress`)
 - `/app/settings`
 
 ## 3. Auth model
@@ -185,6 +185,8 @@ Correlation insight engine:
 - `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations` generate and read aggregate medication/health correlations.
 - User consent is required before generation and before correlation cards are visible.
 - Evidence shown or persisted for insights is aggregate only.
+- The primary user-facing analytics surface is `/app/progress`; `/app/insights*` routes redirect there.
+- Oura connection and health sync controls live in `/app/settings`.
 
 ## 12. High-risk files
 

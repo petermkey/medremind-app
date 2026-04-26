@@ -92,6 +92,8 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - OpenRouter model routing is server-side only. Prompts, evidence excerpts, and user identifiers must not be logged; structured outputs require `provider.require_parameters`.
 - Correlation insight generation is backed by `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations`.
 - User consent is required before correlation generation and before read-card visibility. Correlation evidence is aggregate only.
+- Progress is the primary user-facing surface for health and medication pattern cards.
+- Settings is the user-facing surface for Oura connection, disconnect, and health sync controls.
 - Safety rule: MedRemind must not provide direct medication-change instructions. Insights should route users toward clinician review rather than telling them to start, stop, increase, decrease, or reschedule medication.
 
 ### Lifecycle and schedule
