@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, waitForRealtimeSyncIdle } from '@/lib/store/store';
 import { useFoodStore } from '@/lib/store/foodStore';
+import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
 import { subscribeToPush, unsubscribeFromPush, saveNotificationSettingsToSupabase } from '@/lib/push/subscription';
 import { useInstallState } from '@/lib/push/useInstallState';
@@ -168,6 +169,7 @@ export default function SettingsPage() {
     clearSyncOutbox();
     signOut();
     useFoodStore.getState().resetFoodEntries();
+    useNutritionTargetsStore.getState().resetNutritionTargets();
     router.push('/login');
   }
 
@@ -176,6 +178,7 @@ export default function SettingsPage() {
     clearSyncOutbox();
     signOut();
     useFoodStore.getState().resetFoodEntries();
+    useNutritionTargetsStore.getState().resetNutritionTargets();
     if (typeof window !== 'undefined') localStorage.clear();
     router.push('/register');
   }

@@ -4,12 +4,23 @@ import { create } from 'zustand';
 import { v4 as uuid } from 'uuid';
 import type { FoodAnalysisDraft, FoodDailyTotals, FoodEntry } from '@/types/food';
 import { filterFoodEntriesForLocalDate, sumFoodNutrients } from '@/lib/food/nutrition';
-import { pullFoodEntriesForRange, syncFoodEntrySave } from '@/lib/supabase/foodSync';
+import {
+  addPendingDeletedFoodEntryId,
+  removePendingDeletedFoodEntryId,
+  readPendingDeletedFoodEntryIds,
+  subscribePendingDeletedFoodEntryIds,
+} from '@/lib/food/pendingFoodDeletes';
+import {
+  decrementInflightFoodEntrySave,
+  incrementInflightFoodEntrySave,
+} from '@/lib/food/inflightFoodSaves';
+import { pullFoodEntriesForRange, syncFoodEntryDelete, syncFoodEntrySave } from '@/lib/supabase/foodSync';
 import {
   enqueueSyncOperation,
   markSyncFailure,
   markSyncSuccess,
   pumpOutbox,
+  removeQueuedFoodEntrySaveOperations,
   removeQueuedSyncOperation,
 } from '@/lib/supabase/syncOutbox';
 
@@ -29,6 +40,7 @@ const NUTRIENT_KEYS = [
 
 export interface FoodStoreState {
   entries: FoodEntry[];
+  pendingDeletedEntryIds: string[];
   currentUserId: string | null;
   loading: boolean;
   error: string | null;
@@ -39,6 +51,7 @@ export interface FoodStoreState {
     draft: FoodAnalysisDraft;
     consumedAt?: string;
   }): FoodEntry;
+  deleteFoodEntry(entryId: string, userId?: string): void;
   entriesForDate(date: string, timezone?: string): FoodEntry[];
   totalsForDate(date: string, timezone?: string): FoodDailyTotals;
   resetFoodEntries(): void;
@@ -93,7 +106,8 @@ function sortNewestFirst(entries: FoodEntry[]): FoodEntry[] {
   });
 }
 
-function syncFoodFireAndForget(userId: string, entry: FoodEntry) {
+function syncFoodFireAndForget(userId: string, entry: FoodEntry, isLocallyDeleted: () => boolean) {
+  incrementInflightFoodEntrySave(entry.id);
   const queuedFallbackId = enqueueSyncOperation(
     { kind: 'foodEntrySave', payload: { userId, entry } },
     { pump: false },
@@ -102,7 +116,34 @@ function syncFoodFireAndForget(userId: string, entry: FoodEntry) {
   void syncFoodEntrySave(userId, entry)
     .then(() => {
       if (queuedFallbackId) removeQueuedSyncOperation(queuedFallbackId);
+      if (isLocallyDeleted()) {
+        addPendingDeletedFoodEntryId(entry.id);
+        removeQueuedFoodEntrySaveOperations(userId, entry.id);
+        syncFoodDeleteFireAndForget(userId, entry.id);
+        return;
+      }
       markSyncSuccess();
+    })
+    .catch((error: unknown) => {
+      markSyncFailure(error);
+      void pumpOutbox({ force: true });
+    })
+    .finally(() => {
+      decrementInflightFoodEntrySave(entry.id);
+    });
+}
+
+function syncFoodDeleteFireAndForget(userId: string, entryId: string) {
+  const queuedFallbackId = enqueueSyncOperation(
+    { kind: 'foodEntryDelete', payload: { userId, entryId } },
+    { pump: false },
+  );
+
+  void syncFoodEntryDelete(userId, entryId)
+    .then(() => {
+      removePendingDeletedFoodEntryId(entryId);
+      markSyncSuccess();
+      void pumpOutbox({ force: true });
     })
     .catch((error: unknown) => {
       markSyncFailure(error);
@@ -112,14 +153,17 @@ function syncFoodFireAndForget(userId: string, entry: FoodEntry) {
 
 export const useFoodStore = create<FoodStoreState>((set, get) => ({
   entries: [],
+  pendingDeletedEntryIds: readPendingDeletedFoodEntryIds(),
   currentUserId: null,
   loading: false,
   error: null,
 
   async loadEntriesForRange(userId, fromIso, toIso) {
+    const pendingDeletedEntryIds = readPendingDeletedFoodEntryIds();
     set(state => ({
       currentUserId: userId,
       entries: state.entries.filter(entry => entry.userId === userId),
+      pendingDeletedEntryIds,
       loading: true,
       error: null,
     }));
@@ -129,13 +173,15 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
         if (state.currentUserId !== userId) {
           return {};
         }
+        const pendingDeleted = new Set(state.pendingDeletedEntryIds);
 
         const entriesById = new Map(
           state.entries
-            .filter(entry => entry.userId === userId)
+            .filter(entry => entry.userId === userId && !pendingDeleted.has(entry.id))
             .map(entry => [entry.id, entry]),
         );
         for (const entry of incoming) {
+          if (pendingDeleted.has(entry.id)) continue;
           entriesById.set(entry.id, entry);
         }
         return {
@@ -197,15 +243,41 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
       ],
     }));
 
-    syncFoodFireAndForget(userId, entry);
+    syncFoodFireAndForget(userId, entry, () => {
+      if (readPendingDeletedFoodEntryIds().includes(entry.id)) return true;
+      const state = get();
+      return state.currentUserId === userId && !state.entries.some(existing => existing.userId === userId && existing.id === entry.id);
+    });
     return entry;
   },
 
+  deleteFoodEntry(entryId, userId) {
+    const resolvedUserId = userId ?? get().currentUserId;
+    if (!resolvedUserId) {
+      set({ error: 'Food entry delete failed: no current user.' });
+      return;
+    }
+
+    set(state => {
+      const pendingDeletedEntryIds = addPendingDeletedFoodEntryId(entryId);
+      return {
+        currentUserId: resolvedUserId,
+        pendingDeletedEntryIds,
+        entries: state.entries.filter(entry => entry.id !== entryId),
+        error: null,
+      };
+    });
+
+    removeQueuedFoodEntrySaveOperations(resolvedUserId, entryId);
+    syncFoodDeleteFireAndForget(resolvedUserId, entryId);
+  },
+
   entriesForDate(date, timezone) {
-    const { currentUserId, entries } = get();
+    const { currentUserId, entries, pendingDeletedEntryIds } = get();
+    const pendingDeleted = new Set(pendingDeletedEntryIds);
     const scopedEntries = currentUserId
-      ? entries.filter(entry => entry.userId === currentUserId)
-      : entries;
+      ? entries.filter(entry => entry.userId === currentUserId && !pendingDeleted.has(entry.id))
+      : entries.filter(entry => !pendingDeleted.has(entry.id));
     return sortNewestFirst(filterFoodEntriesForLocalDate(scopedEntries, date, timezone));
   },
 
@@ -216,9 +288,16 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
   resetFoodEntries() {
     set({
       entries: [],
+      pendingDeletedEntryIds: [],
       currentUserId: null,
       loading: false,
       error: null,
     });
   },
 }));
+
+if (typeof window !== 'undefined') {
+  subscribePendingDeletedFoodEntryIds(pendingDeletedEntryIds => {
+    useFoodStore.setState({ pendingDeletedEntryIds });
+  });
+}

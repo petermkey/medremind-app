@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFoodStore } from '@/lib/store/foodStore';
+import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { useStore } from '@/lib/store/store';
 import { resendSignupConfirmationEmail, signInWithOAuth, supabaseSignUp } from '@/lib/supabase/auth';
 import { Button } from '@/components/ui/Button';
@@ -86,6 +87,7 @@ export default function RegisterPage() {
 
     store.resetUserData();
     useFoodStore.getState().resetFoodEntries();
+    useNutritionTargetsStore.getState().resetNutritionTargets();
     store.setProfile(profile);
     router.push('/onboarding');
   }

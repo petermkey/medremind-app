@@ -32,7 +32,11 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 - Progress view:
   - adherence summary, weekly bars, heatmap with 30/60/90-day toggle
 - Food diary:
-  - authenticated `/app/food` diary with daily totals, photo upload, AI-assisted food analysis drafts, and Supabase-backed saved entries
+  - authenticated `/app/food` nutrition target setup before first diary use
+  - editable daily targets for calories, macros, fiber, and water
+  - date-aware diary with daily target progress, photo upload, AI-assisted food analysis drafts, and Supabase-backed saved entries
+  - collapsible saved food entries with component details and confirmed delete
+  - hydration quick-add buttons with daily water progress
 - Settings:
   - export snapshot
   - backup current state to cloud
@@ -64,6 +68,8 @@ MedRemind is a Next.js application for protocol scheduling, dose adherence track
 - `scripts/backfill-planned-future-occurrences.mjs` - D3 backfill tooling
 - `scripts/validate-lifecycle-parity.mjs` - C5 parity tooling
 - `scripts/check-lifecycle-consistency.mjs` - D4 consistency checker
+- `supabase/005_food_intake.sql` - food diary tables
+- `supabase/006_nutrition_targets_and_hydration.sql` - nutrition target profile and water entry tables
 
 ## Quick Start
 
