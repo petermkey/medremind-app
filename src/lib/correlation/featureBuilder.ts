@@ -43,9 +43,35 @@ function localDateFromTimestamp(value: unknown): string | null {
   return typeof value === 'string' && value.length >= 10 ? value.slice(0, 10) : null;
 }
 
+function localDateInTimezone(value: unknown, timezone: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const timeZone = typeof timezone === 'string' && timezone.length > 0 ? timezone : 'UTC';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const year = parts.find(part => part.type === 'year')?.value;
+    const month = parts.find(part => part.type === 'month')?.value;
+    const day = parts.find(part => part.type === 'day')?.value;
+
+    return year && month && day ? `${year}-${month}-${day}` : null;
+  } catch {
+    return localDateFromTimestamp(value);
+  }
+}
+
 function rowLocalDate(row: Row, fallbackTimestampKey: string): string | null {
   if (typeof row.local_date === 'string') return row.local_date;
   if (typeof row.scheduled_date === 'string') return row.scheduled_date;
+  if (fallbackTimestampKey === 'consumed_at') {
+    return localDateInTimezone(row[fallbackTimestampKey], row.timezone);
+  }
   return localDateFromTimestamp(row[fallbackTimestampKey]);
 }
 
@@ -92,6 +118,35 @@ function countStatus(rows: Row[], status: string): number {
   return rows.filter(row => row.status === status || row.action === status).length;
 }
 
+function recordScheduledDoseId(row: Row): string | null {
+  if (typeof row.scheduled_dose_id === 'string') return row.scheduled_dose_id;
+  if (typeof row.scheduledDoseId === 'string') return row.scheduledDoseId;
+  return null;
+}
+
+function rowId(row: Row): string | null {
+  return typeof row.id === 'string' ? row.id : null;
+}
+
+function canonicalDoseCounts(doseRows: Row[], recordRows: Row[]) {
+  const scheduledIds = new Set(doseRows.map(rowId).filter((id): id is string => id !== null));
+  const unlinkedRecords = recordRows.filter(row => {
+    const scheduledDoseId = recordScheduledDoseId(row);
+    return !scheduledDoseId || !scheduledIds.has(scheduledDoseId);
+  });
+  const takenCount = countStatus(doseRows, 'taken') + countStatus(unlinkedRecords, 'taken');
+  const skippedCount = countStatus(doseRows, 'skipped') + countStatus(unlinkedRecords, 'skipped');
+  const missedCount = countStatus(doseRows, 'missed') + countStatus(doseRows, 'pending');
+  const denominator = doseRows.length + unlinkedRecords.length;
+
+  return {
+    takenCount,
+    skippedCount,
+    missedCount,
+    adherencePct: denominator > 0 ? (takenCount / denominator) * 100 : null,
+  };
+}
+
 export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshotsInput): DailyLifestyleSnapshot[] {
   const foodByDate = indexByDate(input.foodEntries, input.userId, 'consumed_at');
   const waterByDate = indexByDate(input.waterEntries, input.userId, 'consumed_at');
@@ -108,10 +163,7 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
     const healthRows = healthByDate.get(localDate) ?? [];
     const exposureRows = exposureByDate.get(localDate) ?? [];
     const exposure = exposureRows[0] ?? {};
-    const takenCount = countStatus(doseRows, 'taken') + countStatus(recordRows, 'taken');
-    const skippedCount = countStatus(doseRows, 'skipped') + countStatus(recordRows, 'skipped');
-    const missedCount = countStatus(doseRows, 'missed') + countStatus(doseRows, 'pending');
-    const scheduledCount = doseRows.length;
+    const doseCounts = canonicalDoseCounts(doseRows, recordRows);
 
     return {
       userId: input.userId,
@@ -120,10 +172,10 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
       proteinG: sum(foodRows, 'protein_g'),
       fiberG: sum(foodRows, 'fiber_g'),
       waterMl: sum(waterRows, 'amount_ml'),
-      takenCount,
-      skippedCount,
-      missedCount,
-      adherencePct: scheduledCount > 0 ? (takenCount / scheduledCount) * 100 : null,
+      takenCount: doseCounts.takenCount,
+      skippedCount: doseCounts.skippedCount,
+      missedCount: doseCounts.missedCount,
+      adherencePct: doseCounts.adherencePct,
       sleepScore: firstNumber(healthRows, 'sleep_score'),
       readinessScore: firstNumber(healthRows, 'readiness_score'),
       activityScore: firstNumber(healthRows, 'activity_score'),

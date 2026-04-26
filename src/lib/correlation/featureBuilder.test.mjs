@@ -105,3 +105,57 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     },
   });
 });
+
+test('buildDailyLifestyleSnapshots buckets food and water by row timezone local date', () => {
+  const snapshots = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-04-01',
+    endDate: '2026-04-01',
+    foodEntries: [
+      {
+        user_id: 'user-1',
+        consumed_at: '2026-04-02T06:30:00.000Z',
+        timezone: 'America/Los_Angeles',
+        calories_kcal: 250,
+        protein_g: 12,
+        fiber_g: 3,
+      },
+    ],
+    waterEntries: [
+      {
+        user_id: 'user-1',
+        consumed_at: '2026-04-02T06:45:00.000Z',
+        timezone: 'America/Los_Angeles',
+        amount_ml: 400,
+      },
+    ],
+  });
+
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].localDate, '2026-04-01');
+  assert.equal(snapshots[0].caloriesKcal, 250);
+  assert.equal(snapshots[0].waterMl, 400);
+});
+
+test('buildDailyLifestyleSnapshots does not double count taken dose records for scheduled rows', () => {
+  const snapshots = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-04-01',
+    endDate: '2026-04-01',
+    scheduledDoses: [
+      { id: 'dose-1', user_id: 'user-1', scheduled_date: '2026-04-01', status: 'taken' },
+    ],
+    doseRecords: [
+      {
+        user_id: 'user-1',
+        scheduled_dose_id: 'dose-1',
+        action: 'taken',
+        recorded_at: '2026-04-01T08:05:00.000Z',
+      },
+    ],
+  });
+
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].takenCount, 1);
+  assert.equal(snapshots[0].adherencePct, 100);
+});

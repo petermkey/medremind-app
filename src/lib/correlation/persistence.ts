@@ -244,11 +244,13 @@ export async function buildAndPersistDailyLifestyleSnapshots(
   endDate: string,
   supabase: SupabaseClient = createCorrelationServiceClient(),
 ): Promise<DailyLifestyleSnapshot[]> {
+  const widenedStartDate = addDays(startDate, -1);
+  const widenedEndDate = addDays(endDate, 1);
   const [foodEntries, waterEntries, scheduledDoses, doseRecords, healthSnapshots, medicationExposures] = await Promise.all([
-    fetchSourceRows(supabase, 'food_entries', userId, 'consumed_at', `${startDate}T00:00:00.000Z`, `${endDate}T23:59:59.999Z`),
-    fetchSourceRows(supabase, 'water_entries', userId, 'consumed_at', `${startDate}T00:00:00.000Z`, `${endDate}T23:59:59.999Z`),
+    fetchSourceRows(supabase, 'food_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
+    fetchSourceRows(supabase, 'water_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchSourceRows(supabase, 'scheduled_doses', userId, 'scheduled_date', startDate, endDate),
-    fetchSourceRows(supabase, 'dose_records', userId, 'recorded_at', `${startDate}T00:00:00.000Z`, `${endDate}T23:59:59.999Z`),
+    fetchSourceRows(supabase, 'dose_records', userId, 'recorded_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchSourceRows(supabase, 'external_health_daily_snapshots', userId, 'local_date', startDate, endDate),
     fetchSourceRows(supabase, 'daily_medication_exposures', userId, 'local_date', startDate, endDate),
   ]);
@@ -294,10 +296,7 @@ export async function generateAndPersistCorrelationInsights(userId: string): Pro
   const supabase = createCorrelationServiceClient();
   const endDate = new Date().toISOString().slice(0, 10);
   const startDate = addDays(endDate, -89);
-  const existingSnapshots = await getDailyLifestyleSnapshots(userId, startDate, endDate, supabase);
-  const snapshots = existingSnapshots.length > 0
-    ? existingSnapshots
-    : await buildAndPersistDailyLifestyleSnapshots(userId, startDate, endDate, supabase);
+  const snapshots = await buildAndPersistDailyLifestyleSnapshots(userId, startDate, endDate, supabase);
   const cards = generateCorrelationInsightCards({ userId, snapshots, now: new Date() });
 
   await replaceCorrelationInsightCards(userId, cards, supabase);

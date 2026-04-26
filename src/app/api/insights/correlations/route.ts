@@ -53,7 +53,7 @@ export async function GET() {
 
   return NextResponse.json({
     consent,
-    cards: cards.map(publicCard),
+    cards: hasActiveCorrelationConsent(consent) ? cards.map(publicCard) : [],
   });
 }
 
