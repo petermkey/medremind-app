@@ -30,6 +30,12 @@ type BuildInfo = {
   environment: string;
 };
 
+type OuraStatus = {
+  connected: boolean;
+  status: string | null;
+  lastSyncAt: string | null;
+};
+
 export default function SettingsPage() {
   const router = useRouter();
   const { profile, updateProfile, signOut, notificationSettings, updateNotificationSettings } = useStore();
@@ -50,20 +56,23 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [outbox, setOutbox] = useState<SyncStatus>(getSyncStatusSnapshot());
   const [flushing, setFlushing] = useState(false);
+  const [ouraStatus, setOuraStatus] = useState<OuraStatus | null>(null);
+  const [healthSyncStatus, setHealthSyncStatus] = useState('');
+  const [healthSyncing, setHealthSyncing] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const installState = useInstallState();
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/version')
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: BuildInfo | null) => {
-        if (!cancelled && data) setBuildInfo(data);
-      })
-      .catch(() => {
-        // Non-critical info; keep UI working even if endpoint is unavailable.
-      });
+    Promise.all([
+      fetch('/api/version').then(r => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/integrations/oura/status').then(r => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([versionData, ouraData]: [BuildInfo | null, OuraStatus | null]) => {
+      if (cancelled) return;
+      if (versionData) setBuildInfo(versionData);
+      if (ouraData) setOuraStatus(ouraData);
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -293,6 +302,24 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleHealthSync() {
+    setHealthSyncing(true);
+    setHealthSyncStatus('Syncing health summaries...');
+    try {
+      const response = await fetch('/api/integrations/health/sync', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) {
+        setHealthSyncStatus(data.error ?? 'Health sync failed.');
+        return;
+      }
+      setHealthSyncStatus(`Health sync complete: ${data.counts?.oura ?? 0} Oura day(s).`);
+      const statusResponse = await fetch('/api/integrations/oura/status');
+      if (statusResponse.ok) setOuraStatus(await statusResponse.json());
+    } finally {
+      setHealthSyncing(false);
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
@@ -343,6 +370,44 @@ export default function SettingsPage() {
             </div>
           )}
           <Button size="sm" onClick={saveNotifications}>Save Notifications</Button>
+        </Section>
+
+        <Section title="🧭 Integrations">
+          <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[#F0F6FC]">Oura</div>
+                <div className="mt-1 text-xs text-[#8B949E]">
+                  {ouraStatus?.connected ? 'Connected' : 'Not connected'}
+                  {ouraStatus?.lastSyncAt ? ` · Last sync: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : ''}
+                </div>
+              </div>
+              <div className="flex flex-shrink-0 gap-2">
+                <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+                  Connect
+                </a>
+                <a href="https://cloud.ouraring.com/user/apps" className="text-xs font-semibold text-[#8B949E] hover:text-[#F0F6FC]">
+                  Disconnect
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[#F0F6FC]">Health sync</div>
+                <div className="mt-1 text-xs text-[#8B949E]">
+                  {healthSyncStatus || (ouraStatus?.lastSyncAt ? `Last run: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : 'No health sync run shown yet.')}
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={handleHealthSync} loading={healthSyncing}>
+                Sync
+              </Button>
+            </div>
+            <a href="/app/insights" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+              Open Insights
+            </a>
+          </div>
         </Section>
 
         {/* About */}
