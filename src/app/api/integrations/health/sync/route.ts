@@ -242,7 +242,6 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      range,
       counts,
       totalSnapshots: Object.values(counts).reduce((total, count) => total + count, 0),
     });
