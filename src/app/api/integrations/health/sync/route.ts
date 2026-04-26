@@ -241,10 +241,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      counts,
-      totalSnapshots: Object.values(counts).reduce((total, count) => total + count, 0),
-    });
+    return NextResponse.json({ counts });
   } catch (err) {
     console.error('[health/sync] sync failed', err);
 
