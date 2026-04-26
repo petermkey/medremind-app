@@ -9,6 +9,7 @@
     "tool:backfill:planned-future": "node scripts/backfill-planned-future-occurrences.mjs",
     "tool:backfill:execution-history": "node scripts/backfill-execution-history.mjs",
     "tool:validate:lifecycle-parity": "node scripts/validate-lifecycle-parity.mjs",
+    "test:unit": "rm -rf .tmp/unit && tsc --ignoreConfig --target ES2020 --module Node16 --moduleResolution node16 --types node --strict --esModuleInterop --skipLibCheck --outDir .tmp/unit --rootDir . --noEmit false tests/unit/targetAlgorithm.test.ts src/lib/food/targetAlgorithm.ts src/lib/food/pendingFoodDeletes.ts src/lib/nutrition/waterEntryTime.ts src/lib/nutrition/nutritionTargetsCache.ts src/lib/supabase/syncOutboxQueue.ts src/types/nutritionTargets.ts && node .tmp/unit/tests/unit/targetAlgorithm.test.js; status=$?; rm -rf .tmp/unit .tmp; exit $status",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:install": "playwright install chromium"

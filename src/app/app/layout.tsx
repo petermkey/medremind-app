@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { useFoodStore } from '@/lib/store/foodStore';
+import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { getCurrentUser } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
 import { startSyncOutbox } from '@/lib/supabase/syncOutbox';
@@ -54,6 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
         resetUserData();
         useFoodStore.getState().resetFoodEntries();
+        useNutritionTargetsStore.getState().resetNutritionTargets();
         router.replace('/login');
         setChecking(false);
         return;
@@ -62,6 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (!user) {
         resetUserData();
         useFoodStore.getState().resetFoodEntries();
+        useNutritionTargetsStore.getState().resetNutritionTargets();
         router.replace('/login');
         setChecking(false);
         return;
@@ -71,6 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         // Prevent cross-account bleed from persisted local state while switching users.
         resetUserData();
         useFoodStore.getState().resetFoodEntries();
+        useNutritionTargetsStore.getState().resetNutritionTargets();
       }
       setProfile(user);
       if (!user.onboarded) {

@@ -231,6 +231,17 @@ export async function syncFoodEntrySave(userId: string, entry: FoodEntry) {
   }
 }
 
+export async function syncFoodEntryDelete(userId: string, entryId: string) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from('food_entries')
+    .delete()
+    .eq('id', entryId)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(`Food entry delete failed: ${error.message}`);
+}
+
 export async function pullFoodEntriesForRange(
   userId: string,
   fromIso: string,

@@ -2,7 +2,23 @@
 
 import type { ActiveProtocol, DoseRecord, Protocol, ScheduledDose } from '@/types';
 import type { FoodEntry } from '@/types/food';
-import { sanitizeFoodEntryForSync, syncFoodEntrySave } from './foodSync';
+import type { NutritionTargetProfile, WaterEntry } from '@/types/nutritionTargets';
+import {
+  clearPendingDeletedFoodEntryIdsExcept,
+  clearPendingDeletedFoodEntryIds,
+  readPendingDeletedFoodEntryIds,
+  removePendingDeletedFoodEntryId,
+} from '@/lib/food/pendingFoodDeletes';
+import {
+  getInflightFoodEntrySaveIds,
+} from '@/lib/food/inflightFoodSaves';
+import { sanitizeFoodEntryForSync, syncFoodEntryDelete, syncFoodEntrySave } from './foodSync';
+import { syncNutritionTargetProfileSave, syncWaterEntrySave } from './nutritionTargetsSync';
+import {
+  hasStaleFoodEntrySaveOperationInQueue,
+  removeStaleFoodEntrySaveOperationsFromQueue,
+  removeSyncOperationFromQueueById,
+} from './syncOutboxQueue';
 import {
   syncActivation,
   syncActiveStatus,
@@ -39,7 +55,10 @@ type SyncKind =
   | 'archiveCommand'
   | 'endProtocolFromToday'
   | 'removeDose'
-  | 'foodEntrySave';
+  | 'foodEntrySave'
+  | 'foodEntryDelete'
+  | 'nutritionTargetProfileSave'
+  | 'waterEntrySave';
 
 type SyncPayloadMap = {
   protocolUpsert: { userId: string; protocol: Protocol };
@@ -116,6 +135,9 @@ type SyncPayloadMap = {
     doseId: string;
   };
   foodEntrySave: { userId: string; entry: FoodEntry };
+  foodEntryDelete: { userId: string; entryId: string };
+  nutritionTargetProfileSave: { userId: string; profile: NutritionTargetProfile };
+  waterEntrySave: { userId: string; entry: WaterEntry };
 };
 
 export type SyncOperation =
@@ -135,7 +157,10 @@ export type SyncOperation =
   | { kind: 'archiveCommand'; payload: SyncPayloadMap['archiveCommand'] }
   | { kind: 'endProtocolFromToday'; payload: SyncPayloadMap['endProtocolFromToday'] }
   | { kind: 'removeDose'; payload: SyncPayloadMap['removeDose'] }
-  | { kind: 'foodEntrySave'; payload: SyncPayloadMap['foodEntrySave'] };
+  | { kind: 'foodEntrySave'; payload: SyncPayloadMap['foodEntrySave'] }
+  | { kind: 'foodEntryDelete'; payload: SyncPayloadMap['foodEntryDelete'] }
+  | { kind: 'nutritionTargetProfileSave'; payload: SyncPayloadMap['nutritionTargetProfileSave'] }
+  | { kind: 'waterEntrySave'; payload: SyncPayloadMap['waterEntrySave'] };
 
 type StoredSyncOperation = SyncOperation & {
   id: string;
@@ -333,7 +358,18 @@ async function executeOperation(op: SyncOperation) {
     case 'removeDose':
       return syncRemoveDoseCommand(normalizedOp.payload.userId, normalizedOp.payload.doseId);
     case 'foodEntrySave':
+      if (readPendingDeletedFoodEntryIds().includes(normalizedOp.payload.entry.id)) {
+        return Promise.resolve();
+      }
       return syncFoodEntrySave(normalizedOp.payload.userId, normalizedOp.payload.entry);
+    case 'foodEntryDelete':
+      await syncFoodEntryDelete(normalizedOp.payload.userId, normalizedOp.payload.entryId);
+      removePendingDeletedFoodEntryId(normalizedOp.payload.entryId);
+      return;
+    case 'nutritionTargetProfileSave':
+      return syncNutritionTargetProfileSave(normalizedOp.payload.userId, normalizedOp.payload.profile);
+    case 'waterEntrySave':
+      return syncWaterEntrySave(normalizedOp.payload.userId, normalizedOp.payload.entry);
     default:
       return Promise.resolve();
   }
@@ -394,6 +430,28 @@ export function removeQueuedSyncOperation(id: string) {
   scheduleNextPump(next);
 }
 
+export function removeQueuedFoodEntrySaveOperations(userId: string, entryId: string) {
+  if (!hasWindow()) return;
+  const queue = readQueue();
+  const next = removeStaleFoodEntrySaveOperationsFromQueue(queue, userId, entryId);
+  if (next.length === queue.length) return;
+  writeQueue(next);
+  scheduleNextPump(next);
+}
+
+export function hasQueuedFoodEntrySaveOperation(userId: string, entryId: string): boolean {
+  if (!hasWindow()) return false;
+  return hasStaleFoodEntrySaveOperationInQueue(readQueue(), userId, entryId);
+}
+
+export function hasQueuedNutritionTargetProfileSaveOperation(userId: string): boolean {
+  if (!hasWindow()) return false;
+  return readQueue().some(item => (
+    item.kind === 'nutritionTargetProfileSave' &&
+    item.payload.userId === userId
+  ));
+}
+
 export async function pumpOutbox(options?: { force?: boolean }) {
   const force = options?.force ?? false;
   if (!hasWindow() || pumping) return;
@@ -411,16 +469,38 @@ export async function pumpOutbox(options?: { force?: boolean }) {
 
   const now = Date.now();
   for (const item of [...queue]) {
-    if (!force && item.nextAttemptAt > now) continue;
+    const liveBefore = readQueue();
+    const liveItem = liveBefore.find(q => q.id === item.id);
+    if (!liveItem) {
+      queue = liveBefore;
+      continue;
+    }
+    if (!force && liveItem.nextAttemptAt > now) {
+      queue = liveBefore;
+      continue;
+    }
     try {
-      await executeOperation(item);
-      queue = queue.filter(q => q.id !== item.id);
+      await executeOperation(liveItem);
+      let liveAfter = readQueue();
+      if (liveItem.kind === 'foodEntryDelete') {
+        liveAfter = removeStaleFoodEntrySaveOperationsFromQueue(
+          liveAfter,
+          liveItem.payload.userId,
+          liveItem.payload.entryId,
+        );
+      }
+      queue = removeSyncOperationFromQueueById(liveAfter, liveItem.id);
       writeQueue(queue);
       markSyncSuccess();
     } catch (error) {
-      const attempts = item.attempts + 1;
+      const attempts = liveItem.attempts + 1;
       const nextAttemptAt = Date.now() + nextBackoffMs(attempts);
-      queue = queue.map(q => {
+      const liveAfter = readQueue();
+      if (!liveAfter.some(q => q.id === item.id)) {
+        queue = liveAfter;
+        continue;
+      }
+      queue = liveAfter.map(q => {
         if (q.id !== item.id) return q;
         return {
           ...q,
@@ -482,6 +562,12 @@ export function clearSyncOutbox() {
     retryTimer = null;
   }
   localStorage.removeItem(KEY);
+  const inflightSaveIds = getInflightFoodEntrySaveIds();
+  if (inflightSaveIds.length > 0) {
+    clearPendingDeletedFoodEntryIdsExcept(inflightSaveIds);
+  } else {
+    clearPendingDeletedFoodEntryIds();
+  }
   status.pending = 0;
   status.running = false;
   status.lastError = null;

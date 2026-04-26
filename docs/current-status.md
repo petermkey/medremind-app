@@ -1,6 +1,6 @@
 # MedRemind Current Status
 
-Date: 2026-04-25
+Date: 2026-04-26
 Owner: engineering runtime status on current `main`
 
 > **Lifecycle contract:** `docs/lifecycle-contract-v1.md` is the authoritative behavioral specification
@@ -74,6 +74,15 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - **Per-protocol breakdown**: sorted weakest-first; filters to `status === 'active'` protocols only.
 - **Time-scoped metric labels**: "last 30d" / "days in a row" on summary grid.
 
+### Food diary and nutrition targets (landed 2026-04-26)
+
+- `/app/food` now starts with nutrition target setup when the signed-in user has no target profile.
+- Target setup calculates daily calories, macros, fiber, and water from body profile inputs, then lets users edit values before saving.
+- Saved target profiles unlock the date-aware food diary, target progress cards, and hydration tracker.
+- Food entries remain Supabase-backed, are scoped by selected diary date, and are collapsed by default until expanded for component and detailed nutrient views.
+- Hydration supports quick-add manual water entries and daily water progress.
+- Food delete now requires confirmation, removes the entry from the selected-day diary, and updates the day totals.
+
 ### Lifecycle and schedule
 
 - Fixed-duration validation and inclusive activation `endDate` behavior.
@@ -130,6 +139,11 @@ Landed implementation slices on `main`:
 - C1, C2, C3, C4, C5
 - D1, D2, D4
 - D3 tooling implementation is landed and available for operational runs
+
+Food/nutrition schema additions:
+
+- `supabase/005_food_intake.sql`: `food_entries` and `food_entry_components`
+- `supabase/006_nutrition_targets_and_hydration.sql`: `nutrition_target_profiles` and `water_entries`
 
 ## 4. Remaining work categories
 
