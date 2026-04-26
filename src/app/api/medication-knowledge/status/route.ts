@@ -131,7 +131,7 @@ export async function GET() {
             jobType: latestJob.job_type,
             windowStart: latestJob.input_window_start,
             windowEnd: latestJob.input_window_end,
-            lastError: latestJob.last_error,
+            lastError: latestJob.last_error ? 'Last refresh failed. Try again.' : null,
             updatedAt: latestJob.updated_at,
           }
         : null,

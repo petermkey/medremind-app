@@ -59,6 +59,7 @@ export default function SettingsPage() {
   const [ouraStatus, setOuraStatus] = useState<OuraStatus | null>(null);
   const [healthSyncStatus, setHealthSyncStatus] = useState('');
   const [healthSyncing, setHealthSyncing] = useState(false);
+  const [disconnectingOura, setDisconnectingOura] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const installState = useInstallState();
@@ -320,6 +321,26 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleOuraDisconnect() {
+    setDisconnectingOura(true);
+    try {
+      const response = await fetch('/api/integrations/oura/disconnect', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) {
+        setHealthSyncStatus(data.error ?? 'Oura disconnect failed.');
+        return;
+      }
+      setOuraStatus({
+        connected: false,
+        status: data.status ?? 'revoked',
+        lastSyncAt: null,
+      });
+      setHealthSyncStatus('Oura disconnected in MedRemind.');
+    } finally {
+      setDisconnectingOura(false);
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
@@ -386,11 +407,19 @@ export default function SettingsPage() {
                 <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#3B82F6] hover:underline">
                   Connect
                 </a>
-                <a href="https://cloud.ouraring.com/user/apps" className="text-xs font-semibold text-[#8B949E] hover:text-[#F0F6FC]">
+                <button
+                  type="button"
+                  onClick={handleOuraDisconnect}
+                  disabled={disconnectingOura}
+                  className="text-xs font-semibold text-[#FCA5A5] hover:underline disabled:opacity-50"
+                >
                   Disconnect
-                </a>
+                </button>
               </div>
             </div>
+            <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#8B949E] hover:text-[#F0F6FC]">
+              Manage Oura app access
+            </a>
           </div>
           <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">

@@ -36,8 +36,37 @@ function addDays(localDate: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10);
+function localDateForTimeZone(timeZone: string, now = new Date()): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch {
+    // Fall through to UTC for invalid or unavailable timezone data.
+  }
+
+  return now.toISOString().slice(0, 10);
+}
+
+async function getUserTimezone(service: ReturnType<typeof serviceClient>, userId: string): Promise<string> {
+  const { data, error } = await service
+    .from('profiles')
+    .select('timezone')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return typeof data?.timezone === 'string' && data.timezone.length > 0 ? data.timezone : 'UTC';
 }
 
 function mapItemRow(item: MedicationMapItem) {
@@ -206,7 +235,8 @@ export async function POST() {
 
   const service = serviceClient();
   const userId = data.user.id;
-  const windowEnd = todayUtc();
+  const timezone = await getUserTimezone(service, userId);
+  const windowEnd = localDateForTimeZone(timezone);
   const windowStart = addDays(windowEnd, -89);
   const idempotencyKey = `${userId}:medication_knowledge_refresh:${windowEnd}`;
 
