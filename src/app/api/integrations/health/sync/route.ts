@@ -20,9 +20,14 @@ import { createClient } from '@/lib/supabase/server';
 export const runtime = 'nodejs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const OURA_MAX_PAGES_PER_COLLECTION = 25;
 
 type OuraCollectionResponse = {
   data?: unknown[];
+  next_token?: unknown;
+  nextToken?: unknown;
+  continuation_token?: unknown;
+  continuationToken?: unknown;
 };
 
 type OuraDailyCollections = {
@@ -104,6 +109,17 @@ function groupWorkoutData(response: OuraCollectionResponse): Map<string, unknown
   return grouped;
 }
 
+function getContinuationToken(response: OuraCollectionResponse): string | null {
+  for (const key of ['next_token', 'nextToken', 'continuation_token', 'continuationToken'] as const) {
+    const token = response[key];
+    if (typeof token === 'string' && token.length > 0) {
+      return token;
+    }
+  }
+
+  return null;
+}
+
 function getSnapshotDates(collections: OuraDailyCollections): string[] {
   const dates = new Set<string>();
 
@@ -152,19 +168,56 @@ async function getValidOuraTokens(userId: string) {
   return { config, tokens };
 }
 
+async function fetchPaginatedOuraCollection(
+  apiBaseUrl: string,
+  accessToken: string,
+  path: string,
+  range: { start_date: string; end_date: string },
+): Promise<OuraCollectionResponse> {
+  const data: unknown[] = [];
+  const seenTokens = new Set<string>();
+  let nextToken: string | null = null;
+
+  for (let page = 0; page < OURA_MAX_PAGES_PER_COLLECTION; page += 1) {
+    const response = await fetchOuraJson<OuraCollectionResponse>(
+      apiBaseUrl,
+      accessToken,
+      path,
+      nextToken ? { ...range, next_token: nextToken } : range,
+    );
+
+    if (Array.isArray(response.data)) {
+      data.push(...response.data);
+    }
+
+    nextToken = getContinuationToken(response);
+    if (!nextToken) {
+      return { ...response, data };
+    }
+
+    if (seenTokens.has(nextToken)) {
+      throw new Error(`Oura pagination repeated a continuation token for ${path}`);
+    }
+
+    seenTokens.add(nextToken);
+  }
+
+  throw new Error(`Oura pagination exceeded ${OURA_MAX_PAGES_PER_COLLECTION} pages for ${path}`);
+}
+
 async function fetchOuraDailyCollections(
   apiBaseUrl: string,
   accessToken: string,
   range: { start_date: string; end_date: string },
 ): Promise<OuraDailyCollections> {
   const [dailySleep, readiness, activity, spo2, stress, heartHealth, workouts] = await Promise.all([
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_sleep', range),
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_readiness', range),
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_spo2', range),
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/daily_stress', range),
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/heart_health', range),
-    fetchOuraJson<OuraCollectionResponse>(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_sleep', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_readiness', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_spo2', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_stress', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/heart_health', range),
+    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
   ]);
 
   return {
