@@ -13,7 +13,7 @@ test('mapOuraDailyPayloadToHealthSnapshot maps daily sleep/readiness/activity/st
     dailyActivity: { score: 74, steps: 8600, active_calories: 520, total_calories: 2420 },
     dailyStress: { stress_high: 3600, recovery_high: 7200 },
     dailySpO2: { spo2_percentage: { average: 97.2 }, breathing_disturbance_index: 2 },
-    heartHealth: { vo2_max: 42.4, hrv_balance: 'fair' },
+    heartHealth: { vo2_max: 42.4, resting_heart_rate: 54, hrv_balance: 'fair' },
   });
 
   assert.equal(snapshot.source, 'oura');
@@ -27,5 +27,6 @@ test('mapOuraDailyPayloadToHealthSnapshot maps daily sleep/readiness/activity/st
   assert.equal(snapshot.steps, 8600);
   assert.equal(snapshot.averageSpo2, 97.2);
   assert.equal(snapshot.breathingDisturbanceIndex, 2);
+  assert.equal(snapshot.restingHeartRate, 54);
   assert.equal(snapshot.hrvBalance, 'fair');
 });

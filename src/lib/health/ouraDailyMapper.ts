@@ -19,6 +19,7 @@ type OuraDailyPayload = {
   } | null;
   heartHealth?: {
     vo2_max?: number | null;
+    resting_heart_rate?: number | null;
     hrv_balance?: string | null;
     resilience_level?: string | null;
   } | null;
@@ -52,7 +53,7 @@ export function mapOuraDailyPayloadToHealthSnapshot(
     averageSpo2: numberOrNull(input.dailySpO2?.spo2_percentage?.average),
     breathingDisturbanceIndex: numberOrNull(input.dailySpO2?.breathing_disturbance_index),
     vo2Max: numberOrNull(input.heartHealth?.vo2_max),
-    restingHeartRate: null,
+    restingHeartRate: numberOrNull(input.heartHealth?.resting_heart_rate),
     hrvBalance: stringOrNull(input.heartHealth?.hrv_balance),
     resilienceLevel: stringOrNull(input.heartHealth?.resilience_level),
     workoutCount: Array.isArray(input.workouts) ? input.workouts.length : 0,
