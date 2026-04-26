@@ -123,3 +123,96 @@ test('buildDailyMedicationExposure returns false and null defaults without match
   assert.equal(exposure.lateMedicationCount, 0);
   assert.equal(exposure.missedMedicationCount, 0);
 });
+
+test('buildDailyMedicationExposure ignores dose signals outside the requested local date', () => {
+  const exposure = buildDailyMedicationExposure({
+    userId: 'u-1',
+    localDate: '2026-04-20',
+    mapItems: [
+      {
+        id: 'map-1',
+        userId: 'u-1',
+        activeProtocolId: 'ap-1',
+        protocolItemId: 'pi-1',
+        displayName: 'Levothyroxine',
+        genericName: 'levothyroxine',
+        frequencyType: 'daily',
+        times: ['07:00'],
+        withFood: 'no',
+        startDate: '2026-04-01',
+        endDate: null,
+        status: 'active',
+        sourceHash: 'h-1',
+      },
+    ],
+    normalizations: [],
+    doseSignals: [
+      {
+        medicationMapItemId: 'map-1',
+        scheduledDate: '2026-04-19',
+        scheduledTime: '07:00',
+        status: 'taken',
+        recordedAt: '2026-04-19T08:00:00.000Z',
+        withFoodTaken: true,
+      },
+      {
+        medicationMapItemId: 'map-1',
+        scheduledDate: '2026-04-21',
+        scheduledTime: '07:00',
+        status: 'skipped',
+      },
+    ],
+    reviewSignals: [],
+  });
+
+  assert.equal(exposure.withFoodMismatchCount, 0);
+  assert.equal(exposure.lateMedicationCount, 0);
+  assert.equal(exposure.missedMedicationCount, 0);
+});
+
+test('buildDailyMedicationExposure counts review signals only for active map items on the local date', () => {
+  const exposure = buildDailyMedicationExposure({
+    userId: 'u-1',
+    localDate: '2026-04-20',
+    mapItems: [
+      {
+        id: 'map-active',
+        userId: 'u-1',
+        activeProtocolId: 'ap-1',
+        protocolItemId: 'pi-1',
+        displayName: 'Testosterone',
+        genericName: 'testosterone',
+        frequencyType: 'weekly',
+        times: ['09:00'],
+        withFood: 'any',
+        startDate: '2026-04-01',
+        endDate: null,
+        status: 'active',
+        sourceHash: 'h-1',
+      },
+      {
+        id: 'map-inactive',
+        userId: 'u-1',
+        activeProtocolId: 'ap-2',
+        protocolItemId: 'pi-2',
+        displayName: 'Prior medication',
+        genericName: null,
+        frequencyType: 'daily',
+        times: ['09:00'],
+        withFood: 'any',
+        startDate: '2026-03-01',
+        endDate: '2026-03-31',
+        status: 'active',
+        sourceHash: 'h-2',
+      },
+    ],
+    normalizations: [],
+    doseSignals: [],
+    reviewSignals: [
+      { medicationMapItemId: 'map-active', recommendationKind: 'clinician_review' },
+      { medicationMapItemId: 'map-inactive', recommendationKind: 'clinician_review' },
+    ],
+  });
+
+  assert.equal(exposure.medicationReviewSignalCount, 1);
+});

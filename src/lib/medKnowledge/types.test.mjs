@@ -31,3 +31,11 @@ test('migration 009 contains the medication knowledge entity set', () => {
   }
   assert.doesNotMatch(sql, /vector\(/i);
 });
+
+test('medication ai runs cascade on user delete to keep nullable-user RLS safe', () => {
+  const sql = readFileSync(new URL('../../../supabase/009_medication_knowledge.sql', import.meta.url), 'utf8');
+  const medicationAiRunsBlock = sql.match(/create table if not exists medication_ai_runs \([\s\S]*?\n\);/)?.[0] ?? '';
+
+  assert.match(medicationAiRunsBlock, /user_id uuid references profiles\(id\) on delete cascade/);
+  assert.doesNotMatch(medicationAiRunsBlock, /user_id uuid references profiles\(id\) on delete set null/);
+});

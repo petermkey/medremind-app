@@ -21,6 +21,9 @@ export type BuildDailyMedicationExposureInput = {
 export function buildDailyMedicationExposure(input: BuildDailyMedicationExposureInput): DailyMedicationExposure {
   const normalizationsByMapItemId = new Map(input.normalizations.map((normalization) => [normalization.medicationMapItemId, normalization]));
   const activeItems = input.mapItems.filter((item) => isActiveOnDate(item, input.localDate));
+  const activeItemIds = new Set(activeItems.flatMap((item) => [item.id, item.protocolItemId]).filter(Boolean) as string[]);
+  const localDoseSignals = (input.doseSignals ?? []).filter((signal) => signal.scheduledDate === input.localDate);
+  const activeReviewSignals = (input.reviewSignals ?? []).filter((signal) => activeItemIds.has(signal.medicationMapItemId));
   const classFlags = activeItems.map((item) => classifyMedication(item, normalizationsByMapItemId.get(item.id ?? item.protocolItemId)));
   const glp1Items = activeItems.filter((item, index) => classFlags[index].glp1);
   const testosteroneItems = activeItems.filter((item, index) => classFlags[index].testosterone);
@@ -37,11 +40,11 @@ export function buildDailyMedicationExposure(input: BuildDailyMedicationExposure
     hasBetaBlockerActive: classFlags.some((flags) => flags.betaBlocker),
     hasThyroidMedActive: classFlags.some((flags) => flags.thyroid),
     hasSsriActive: classFlags.some((flags) => flags.ssri),
-    withFoodMismatchCount: countWithFoodMismatches(input.doseSignals ?? [], activeItems),
-    lateMedicationCount: countLateMedicationSignals(input.doseSignals ?? []),
-    missedMedicationCount: (input.doseSignals ?? []).filter((signal) => ['skipped', 'missed', 'overdue'].includes(signal.status)).length,
+    withFoodMismatchCount: countWithFoodMismatches(localDoseSignals, activeItems),
+    lateMedicationCount: countLateMedicationSignals(localDoseSignals),
+    missedMedicationCount: localDoseSignals.filter((signal) => ['skipped', 'missed', 'overdue'].includes(signal.status)).length,
     medicationClassExposureScore: activeClassCount,
-    medicationReviewSignalCount: (input.reviewSignals ?? []).filter((signal) => signal.recommendationKind === 'clinician_review').length,
+    medicationReviewSignalCount: activeReviewSignals.filter((signal) => signal.recommendationKind === 'clinician_review').length,
     sourcePayload: {
       activeMedicationMapItemIds: activeItems.map((item) => item.id ?? item.protocolItemId),
       activeClassCount,

@@ -10,6 +10,7 @@
     "tool:backfill:execution-history": "node scripts/backfill-execution-history.mjs",
     "tool:validate:lifecycle-parity": "node scripts/validate-lifecycle-parity.mjs",
     "test:unit": "rm -rf .tmp/unit && tsc --ignoreConfig --target ES2020 --module Node16 --moduleResolution node16 --types node --strict --esModuleInterop --skipLibCheck --outDir .tmp/unit --rootDir . --noEmit false tests/unit/targetAlgorithm.test.ts tests/unit/openRouterModels.test.ts src/lib/food/targetAlgorithm.ts src/lib/food/pendingFoodDeletes.ts src/lib/food/analyze/openRouterModels.ts src/lib/nutrition/waterEntryTime.ts src/lib/nutrition/nutritionTargetsCache.ts src/lib/supabase/syncOutboxQueue.ts src/types/nutritionTargets.ts && node .tmp/unit/tests/unit/targetAlgorithm.test.js && node .tmp/unit/tests/unit/openRouterModels.test.js; status=$?; rm -rf .tmp/unit .tmp; exit $status",
+    "test:med-knowledge": "node --experimental-strip-types --test src/lib/medKnowledge/types.test.mjs src/lib/medKnowledge/safety.test.mjs src/lib/medKnowledge/rules.test.mjs src/lib/medKnowledge/mapReader.test.mjs src/lib/medKnowledge/features.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:install": "playwright install chromium"
