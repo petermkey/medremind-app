@@ -114,3 +114,45 @@ test('buildMedicationMapItems excludes non-medications and protocols outside the
   assert.equal(items[0].protocolItemId, 'pi-med');
   assert.equal(items[0].status, 'paused');
 });
+
+test('buildMedicationMapItems excludes medication items outside the requested date window', () => {
+  const items = buildMedicationMapItems({
+    windowStart: '2026-04-01',
+    windowEnd: '2026-04-30',
+    activeProtocols: [
+      {
+        id: 'ap-1',
+        user_id: 'u-1',
+        protocol_id: 'p-1',
+        status: 'active',
+        start_date: '2026-04-01',
+        end_date: '2026-12-31',
+      },
+    ],
+    protocolItems: [
+      {
+        id: 'pi-april',
+        protocol_id: 'p-1',
+        item_type: 'medication',
+        name: 'April medication',
+        frequency_type: 'daily',
+        times: ['08:00'],
+        start_day: 1,
+        end_day: 30,
+      },
+      {
+        id: 'pi-july',
+        protocol_id: 'p-1',
+        item_type: 'medication',
+        name: 'July medication',
+        frequency_type: 'daily',
+        times: ['08:00'],
+        start_day: 92,
+        end_day: 122,
+      },
+    ],
+    drugs: [],
+  });
+
+  assert.deepEqual(items.map((item) => item.protocolItemId), ['pi-april']);
+});

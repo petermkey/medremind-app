@@ -55,18 +55,21 @@ export function buildMedicationMapItems(input: BuildMedicationMapItemsInput): Me
 
       return protocolItems
         .filter((protocolItem) => protocolItem.item_type === 'medication')
-        .map((protocolItem) => buildMedicationMapItem(activeProtocol, protocolItem, drugsById.get(protocolItem.drug_id ?? '')));
+        .map((protocolItem) => ({
+          protocolItem,
+          itemWindow: deriveMedicationItemWindow(activeProtocol, protocolItem),
+        }))
+        .filter(({ itemWindow }) => intersectsDateWindow(itemWindow.startDate, itemWindow.endDate, input.windowStart, input.windowEnd))
+        .map(({ protocolItem, itemWindow }) => buildMedicationMapItem(activeProtocol, protocolItem, itemWindow, drugsById.get(protocolItem.drug_id ?? '')));
     });
 }
 
 function buildMedicationMapItem(
   activeProtocol: ActiveProtocolRow,
   protocolItem: ProtocolItemRow,
+  itemWindow: MedicationItemWindow,
   drug: DrugRow | undefined,
 ): MedicationMapItem {
-  const startDate = addUtcDays(activeProtocol.start_date, Math.max((protocolItem.start_day ?? 1) - 1, 0));
-  const itemEndDate = protocolItem.end_day ? addUtcDays(activeProtocol.start_date, Math.max(protocolItem.end_day - 1, 0)) : null;
-  const endDate = minDateString(itemEndDate, activeProtocol.end_date ?? null);
   const item: MedicationMapItem = {
     userId: activeProtocol.user_id,
     activeProtocolId: activeProtocol.id,
@@ -81,8 +84,8 @@ function buildMedicationMapItem(
     frequencyType: protocolItem.frequency_type,
     times: protocolItem.times ?? [],
     withFood: protocolItem.with_food ?? null,
-    startDate,
-    endDate,
+    startDate: itemWindow.startDate,
+    endDate: itemWindow.endDate,
     status: normalizeStatus(activeProtocol.status),
     sourceHash: '',
   };
@@ -90,6 +93,21 @@ function buildMedicationMapItem(
   return {
     ...item,
     sourceHash: hashMedicationMapItem(item),
+  };
+}
+
+type MedicationItemWindow = {
+  startDate: string;
+  endDate: string | null;
+};
+
+function deriveMedicationItemWindow(activeProtocol: ActiveProtocolRow, protocolItem: ProtocolItemRow): MedicationItemWindow {
+  const startDate = addUtcDays(activeProtocol.start_date, Math.max((protocolItem.start_day ?? 1) - 1, 0));
+  const itemEndDate = protocolItem.end_day ? addUtcDays(activeProtocol.start_date, Math.max(protocolItem.end_day - 1, 0)) : null;
+
+  return {
+    startDate,
+    endDate: minDateString(itemEndDate, activeProtocol.end_date ?? null),
   };
 }
 
