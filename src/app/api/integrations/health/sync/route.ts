@@ -8,7 +8,7 @@ import {
   markHealthConnectionSyncError,
   markHealthConnectionSyncSuccess,
 } from '@/lib/health/sourceRegistry';
-import { fetchOuraJson, refreshOuraAccessToken } from '@/lib/oura/client';
+import { fetchOuraJson, OuraApiError, refreshOuraAccessToken } from '@/lib/oura/client';
 import { getOuraServerConfig } from '@/lib/oura/config';
 import {
   getStoredOuraTokens,
@@ -205,6 +205,23 @@ async function fetchPaginatedOuraCollection(
   throw new Error(`Oura pagination exceeded ${OURA_MAX_PAGES_PER_COLLECTION} pages for ${path}`);
 }
 
+async function fetchOptionalOuraCollection(
+  apiBaseUrl: string,
+  accessToken: string,
+  path: string,
+  range: { start_date: string; end_date: string },
+): Promise<OuraCollectionResponse> {
+  try {
+    return await fetchPaginatedOuraCollection(apiBaseUrl, accessToken, path, range);
+  } catch (err) {
+    if (err instanceof OuraApiError && [401, 403, 404].includes(err.status)) {
+      return { data: [] };
+    }
+
+    throw err;
+  }
+}
+
 async function fetchOuraDailyCollections(
   apiBaseUrl: string,
   accessToken: string,
@@ -216,7 +233,7 @@ async function fetchOuraDailyCollections(
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_spo2', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_stress', range),
-    fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/heart_health', range),
+    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/heart_health', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
   ]);
 
