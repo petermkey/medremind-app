@@ -106,7 +106,9 @@ Food photo analysis (server-side):
 
 - `FOOD_AI_PROVIDER`: unset or `mock` for mock mode; `openai`; `openrouter`; `gemini`
 - `OPENAI_API_KEY` and optional `OPENAI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openai`
-- `OPENROUTER_API_KEY` and optional `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`
+- `OPENROUTER_API_KEY` for `FOOD_AI_PROVIDER=openrouter`
+- `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to free `google/gemma-4-31b-it:free`
+- `OPENROUTER_FOOD_VISION_FALLBACK_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to paid `google/gemini-2.5-flash` when the free model/provider is temporarily unavailable
 - `GEMINI_API_KEY` and optional `GEMINI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=gemini`
 - `NEXT_PUBLIC_APP_URL` is also used as the OpenRouter `HTTP-Referer`; it remains the optional app URL above.
 
