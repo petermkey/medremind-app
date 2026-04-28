@@ -88,6 +88,7 @@ Overall: beta with hardened auth/session flows, lifecycle command paths, additiv
 - Oura OAuth backend routes are under `/api/integrations/oura`: `connect`, `callback`, `status`, `daily`, and `disconnect`.
 - Oura tokens are encrypted server-side in `user_integrations` via `supabase/007_oura_integrations.sql` and are never returned to browser routes.
 - External health data is normalized through `supabase/008_external_health_snapshots.sql`, `src/lib/health/*`, and `/api/integrations/health/sync`; the boundary is source-compatible for Oura now and Apple Health later. Sync responses expose counts only.
+- Oura analytics storage is wired into `/api/integrations/health/sync`: each authenticated Oura sync creates an `external_health_sync_runs` row, records endpoint coverage, upserts server-only `oura_raw_documents`, writes derived `daily_health_features`, prunes raw payloads to the 90-day retention window, and preserves the existing `external_health_daily_snapshots` write.
 - Medication Knowledge Layer is backed by `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence modules.
 - OpenRouter model routing is server-side only. Prompts, evidence excerpts, and user identifiers must not be logged; structured outputs require `provider.require_parameters`.
 - Correlation insight generation is backed by `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations`.

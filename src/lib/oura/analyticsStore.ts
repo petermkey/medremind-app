@@ -16,7 +16,7 @@ export type OuraSyncType = 'initial_backfill' | 'daily' | 'manual_refresh';
 export type OuraSyncRunStatus = 'running' | 'success' | 'partial_success' | 'failed';
 export type OuraEndpointStatus = 'success' | 'failed' | 'skipped';
 
-type JsonValue =
+export type JsonValue =
   | null
   | boolean
   | number
@@ -24,7 +24,7 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-type JsonObject = { [key: string]: JsonValue };
+export type JsonObject = { [key: string]: JsonValue };
 
 export type OuraSyncRun = {
   id: string;

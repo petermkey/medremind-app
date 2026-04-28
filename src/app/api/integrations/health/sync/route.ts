@@ -8,6 +8,19 @@ import {
   markHealthConnectionSyncError,
   markHealthConnectionSyncSuccess,
 } from '@/lib/health/sourceRegistry';
+import {
+  finishOuraSyncRun,
+  type JsonObject,
+  pruneOuraRawDocuments,
+  recordOuraEndpointCoverage,
+  startOuraSyncRun,
+  upsertDailyHealthFeature,
+  upsertOuraRawDocument,
+} from '@/lib/oura/analyticsStore';
+import {
+  buildOuraAnalyticsSyncPayloads,
+  type OuraAnalyticsCollection,
+} from '@/lib/oura/analyticsSync';
 import { fetchOuraJson, OuraApiError, refreshOuraAccessToken } from '@/lib/oura/client';
 import { getOuraServerConfig } from '@/lib/oura/config';
 import {
@@ -38,6 +51,7 @@ type OuraDailyCollections = {
   dailyStress: Map<string, Record<string, unknown>>;
   heartHealth: Map<string, Record<string, unknown>>;
   workouts: Map<string, unknown[]>;
+  analyticsCollections: Record<string, OuraAnalyticsCollection>;
 };
 
 function toDateInput(value: string | null): string | null {
@@ -123,13 +137,28 @@ function getContinuationToken(response: OuraCollectionResponse): string | null {
 function getSnapshotDates(collections: OuraDailyCollections): string[] {
   const dates = new Set<string>();
 
-  for (const collection of Object.values(collections)) {
+  for (const collection of [
+    collections.dailySleep,
+    collections.dailyReadiness,
+    collections.dailyActivity,
+    collections.dailySpO2,
+    collections.dailyStress,
+    collections.heartHealth,
+    collections.workouts,
+  ]) {
     for (const date of collection.keys()) {
       dates.add(date);
     }
   }
 
   return Array.from(dates).sort();
+}
+
+function collectionData(response: OuraCollectionResponse): JsonObject[] {
+  return (response.data ?? [])
+    .map(asRecord)
+    .filter((item): item is Record<string, unknown> => item !== null)
+    .map((item) => item as JsonObject);
 }
 
 async function getValidOuraTokens(userId: string) {
@@ -245,7 +274,47 @@ async function fetchOuraDailyCollections(
     dailyStress: groupDailyData(stress),
     heartHealth: groupDailyData(heartHealth),
     workouts: groupWorkoutData(workouts),
+    analyticsCollections: {
+      daily_sleep: { required: true, data: collectionData(dailySleep) },
+      daily_readiness: { required: true, data: collectionData(readiness) },
+      daily_activity: { required: true, data: collectionData(activity) },
+      daily_spo2: { required: true, data: collectionData(spo2) },
+      daily_stress: { required: true, data: collectionData(stress) },
+      workout: { required: true, data: collectionData(workouts) },
+      heart_health: { required: false, data: collectionData(heartHealth) },
+    },
   };
+}
+
+async function persistOuraAnalyticsPayloads(input: {
+  userId: string;
+  connectionId: string;
+  syncRunId: string;
+  range: { start_date: string; end_date: string };
+  collections: OuraDailyCollections;
+}) {
+  const payloads = buildOuraAnalyticsSyncPayloads({
+    userId: input.userId,
+    connectionId: input.connectionId,
+    syncRunId: input.syncRunId,
+    rangeStart: input.range.start_date,
+    rangeEnd: input.range.end_date,
+    collections: input.collections.analyticsCollections,
+  });
+
+  for (const coverage of payloads.endpointCoverage) {
+    await recordOuraEndpointCoverage(coverage);
+  }
+
+  for (const rawDocument of payloads.rawDocuments) {
+    await upsertOuraRawDocument(rawDocument);
+  }
+
+  for (const dailyHealthFeature of payloads.dailyHealthFeatures) {
+    await upsertDailyHealthFeature(dailyHealthFeature);
+  }
+
+  return payloads;
 }
 
 async function syncOuraSnapshots(
@@ -255,31 +324,70 @@ async function syncOuraSnapshots(
   const auth = await getValidOuraTokens(userId);
   if (!auth) return 0;
 
-  const collections = await fetchOuraDailyCollections(
-    auth.config.apiBaseUrl,
-    auth.tokens.accessToken,
-    range,
-  );
+  const syncRun = await startOuraSyncRun({
+    userId,
+    syncType: 'manual_refresh',
+    rangeStart: range.start_date,
+    rangeEnd: range.end_date,
+  });
 
-  const snapshots = getSnapshotDates(collections).map((localDate) =>
-    mapOuraDailyPayloadToHealthSnapshot({
+  try {
+    const collections = await fetchOuraDailyCollections(
+      auth.config.apiBaseUrl,
+      auth.tokens.accessToken,
+      range,
+    );
+
+    const analyticsPayloads = await persistOuraAnalyticsPayloads({
       userId,
-      localDate,
-      dailySleep: collections.dailySleep.get(localDate),
-      dailyReadiness: collections.dailyReadiness.get(localDate),
-      dailyActivity: collections.dailyActivity.get(localDate),
-      dailyStress: collections.dailyStress.get(localDate),
-      dailySpO2: collections.dailySpO2.get(localDate),
-      heartHealth: collections.heartHealth.get(localDate),
-      workouts: collections.workouts.get(localDate),
-    }),
-  );
+      connectionId: auth.tokens.rowId,
+      syncRunId: syncRun.id,
+      range,
+      collections,
+    });
 
-  const count = await upsertExternalHealthDailySnapshots(snapshots);
-  await markOuraSyncSuccess(userId);
-  await markHealthConnectionSyncSuccess(userId, 'oura');
+    const snapshots = getSnapshotDates(collections).map((localDate) =>
+      mapOuraDailyPayloadToHealthSnapshot({
+        userId,
+        localDate,
+        dailySleep: collections.dailySleep.get(localDate),
+        dailyReadiness: collections.dailyReadiness.get(localDate),
+        dailyActivity: collections.dailyActivity.get(localDate),
+        dailyStress: collections.dailyStress.get(localDate),
+        dailySpO2: collections.dailySpO2.get(localDate),
+        heartHealth: collections.heartHealth.get(localDate),
+        workouts: collections.workouts.get(localDate),
+      }),
+    );
 
-  return count;
+    const count = await upsertExternalHealthDailySnapshots(snapshots);
+    await markOuraSyncSuccess(userId);
+    await markHealthConnectionSyncSuccess(userId, 'oura');
+    await finishOuraSyncRun({
+      syncRunId: syncRun.id,
+      status: 'success',
+      counts: {
+        endpointCoverage: analyticsPayloads.endpointCoverage.length,
+        rawDocuments: analyticsPayloads.rawDocuments.length,
+        dailyHealthFeatures: analyticsPayloads.dailyHealthFeatures.length,
+        externalHealthSnapshots: count,
+      },
+    });
+    await pruneOuraRawDocuments({ userId });
+
+    return count;
+  } catch (err) {
+    await finishOuraSyncRun({
+      syncRunId: syncRun.id,
+      status: 'failed',
+      errors: [{
+        message: err instanceof Error ? err.message : 'Oura health sync failed.',
+      }],
+    }).catch((finishErr) => {
+      console.error('[health/sync] failed to finish Oura sync run', finishErr);
+    });
+    throw err;
+  }
 }
 
 export async function POST(request: NextRequest) {
