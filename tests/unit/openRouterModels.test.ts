@@ -7,10 +7,7 @@ import {
 {
   const models = getOpenRouterFoodVisionModels({});
 
-  assert.deepEqual(models, [
-    'google/gemma-4-31b-it:free',
-    'google/gemini-2.5-flash',
-  ]);
+  assert.deepEqual(models, ['google/gemma-4-31b-it:free']);
 }
 
 {
