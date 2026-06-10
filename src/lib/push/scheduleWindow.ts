@@ -72,13 +72,18 @@ export function computeWindowSegments(
 
 /**
  * Build a PostgREST `.or()` filter string matching any of the given segments.
- * Each segment becomes an AND group on (scheduled_date, scheduled_time).
+ * Each segment becomes an AND group on (dateCol, timeCol).
+ * Defaults to V1 column names; pass V2 names for planned_occurrences queries.
  */
-export function segmentsToOrFilter(segments: WindowSegment[]): string {
+export function segmentsToOrFilter(
+  segments: WindowSegment[],
+  dateCol = 'scheduled_date',
+  timeCol = 'scheduled_time',
+): string {
   return segments
     .map(
       (s) =>
-        `and(scheduled_date.eq.${s.date},scheduled_time.gte.${s.startTime},scheduled_time.lte.${s.endTime})`,
+        `and(${dateCol}.eq.${s.date},${timeCol}.gte.${s.startTime},${timeCol}.lte.${s.endTime})`,
     )
     .join(',');
 }
