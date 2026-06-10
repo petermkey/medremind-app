@@ -465,6 +465,17 @@ export async function syncRegeneratedDoses(
     retainedSlots.add(slot);
   }
 
+  // V2 dual-write: build occurrence IDs for stale V2 slots before deleting from V1.
+  // Computed here so we still have the `existing` row data (protocol_item_id / dates).
+  const cProtocolId = cloudProtocolId(userId, active.protocolId);
+  const deletableSet = new Set(deletableIds);
+  const deletableOccurrenceIds: string[] = [];
+  for (const row of existing) {
+    if (!deletableSet.has(row.id)) continue;
+    const occurrenceKey = `${cActiveId}|${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
+    deletableOccurrenceIds.push(stableUuid(`planned-occurrence:${userId}`, occurrenceKey));
+  }
+
   for (const ids of chunk(deletableIds, 250)) {
     const { error: delErr } = await supabase
       .from('scheduled_doses')
@@ -472,6 +483,18 @@ export async function syncRegeneratedDoses(
       .eq('user_id', userId)
       .in('id', ids);
     if (delErr) throw new Error(`Delete regenerated doses failed: ${delErr.message}`);
+  }
+
+  // V2 dual-write: delete the corresponding stale planned_occurrences.
+  // Status guard ('planned') prevents touching any occurrence that already has events.
+  for (const ids of chunk(deletableOccurrenceIds, 250)) {
+    const { error: v2DelErr } = await supabase
+      .from('planned_occurrences')
+      .delete()
+      .eq('user_id', userId)
+      .eq('status', 'planned')
+      .in('id', ids);
+    if (v2DelErr) throw new Error(`Delete regenerated V2 occurrences failed: ${v2DelErr.message}`);
   }
 
   const rows = newDoses
@@ -492,6 +515,33 @@ export async function syncRegeneratedDoses(
   for (const part of chunk(rows, 250)) {
     const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
     if (error) throw new Error(`Insert regenerated doses failed: ${error.message}`);
+  }
+
+  // V2 dual-write: upsert new planned_occurrences.
+  // Mirrors the write-through in syncActivation; uses the same occurrence_key so
+  // duplicate regeneration calls coalesce cleanly.
+  const plannedRows = rows.map(row => {
+    const occurrenceKey = `${cActiveId}|${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
+    return {
+      id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
+      user_id: userId,
+      active_protocol_id: cActiveId,
+      protocol_id: cProtocolId,
+      protocol_item_id: row.protocol_item_id,
+      occurrence_date: row.scheduled_date,
+      occurrence_time: row.scheduled_time,
+      occurrence_key: occurrenceKey,
+      revision: 1,
+      status: 'planned',
+      source_generation: 'regeneration_write_through',
+      legacy_scheduled_dose_id: row.id,
+    };
+  });
+  for (const part of chunk(plannedRows, 250)) {
+    const { error: v2UpsertErr } = await supabase
+      .from('planned_occurrences')
+      .upsert(part, { onConflict: 'user_id,occurrence_key,revision' });
+    if (v2UpsertErr) throw new Error(`Upsert regenerated V2 occurrences failed: ${v2UpsertErr.message}`);
   }
 }
 
