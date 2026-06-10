@@ -213,14 +213,24 @@ function toMapItem(item: MedicationMapItem, row: Row): MedicationMapItem {
   };
 }
 
-function toDoseSignal(row: Row, recordsByDoseId: Map<string, Row>): MedicationDoseSignal {
-  const record = recordsByDoseId.get(String(row.id));
+function toDoseSignalV2(row: Row): MedicationDoseSignal {
+  const events = (row.execution_events as Row[] | null) ?? [];
+  const latestEvent = events.sort((a, b) =>
+    String(b.event_at ?? '').localeCompare(String(a.event_at ?? '')),
+  )[0];
+  // planned_occurrences.status is structural ('planned'/'cancelled'/'superseded').
+  // The action status comes from execution_events.event_type.
+  const occStatus = String(row.status);
+  const derivedStatus = latestEvent
+    ? String(latestEvent.event_type)
+    : occStatus === 'cancelled' ? 'skipped' : occStatus;
+
   return {
     medicationMapItemId: String(row.protocol_item_id),
-    scheduledDate: String(row.scheduled_date),
-    scheduledTime: String(row.scheduled_time).slice(0, 5),
-    status: String(row.status),
-    recordedAt: typeof record?.recorded_at === 'string' ? record.recorded_at : null,
+    scheduledDate: String(row.occurrence_date),
+    scheduledTime: String(row.occurrence_time).slice(0, 5),
+    status: derivedStatus,
+    recordedAt: typeof latestEvent?.event_at === 'string' ? latestEvent.event_at : null,
     withFoodTaken: null,
   };
 }
@@ -338,22 +348,16 @@ export async function POST() {
       : { error: null };
     if (evidenceUpsert.error) throw evidenceUpsert.error;
 
-    const scheduledResult = await service
-      .from('scheduled_doses')
-      .select('id, protocol_item_id, scheduled_date, scheduled_time, status')
+    // V2: read from planned_occurrences + execution_events (Phase 1 cut-over).
+    const occurrencesResult = await service
+      .from('planned_occurrences')
+      .select('id, protocol_item_id, occurrence_date, occurrence_time, status, execution_events(event_type, event_at)')
       .eq('user_id', userId)
-      .eq('scheduled_date', windowEnd);
-    if (scheduledResult.error) throw scheduledResult.error;
+      .eq('occurrence_date', windowEnd)
+      .is('superseded_by_occurrence_id', null);
+    if (occurrencesResult.error) throw occurrencesResult.error;
 
-    const scheduledRows = (scheduledResult.data as unknown as Row[] | null) ?? [];
-    const scheduledIds = scheduledRows.map((row) => String(row.id));
-    const recordsResult = scheduledIds.length > 0
-      ? await service.from('dose_records').select('scheduled_dose_id, recorded_at').eq('user_id', userId).in('scheduled_dose_id', scheduledIds)
-      : { data: [], error: null };
-    if (recordsResult.error) throw recordsResult.error;
-
-    const recordsByDoseId = new Map(((recordsResult.data as unknown as Row[] | null) ?? []).map((row) => [String(row.scheduled_dose_id), row]));
-    const doseSignals = scheduledRows.map((row) => toDoseSignal(row, recordsByDoseId));
+    const doseSignals = ((occurrencesResult.data as unknown as Row[] | null) ?? []).map(toDoseSignalV2);
     const exposure = buildDailyMedicationExposure({
       userId,
       localDate: windowEnd,
