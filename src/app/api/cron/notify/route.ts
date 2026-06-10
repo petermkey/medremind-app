@@ -15,6 +15,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { isVapidConfigured, sendPushToUser } from '@/lib/push/sendToUser';
+import { computeWindowSegments, segmentsToOrFilter } from '@/lib/push/scheduleWindow';
+
 // Notification fire window: ±1 minute around the current UTC time.
 // Cron runs every minute via cron-job.org (job #7402449).
 const WINDOW_MINUTES = 1;
@@ -34,7 +37,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  if (!isVapidConfigured()) {
+    return NextResponse.json({ error: 'VAPID not configured' }, { status: 500 });
+  }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,17 +65,11 @@ export async function GET(request: NextRequest) {
   }
 
   // Helper: send one push notification and return success boolean.
+  // Calls the delivery core directly — no self-fetch over the public URL.
   async function sendPush(userId: string, title: string, body: string, tag: string): Promise<boolean> {
     try {
-      const resp = await fetch(`${appUrl}/api/push/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.CRON_SECRET}`,
-        },
-        body: JSON.stringify({ userId, title, body, url: '/app', tag }),
-      });
-      return resp.ok;
+      await sendPushToUser(supabase, userId, { title, body, url: '/app', tag });
+      return true;
     } catch {
       return false;
     }
@@ -109,29 +108,12 @@ export async function GET(request: NextRequest) {
 
       // ── Pass A: Initial scheduled notifications ──────────────────────────
       {
-        // Compute the target scheduled_time that maps to "now" given leadTimeMin.
-        // If lead_time = 15, we want doses whose scheduled_time = now + 15 min.
-        const targetUtc = new Date(now.getTime() + (leadTimeMin ?? 0) * 60 * 1000);
+        // Local-date/time segments covered by the fire window. Normally one
+        // segment; two when the window straddles local midnight (so doses near
+        // 00:00 are not silently dropped). Second-inclusive bounds.
+        const segments = computeWindowSegments(now, leadTimeMin ?? 0, tz, WINDOW_MINUTES);
 
-        // Local calendar date for the user (YYYY-MM-DD).
-        const localDateParts = new Intl.DateTimeFormat('en-CA', {
-          timeZone: tz,
-          year: 'numeric', month: '2-digit', day: '2-digit',
-        }).formatToParts(targetUtc);
-        const localDate = `${localDateParts.find(p => p.type === 'year')!.value}-${localDateParts.find(p => p.type === 'month')!.value}-${localDateParts.find(p => p.type === 'day')!.value}`;
-
-        // Local HH:MM time window.
-        const windowStart = new Date(targetUtc.getTime() - WINDOW_MINUTES * 60 * 1000);
-        const windowEnd   = new Date(targetUtc.getTime() + WINDOW_MINUTES * 60 * 1000);
-
-        function toHHMM(d: Date, timezone: string): string {
-          return d.toLocaleString('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false });
-        }
-
-        const windowStartHHMM = toHHMM(windowStart, tz);
-        const windowEndHHMM   = toHHMM(windowEnd, tz);
-
-        // Query due doses for this user that match the window.
+        // Query due doses for this user that match any window segment.
         const { data: doses, error: dosesErr } = await supabase
           .from('scheduled_doses')
           .select(`
@@ -149,10 +131,8 @@ export async function GET(request: NextRequest) {
             )
           `)
           .eq('user_id', userId)
-          .eq('scheduled_date', localDate)
           .in('status', ['pending', 'overdue'])
-          .gte('scheduled_time', windowStartHHMM)
-          .lte('scheduled_time', windowEndHHMM)
+          .or(segmentsToOrFilter(segments))
           .eq('active_protocols.status', 'active');
 
         if (dosesErr) {
