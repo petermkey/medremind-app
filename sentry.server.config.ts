@@ -9,5 +9,9 @@ Sentry.init({
   dsn,
   enabled: Boolean(dsn),
   tracesSampleRate: 0.1,
+  enableLogs: true,
+  // Medical PWA: keep PII off and local variables out of stack traces — both
+  // can capture health data (medication names, user identifiers).
   sendDefaultPii: false,
+  includeLocalVariables: false,
 });

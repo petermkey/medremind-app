@@ -8,5 +8,6 @@ Sentry.init({
   dsn,
   enabled: Boolean(dsn),
   tracesSampleRate: 0.1,
+  enableLogs: true,
   sendDefaultPii: false,
 });
