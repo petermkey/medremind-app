@@ -42,6 +42,8 @@ type CloudRowsResult = {
 
 const CLOUD_PULL_PAGE_SIZE = 1000;
 
+type OccurrenceRow = Record<string, unknown>;
+
 function profileFromStoreForExport(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
   return {
@@ -136,6 +138,48 @@ async function fetchAllUserRows(
   return { data: rows, error: null };
 }
 
+// V2: paginated fetch of planned_occurrences with nested execution_events.
+// Uses unknown-cast because planned_occurrences is not in the generated schema types.
+async function fetchAllOccurrencesWithEvents(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  userId: string,
+): Promise<{ data: OccurrenceRow[]; error: { message: string } | null }> {
+  const rows: OccurrenceRow[] = [];
+  type V2RangeQuery = {
+    order: (column: string, options: { ascending: boolean }) => V2RangeQuery;
+    range: (from: number, to: number) => Promise<{ data: OccurrenceRow[] | null; error: { message: string } | null }>;
+  };
+  const client = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          is: (column: string, value: null) => {
+            order: (column: string, options: { ascending: boolean }) => V2RangeQuery;
+          };
+        };
+      };
+    };
+  };
+
+  for (let from = 0; ; from += CLOUD_PULL_PAGE_SIZE) {
+    let query = client
+      .from('planned_occurrences')
+      .select('id, user_id, active_protocol_id, protocol_item_id, occurrence_date, occurrence_time, status, execution_events(id, event_type, event_at, note)')
+      .eq('user_id', userId)
+      .is('superseded_by_occurrence_id', null)
+      .order('occurrence_date', { ascending: true });
+    query = query.order('occurrence_time', { ascending: true });
+    query = query.order('id', { ascending: true });
+    const page = await query.range(from, from + CLOUD_PULL_PAGE_SIZE - 1);
+
+    if (page.error) return { data: rows, error: page.error };
+    rows.push(...(page.data ?? []));
+    if ((page.data ?? []).length < CLOUD_PULL_PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 export async function pullStoreFromSupabase(): Promise<PullSummary> {
   const supabase = getSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -156,10 +200,8 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     supabase.from('active_protocols').select('*').eq('user_id', user.id),
   ]);
 
-  const [scheduledRes, recordsRes] = await Promise.all([
-    fetchAllUserRows(supabase, 'scheduled_doses', user.id, ['scheduled_date', 'scheduled_time', 'id']),
-    fetchAllUserRows(supabase, 'dose_records', user.id, ['recorded_at', 'id']),
-  ]);
+  // V2 Phase 1 step 3: read from planned_occurrences + execution_events.
+  const occurrencesRes = await fetchAllOccurrencesWithEvents(supabase, user.id);
 
   if (profileRes.error) {
     throw new Error(`Profile read failed: ${profileRes.error.message}`);
@@ -170,8 +212,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   if (customDrugsRes.error) throw new Error(`Custom drugs read failed: ${customDrugsRes.error.message}`);
   if (protocolsRes.error) throw new Error(`Protocols read failed: ${protocolsRes.error.message}`);
   if (activeRes.error) throw new Error(`Active protocols read failed: ${activeRes.error.message}`);
-  if (scheduledRes.error) throw new Error(`Scheduled doses read failed: ${scheduledRes.error.message}`);
-  if (recordsRes.error) throw new Error(`Dose records read failed: ${recordsRes.error.message}`);
+  if (occurrencesRes.error) throw new Error(`Occurrences read failed: ${occurrencesRes.error.message}`);
 
   const ownedProtocolsRaw = (protocolsRes.data ?? []) as Record<string, unknown>[];
   const activeProtocolRows = (activeRes.data ?? []) as Record<string, unknown>[];
@@ -319,7 +360,10 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     }
   }
 
-  const scheduledDoses: ScheduledDose[] = ((scheduledRes.data ?? []) as Record<string, unknown>[])
+  // V2 Phase 1 step 3: map planned_occurrences → ScheduledDose[].
+  // snoozedUntil is omitted — V2 models snooze via occurrence revision, not a timestamp field.
+  const doseRecords: DoseRecord[] = [];
+  const scheduledDoses: ScheduledDose[] = occurrencesRes.data
     .map(row => {
       const sourceActiveId = String(row.active_protocol_id);
       const itemId = String(row.protocol_item_id);
@@ -329,11 +373,33 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         // Warn so boot-time drops are visible in the browser console for debugging.
         // Common causes: duplicate active-protocol instance conflict, orphaned protocol item.
         console.warn(
-          '[cloud-pull-dose-dropped]',
-          { id: String(row.id), date: String(row.scheduled_date), status: String(row.status), activeProtocolId: sourceActiveId, protocolItemId: itemId, missingActiveProtocol: !activeProtocol, missingProtocolItem: !protocolItem },
+          '[cloud-pull-occurrence-dropped]',
+          { id: String(row.id), date: String(row.occurrence_date), status: String(row.status), activeProtocolId: sourceActiveId, protocolItemId: itemId, missingActiveProtocol: !activeProtocol, missingProtocolItem: !protocolItem },
         );
         return null;
       }
+
+      const events = (row.execution_events as Record<string, unknown>[] | null) ?? [];
+      const latestEvent = events.slice().sort((a, b) =>
+        String(b.event_at ?? '').localeCompare(String(a.event_at ?? '')),
+      )[0];
+      const occStatus = String(row.status);
+      const derivedStatus: ScheduledDose['status'] = latestEvent
+        ? (String(latestEvent.event_type) as ScheduledDose['status'])
+        : occStatus === 'cancelled' ? 'skipped' : 'pending';
+
+      // Collect execution_events as DoseRecord equivalents.
+      for (const ev of events) {
+        doseRecords.push({
+          id: String(ev.id),
+          userId: String(row.user_id),
+          scheduledDoseId: String(row.id),  // planned_occurrence.id
+          action: String(ev.event_type) as DoseRecord['action'],
+          recordedAt: ev.event_at ? String(ev.event_at) : new Date().toISOString(),
+          note: ev.note ? String(ev.note) : undefined,
+        });
+      }
+
       return {
         id: String(row.id),
         userId: String(row.user_id),
@@ -341,23 +407,13 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         protocolItemId: itemId,
         protocolItem,
         activeProtocol,
-        scheduledDate: String(row.scheduled_date),
-        scheduledTime: String(row.scheduled_time).slice(0, 5),
-        status: String(row.status) as ScheduledDose['status'],
-        snoozedUntil: row.snoozed_until ? String(row.snoozed_until) : undefined,
+        scheduledDate: String(row.occurrence_date),
+        scheduledTime: String(row.occurrence_time).slice(0, 5),
+        status: derivedStatus,
+        snoozedUntil: undefined,
       };
     })
     .filter(Boolean) as ScheduledDose[];
-
-  const doseRecords: DoseRecord[] = ((recordsRes.data ?? []) as Record<string, unknown>[])
-    .map(row => ({
-      id: String(row.id),
-      userId: String(row.user_id),
-      scheduledDoseId: String(row.scheduled_dose_id),
-      action: String(row.action) as DoseRecord['action'],
-      recordedAt: row.recorded_at ? String(row.recorded_at) : new Date().toISOString(),
-      note: row.note ? String(row.note) : undefined,
-    }));
 
   const profileRow = profileRes.data as Record<string, unknown> | null;
   const profile: UserProfile = {
@@ -422,7 +478,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     protocols: cloudProtocols.length,
     protocolItems: (protocolItemsRes.data ?? []).length,
     activeProtocols: activeProtocols.length,
-    scheduledDoses: scheduledDoses.length,
-    doseRecords: doseRecords.length,
+    scheduledDoses: scheduledDoses.length,   // occurrences count
+    doseRecords: doseRecords.length,          // execution events count
   };
 }
