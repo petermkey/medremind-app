@@ -9,7 +9,7 @@ const hasE2eEnv = Boolean(e2eEmail && e2ePassword && supabaseUrl && supabaseAnon
 const e2eFoodTitlePrefixes = ['E2E ', 'Cancelled E2E '] as const;
 const createdWaterEntryIds = new Set<string>();
 
-type SupabaseE2eClient = ReturnType<typeof createClient>;
+type SupabaseE2eClient = Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>['supabase'];
 type NutritionTargetProfileRow = Record<string, unknown>;
 
 const foodDraft = {
@@ -475,10 +475,10 @@ async function getDailyTargetProgress(page: Page) {
 }
 
 async function getWaterConsumedMl(page: Page) {
-  const tracker = page.locator('.rounded-2xl').filter({
-    has: page.getByText('Water', { exact: true }),
-    has: page.getByRole('button', { name: '+250 ml' }),
-  }).first();
+  const tracker = page.locator('.rounded-2xl')
+    .filter({ has: page.getByText('Water', { exact: true }) })
+    .filter({ has: page.getByRole('button', { name: '+250 ml' }) })
+    .first();
   await expect(tracker).toBeVisible();
   const text = await tracker.innerText();
   const match = text.match(/([\d.]+)\s*(ml|L)\s*\//);
