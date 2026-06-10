@@ -114,25 +114,26 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: 'error', message: 'Not authenticated' };
 
-  // Single-device policy: keep only the most recently registered endpoint.
-  // Older endpoints are removed so the cron notifier never fans out to stale
-  // or inactive devices. If multi-device support is added, remove this delete
-  // and deduplicate delivery in the send path instead.
-  await supabase
+  // Single-device policy: replace all of the user's subscriptions with the
+  // current one. Delete-then-insert instead of upsert — the live table
+  // predates the (user_id, endpoint) unique constraint from migration 003,
+  // so ON CONFLICT has nothing to match against (see migration 011).
+  const { error: deleteError } = await supabase
     .from('push_subscriptions')
     .delete()
-    .eq('user_id', user.id)
-    .neq('endpoint', endpoint);
+    .eq('user_id', user.id);
 
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      user_id: user.id,
-      endpoint,
-      p256dh,
-      auth,
-    },
-    { onConflict: 'user_id,endpoint' },
-  );
+  if (deleteError) {
+    console.error('[push] clear old subscriptions failed', deleteError);
+    return { ok: false, reason: 'error', message: deleteError.message };
+  }
+
+  const { error } = await supabase.from('push_subscriptions').insert({
+    user_id: user.id,
+    endpoint,
+    p256dh,
+    auth,
+  });
 
   if (error) {
     console.error('[push] save subscription failed', error);
