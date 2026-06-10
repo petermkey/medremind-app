@@ -15,6 +15,7 @@ import {
 import { importStoreSnapshotToSupabase } from '@/lib/supabase/importStore';
 import {
   clearSyncOutbox,
+  discardDeadLetteredOperations,
   flushSyncOutbox,
   getSyncStatusSnapshot,
   pumpOutbox,
@@ -291,6 +292,12 @@ export default function SettingsPage() {
     show('Outbox cleared');
   }
 
+  function handleDiscardDeadLettered() {
+    const removed = discardDeadLetteredOperations();
+    setSyncStatus(`Discarded ${removed} failed change(s) that could not be synced.`);
+    show(removed > 0 ? `Discarded ${removed} failed change(s)` : 'Nothing to discard');
+  }
+
   async function handleRetrySync() {
     setSyncStatus('Retrying sync...');
     await pumpOutbox({ force: true });
@@ -489,6 +496,16 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={handleRetrySync}>Retry now</Button>
                 <Button variant="danger" size="sm" onClick={handleClearOutbox}>Clear outbox</Button>
+              </div>
+            </div>
+          )}
+          {outbox.deadLettered > 0 && (
+            <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
+              <p className="text-xs text-[#FCA5A5]">
+                {outbox.deadLettered} change(s) failed permanently after repeated retries and will not sync.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="danger" size="sm" onClick={handleDiscardDeadLettered}>Discard failed changes</Button>
               </div>
             </div>
           )}

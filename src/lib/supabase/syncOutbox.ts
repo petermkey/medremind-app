@@ -168,6 +168,9 @@ type StoredSyncOperation = SyncOperation & {
   createdAt: number;
   nextAttemptAt: number;
   lastError?: string;
+  // Set once attempts exceed MAX_ATTEMPTS: the operation stops retrying and is
+  // surfaced to the user instead of spinning forever and pinning pending > 0.
+  dead?: boolean;
 };
 
 export type SyncStatus = {
@@ -175,6 +178,7 @@ export type SyncStatus = {
   running: boolean;
   lastError: string | null;
   lastSuccessAt: string | null;
+  deadLettered: number;
 };
 
 export type FlushSyncResult = {
@@ -184,6 +188,11 @@ export type FlushSyncResult = {
 };
 
 const KEY = 'medremind-sync-outbox-v1';
+const LOCK_NAME = 'medremind-sync-outbox';
+// After this many failed attempts an operation is dead-lettered: a poisoned
+// payload (e.g. a permanent 4xx) otherwise retries forever. At the capped
+// 5-min backoff, 20 attempts is roughly 1.5h of retries before giving up.
+const MAX_ATTEMPTS = 20;
 const listeners = new Set<(status: SyncStatus) => void>();
 
 let started = false;
@@ -194,6 +203,7 @@ const status: SyncStatus = {
   running: false,
   lastError: null,
   lastSuccessAt: null,
+  deadLettered: 0,
 };
 
 function emit() {
@@ -220,7 +230,8 @@ function readQueue(): StoredSyncOperation[] {
 function writeQueue(items: StoredSyncOperation[]) {
   if (!hasWindow()) return;
   localStorage.setItem(KEY, JSON.stringify(items.map(normalizeStoredSyncOperation)));
-  status.pending = items.length;
+  status.pending = items.filter(item => !item.dead).length;
+  status.deadLettered = items.filter(item => item.dead).length;
   emit();
 }
 
@@ -235,9 +246,10 @@ function scheduleNextPump(queue: StoredSyncOperation[]) {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
-  if (!queue.length || !hasWindow()) return;
+  const live = queue.filter(item => !item.dead);
+  if (!live.length || !hasWindow()) return;
   const now = Date.now();
-  const nextAt = Math.min(...queue.map(item => item.nextAttemptAt));
+  const nextAt = Math.min(...live.map(item => item.nextAttemptAt));
   const delay = Math.max(0, nextAt - now);
   retryTimer = setTimeout(() => {
     void pumpOutbox();
@@ -452,26 +464,48 @@ export function hasQueuedNutritionTargetProfileSaveOperation(userId: string): bo
   ));
 }
 
-export async function pumpOutbox(options?: { force?: boolean }) {
-  const force = options?.force ?? false;
+// Run the pump body under a cross-tab Web Lock so two open tabs never drain the
+// same queue concurrently (legacy non-idempotent ops would double-apply).
+// Background pumps use ifAvailable — if another tab holds the lock, skip rather
+// than queue up. flushSyncOutbox passes blocking=true to wait for the lock.
+async function withOutboxLock(blocking: boolean, fn: () => Promise<void>): Promise<void> {
+  if (typeof navigator === 'undefined' || !navigator.locks) {
+    await fn();
+    return;
+  }
+  await navigator.locks.request(
+    LOCK_NAME,
+    blocking ? {} : { ifAvailable: true },
+    async (lock) => {
+      if (!lock) return; // another tab is pumping
+      await fn();
+    },
+  );
+}
+
+export async function pumpOutbox(options?: { force?: boolean; blocking?: boolean }) {
+  await withOutboxLock(options?.blocking ?? false, () => pumpOutboxLocked(options?.force ?? false));
+}
+
+async function pumpOutboxLocked(force: boolean) {
   if (!hasWindow() || pumping) return;
   pumping = true;
   status.running = true;
   emit();
   let queue = readQueue();
-  if (!queue.length) {
+  if (!queue.filter(item => !item.dead).length) {
     status.running = false;
-    status.pending = 0;
-    emit();
+    writeQueue(queue);
     pumping = false;
     return;
   }
 
   const now = Date.now();
   for (const item of [...queue]) {
+    if (item.dead) continue;
     const liveBefore = readQueue();
     const liveItem = liveBefore.find(q => q.id === item.id);
-    if (!liveItem) {
+    if (!liveItem || liveItem.dead) {
       queue = liveBefore;
       continue;
     }
@@ -494,7 +528,8 @@ export async function pumpOutbox(options?: { force?: boolean }) {
       markSyncSuccess();
     } catch (error) {
       const attempts = liveItem.attempts + 1;
-      const nextAttemptAt = Date.now() + nextBackoffMs(attempts);
+      const dead = attempts >= MAX_ATTEMPTS;
+      const nextAttemptAt = dead ? liveItem.nextAttemptAt : Date.now() + nextBackoffMs(attempts);
       const liveAfter = readQueue();
       if (!liveAfter.some(q => q.id === item.id)) {
         queue = liveAfter;
@@ -506,10 +541,14 @@ export async function pumpOutbox(options?: { force?: boolean }) {
           ...q,
           attempts,
           nextAttemptAt,
+          dead: dead || undefined,
           lastError: error instanceof Error ? error.message : String(error),
         };
       });
       writeQueue(queue);
+      if (dead) {
+        console.error('[sync-outbox] operation dead-lettered after max attempts', liveItem.kind);
+      }
       markSyncFailure(error);
     }
   }
@@ -522,10 +561,11 @@ export async function pumpOutbox(options?: { force?: boolean }) {
 
 export async function flushSyncOutbox(timeoutMs = 10_000): Promise<FlushSyncResult> {
   if (!hasWindow()) return { ok: true, pending: 0, lastError: null };
+  const countPending = () => readQueue().filter(item => !item.dead).length;
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    await pumpOutbox({ force: true });
-    const pending = readQueue().length;
+    await pumpOutbox({ force: true, blocking: true });
+    const pending = countPending();
     status.pending = pending;
     emit();
     if (pending === 0) {
@@ -533,17 +573,34 @@ export async function flushSyncOutbox(timeoutMs = 10_000): Promise<FlushSyncResu
     }
     await waitMs(250);
   }
-  const pending = readQueue().length;
+  const pending = countPending();
   status.pending = pending;
   emit();
   return { ok: pending === 0, pending, lastError: status.lastError };
+}
+
+/**
+ * Discard dead-lettered operations that have exhausted all retries. Returns the
+ * number removed. Live (still-retrying) operations are untouched.
+ */
+export function discardDeadLetteredOperations(): number {
+  if (!hasWindow()) return 0;
+  const queue = readQueue();
+  const next = queue.filter(item => !item.dead);
+  const removed = queue.length - next.length;
+  if (removed > 0) {
+    writeQueue(next);
+    scheduleNextPump(next);
+  }
+  return removed;
 }
 
 export function startSyncOutbox() {
   if (started || !hasWindow()) return;
   started = true;
   const queue = readQueue();
-  status.pending = queue.length;
+  status.pending = queue.filter(item => !item.dead).length;
+  status.deadLettered = queue.filter(item => item.dead).length;
   emit();
 
   window.addEventListener('online', () => {
@@ -571,5 +628,6 @@ export function clearSyncOutbox() {
   status.pending = 0;
   status.running = false;
   status.lastError = null;
+  status.deadLettered = 0;
   emit();
 }
