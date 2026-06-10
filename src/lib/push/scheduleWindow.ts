@@ -1,10 +1,10 @@
 // Pure date/time logic for the Pass A notification window.
 // Extracted from the cron route so it can be unit-tested.
 //
-// scheduled_doses stores scheduled_date (YYYY-MM-DD) and scheduled_time
-// (HH:MM:SS) in the user's local timezone. A cron tick fires for doses whose
-// local time falls within ±windowMinutes of (now + leadTimeMin). Because the
-// stored values are local calendar fields, the UTC window must be projected
+// planned_occurrences stores occurrence_date (YYYY-MM-DD) and occurrence_time
+// (HH:MM:SS) in the user's local timezone. A cron tick fires for occurrences
+// whose local time falls within ±windowMinutes of (now + leadTimeMin). Because
+// the stored values are local calendar fields, the UTC window must be projected
 // into the user's timezone — and that projection can straddle local midnight,
 // landing on two different calendar dates. Each resulting segment is a single
 // (date, [startTime, endTime]) range with second-inclusive bounds.
@@ -73,12 +73,12 @@ export function computeWindowSegments(
 /**
  * Build a PostgREST `.or()` filter string matching any of the given segments.
  * Each segment becomes an AND group on (dateCol, timeCol).
- * Defaults to V1 column names; pass V2 names for planned_occurrences queries.
+ * Defaults to planned_occurrences column names.
  */
 export function segmentsToOrFilter(
   segments: WindowSegment[],
-  dateCol = 'scheduled_date',
-  timeCol = 'scheduled_time',
+  dateCol = 'occurrence_date',
+  timeCol = 'occurrence_time',
 ): string {
   return segments
     .map(

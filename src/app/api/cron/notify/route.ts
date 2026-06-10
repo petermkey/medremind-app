@@ -12,11 +12,6 @@
 //   - Pass B (reminders): re-fires every REMINDER_INTERVAL_MINUTES while dose is still pending/overdue.
 //   - Fire window: doses due in [now - 1 min, now + 1 min] (scheduler cadence tolerance).
 //
-// V2 read path: enabled when CRON_NOTIFY_V2_READ=true (Vercel env var).
-// Reads planned_occurrences + execution_events instead of scheduled_doses + dose_records.
-// notification_log.scheduled_dose_id is keyed by legacy_scheduled_dose_id so existing
-// log rows remain valid across the cutover. Remove the V1 path in Phase 2.
-
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
@@ -34,10 +29,6 @@ const REMINDER_INTERVAL_MINUTES = 10;
 // Maximum total notifications per dose (1 initial + N-1 reminders).
 // After this cap, no further reminders are sent regardless of dose status.
 const MAX_NOTIFICATIONS = 3;
-
-// Per-route V2 read flag. Set CRON_NOTIFY_V2_READ=true in Vercel to activate.
-// Remove this constant and the V1 blocks in Phase 2 after V1 tables are retired.
-const USE_V2 = process.env.CRON_NOTIFY_V2_READ === 'true';
 
 const ACTIONED_EVENT_TYPES = new Set(['taken', 'skipped']);
 
@@ -120,7 +111,7 @@ export async function GET(request: NextRequest) {
       }
 
       // ── Pass A: Initial scheduled notifications ──────────────────────────
-      if (USE_V2) {
+      {
         // V2: query planned_occurrences in the fire window, exclude actioned.
         const segments = computeWindowSegments(now, leadTimeMin ?? 0, tz, WINDOW_MINUTES);
 
@@ -131,7 +122,6 @@ export async function GET(request: NextRequest) {
             occurrence_date,
             occurrence_time,
             protocol_item_id,
-            legacy_scheduled_dose_id,
             active_protocols!inner (
               status,
               end_date,
@@ -164,9 +154,7 @@ export async function GET(request: NextRequest) {
             const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
 
             for (const occ of eligibleOccurrences) {
-              // Use legacy_scheduled_dose_id as the notification_log key so
-              // existing log rows (written under V1) remain valid after cutover.
-              const logKey = occ.legacy_scheduled_dose_id ?? occ.id;
+              const logKey = occ.id;
 
               const { data: lockRows, error: lockErr } = await supabase
                 .from('notification_log')
@@ -221,114 +209,7 @@ export async function GET(request: NextRequest) {
             }
           }
         }
-      } else {
-        // V1 path ────────────────────────────────────────────────────────────
-        const segments = computeWindowSegments(now, leadTimeMin ?? 0, tz, WINDOW_MINUTES);
-
-        const { data: doses, error: dosesErr } = await supabase
-          .from('scheduled_doses')
-          .select(`
-            id,
-            scheduled_date,
-            scheduled_time,
-            status,
-            protocol_item_id,
-            active_protocol_id,
-            active_protocols!inner (
-              status,
-              end_date,
-              protocol_id,
-              protocols!inner ( name )
-            )
-          `)
-          .eq('user_id', userId)
-          .in('status', ['pending', 'overdue'])
-          .or(segmentsToOrFilter(segments))
-          .eq('active_protocols.status', 'active');
-
-        if (dosesErr) {
-          console.error('[cron/notify] Pass A doses fetch failed', userId, dosesErr);
-        } else if (doses && doses.length > 0) {
-          // Filter: exclude doses beyond end_date (lifecycle contract §3.12).
-          const eligibleDoses = doses.filter((d) => {
-            const ap = Array.isArray(d.active_protocols) ? d.active_protocols[0] : d.active_protocols;
-            if (!ap) return false;
-            if (ap.end_date && d.scheduled_date > ap.end_date) return false;
-            return true;
-          });
-
-          if (eligibleDoses.length > 0) {
-            // Fetch protocol item names for notification body.
-            const itemIds = [...new Set(eligibleDoses.map(d => d.protocol_item_id))];
-            const { data: items } = await supabase
-              .from('protocol_items')
-              .select('id, name')
-              .in('id', itemIds);
-
-            const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
-
-            for (const dose of eligibleDoses) {
-              // Atomic Pass A claim: only one concurrent cron invocation may claim
-              // the initial send for this (user_id, scheduled_dose_id).
-              // count=0 marks an in-flight claim; promoted to 1 after delivery.
-              const { data: lockRows, error: lockErr } = await supabase
-                .from('notification_log')
-                .upsert(
-                  {
-                    user_id: userId,
-                    scheduled_dose_id: dose.id,
-                    sent_at: now.toISOString(),
-                    notification_count: 0,
-                  },
-                  { onConflict: 'user_id,scheduled_dose_id', ignoreDuplicates: true },
-                )
-                .select('scheduled_dose_id');
-
-              if (lockErr) {
-                console.error('[cron/notify] Pass A lock failed', userId, dose.id, lockErr);
-                continue;
-              }
-
-              if (!lockRows || lockRows.length === 0) {
-                results.push({ userId, doseId: dose.id, status: 'already-locked', pass: 'A' });
-                continue;
-              }
-
-              const ap = Array.isArray(dose.active_protocols) ? dose.active_protocols[0] : dose.active_protocols;
-              const protocolName: string = (ap?.protocols as { name?: string } | null)?.name ?? 'Medication';
-              const itemName = itemNameMap.get(dose.protocol_item_id) ?? 'dose';
-              const time = dose.scheduled_time.slice(0, 5);
-
-              const title = `MedRemind — ${time}`;
-              const body = `${itemName} (${protocolName})`;
-              const tag = `dose-${dose.id}`;
-
-              const ok = await sendPush(userId, title, body, tag);
-              if (ok) {
-                // Promote the claim to delivered (count=1) so Pass B can
-                // schedule reminders and stale recovery leaves it alone.
-                await supabase
-                  .from('notification_log')
-                  .update({ notification_count: 1 })
-                  .eq('user_id', userId)
-                  .eq('scheduled_dose_id', dose.id)
-                  .eq('notification_count', 0);
-                results.push({ userId, doseId: dose.id, status: 'sent', pass: 'A' });
-              } else {
-                // Release the claim so the next cron window can retry.
-                await supabase
-                  .from('notification_log')
-                  .delete()
-                  .eq('user_id', userId)
-                  .eq('scheduled_dose_id', dose.id)
-                  .eq('notification_count', 0);
-                results.push({ userId, doseId: dose.id, status: 'send-failed', pass: 'A' });
-              }
-            }
-          }
-        }
       }
-
       // ── Pass B: Reminder notifications for unactioned doses ──────────────
       {
         const reminderCutoff = new Date(now.getTime() - REMINDER_INTERVAL_MINUTES * 60 * 1000);
@@ -354,8 +235,8 @@ export async function GET(request: NextRequest) {
         const logCountMap = new Map(logRows.map(r => [r.scheduled_dose_id, r.notification_count as number]));
         const logSentAtMap = new Map(logRows.map(r => [r.scheduled_dose_id, r.sent_at as string]));
 
-        if (USE_V2) {
-          // V2: look up planned_occurrences by legacy_scheduled_dose_id, check action status.
+        {
+          // V2: look up planned_occurrences by id, check action status.
           const { data: stillPending, error: pendingErr } = await supabase
             .from('planned_occurrences')
             .select(`
@@ -363,7 +244,6 @@ export async function GET(request: NextRequest) {
               occurrence_date,
               occurrence_time,
               protocol_item_id,
-              legacy_scheduled_dose_id,
               active_protocols!inner (
                 status,
                 end_date,
@@ -373,7 +253,7 @@ export async function GET(request: NextRequest) {
             `)
             .eq('user_id', userId)
             .eq('status', 'planned')
-            .in('legacy_scheduled_dose_id', candidateDoseIds)
+            .in('id', candidateDoseIds)
             .eq('active_protocols.status', 'active');
 
           if (pendingErr) {
@@ -402,7 +282,7 @@ export async function GET(request: NextRequest) {
           const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
 
           for (const occ of remindable) {
-            const logKey = occ.legacy_scheduled_dose_id ?? occ.id;
+            const logKey = occ.id;
             const ap = Array.isArray(occ.active_protocols) ? occ.active_protocols[0] : occ.active_protocols;
             const protocolName: string = (ap?.protocols as { name?: string } | null)?.name ?? 'Medication';
             const itemName = itemNameMap.get(occ.protocol_item_id) ?? 'dose';
@@ -451,105 +331,6 @@ export async function GET(request: NextRequest) {
                   .eq('scheduled_dose_id', logKey);
               }
               results.push({ userId, doseId: logKey, status: 'send-failed', pass: 'B' });
-            }
-          }
-        } else {
-          // V1 path ──────────────────────────────────────────────────────────
-          // Check which of those doses are still pending/overdue with an active protocol.
-          const { data: stillPending, error: pendingErr } = await supabase
-            .from('scheduled_doses')
-            .select(`
-              id,
-              scheduled_date,
-              scheduled_time,
-              status,
-              protocol_item_id,
-              active_protocols!inner (
-                status,
-                end_date,
-                protocols!inner ( name )
-              )
-            `)
-            .eq('user_id', userId)
-            .in('id', candidateDoseIds)
-            .in('status', ['pending', 'overdue'])
-            .eq('active_protocols.status', 'active');
-
-          if (pendingErr) {
-            console.error('[cron/notify] Pass B pending fetch failed', userId, pendingErr);
-            return;
-          }
-
-          if (!stillPending || stillPending.length === 0) return;
-
-          // Filter: exclude doses beyond end_date.
-          const remindable = stillPending.filter((d) => {
-            const ap = Array.isArray(d.active_protocols) ? d.active_protocols[0] : d.active_protocols;
-            if (!ap) return false;
-            if (ap.end_date && d.scheduled_date > ap.end_date) return false;
-            return true;
-          });
-
-          if (remindable.length === 0) return;
-
-          // Fetch protocol item names.
-          const itemIds = [...new Set(remindable.map(d => d.protocol_item_id))];
-          const { data: items } = await supabase
-            .from('protocol_items')
-            .select('id, name')
-            .in('id', itemIds);
-
-          const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
-
-          for (const dose of remindable) {
-            const ap = Array.isArray(dose.active_protocols) ? dose.active_protocols[0] : dose.active_protocols;
-            const protocolName: string = (ap?.protocols as { name?: string } | null)?.name ?? 'Medication';
-            const itemName = itemNameMap.get(dose.protocol_item_id) ?? 'dose';
-            const time = dose.scheduled_time.slice(0, 5);
-            const count = logCountMap.get(dose.id) ?? 1;
-
-            // Atomic Pass B reservation: move sent_at/notification_count forward
-            // only if the row is still eligible for reminder.
-            const { data: reservedRows, error: reserveErr } = await supabase
-              .from('notification_log')
-              .update({
-                sent_at: now.toISOString(),
-                notification_count: count + 1,
-              })
-              .eq('user_id', userId)
-              .eq('scheduled_dose_id', dose.id)
-              .lte('sent_at', reminderCutoff.toISOString())
-              .eq('notification_count', count)
-              .select('scheduled_dose_id');
-
-            if (reserveErr) {
-              console.error('[cron/notify] Pass B reserve failed', userId, dose.id, reserveErr);
-              continue;
-            }
-
-            if (!reservedRows || reservedRows.length === 0) {
-              results.push({ userId, doseId: dose.id, status: 'already-locked', pass: 'B' });
-              continue;
-            }
-
-            const title = `⏰ Reminder — ${time}`;
-            const body = `${itemName} (${protocolName})`;
-            const tag = `dose-${dose.id}`;
-
-            const ok = await sendPush(userId, title, body, tag);
-            if (ok) {
-              results.push({ userId, doseId: dose.id, status: 'sent', pass: 'B' });
-            } else {
-              // Rollback the reservation so the next cron window can retry.
-              const prevSentAt = logSentAtMap.get(dose.id);
-              if (prevSentAt) {
-                await supabase
-                  .from('notification_log')
-                  .update({ sent_at: prevSentAt, notification_count: count })
-                  .eq('user_id', userId)
-                  .eq('scheduled_dose_id', dose.id);
-              }
-              results.push({ userId, doseId: dose.id, status: 'send-failed', pass: 'B' });
             }
           }
         }

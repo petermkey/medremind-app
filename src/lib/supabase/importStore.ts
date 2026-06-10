@@ -279,7 +279,6 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
         revision: 1,
         status: occurrenceStatus,
         source_generation: 'import',
-        legacy_scheduled_dose_id: null,
       };
     })
     .filter(Boolean) as Record<string, unknown>[];
@@ -303,8 +302,6 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
         id: newEventId,
         user_id: userId,
         planned_occurrence_id: null,
-        legacy_scheduled_dose_id: null,
-        legacy_dose_record_id: null,
         active_protocol_id: doseInfo.cloudActiveId,
         protocol_item_id: doseInfo.cloudItemId,
         event_type: r.action,
