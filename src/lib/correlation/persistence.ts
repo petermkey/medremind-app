@@ -238,6 +238,40 @@ async function fetchSourceRows(
   return (data as unknown as Row[] | null) ?? [];
 }
 
+// V2: planned_occurrences joined to execution_events, normalised to the
+// Row shape featureBuilder expects (scheduled_date + derived status).
+async function fetchOccurrenceRowsAsV1Compatible(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate: string,
+  endDate: string,
+): Promise<Row[]> {
+  const { data, error } = await supabase
+    .from('planned_occurrences')
+    .select('id, protocol_item_id, occurrence_date, status, execution_events(event_type, event_at)')
+    .eq('user_id', userId)
+    .gte('occurrence_date', startDate)
+    .lte('occurrence_date', endDate)
+    .is('superseded_by_occurrence_id', null);
+
+  if (error) throw error;
+
+  return ((data as unknown as Row[] | null) ?? []).map((row) => {
+    const events = (row.execution_events as Row[] | null) ?? [];
+    const latestEvent = events.sort((a, b) =>
+      String(b.event_at ?? '').localeCompare(String(a.event_at ?? '')),
+    )[0];
+    const occStatus = String(row.status);
+    // planned_occurrences.status is structural; featureBuilder expects V1 action
+    // status ('taken'/'skipped'/'planned'). Derive from execution_events.event_type.
+    const derivedStatus = latestEvent
+      ? String(latestEvent.event_type)
+      : occStatus === 'cancelled' ? 'skipped' : occStatus;
+
+    return { ...row, scheduled_date: row.occurrence_date, status: derivedStatus };
+  });
+}
+
 export async function buildAndPersistDailyLifestyleSnapshots(
   userId: string,
   startDate: string,
@@ -246,11 +280,13 @@ export async function buildAndPersistDailyLifestyleSnapshots(
 ): Promise<DailyLifestyleSnapshot[]> {
   const widenedStartDate = addDays(startDate, -1);
   const widenedEndDate = addDays(endDate, 1);
-  const [foodEntries, waterEntries, scheduledDoses, doseRecords, healthSnapshots, medicationExposures] = await Promise.all([
+
+  // V2 cut-over (Phase 1, step 2): read from planned_occurrences + execution_events.
+  // doseRecords passed as [] — execution events are embedded in normalized occurrences.
+  const [foodEntries, waterEntries, scheduledDoses, healthSnapshots, medicationExposures] = await Promise.all([
     fetchSourceRows(supabase, 'food_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchSourceRows(supabase, 'water_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
-    fetchSourceRows(supabase, 'scheduled_doses', userId, 'scheduled_date', startDate, endDate),
-    fetchSourceRows(supabase, 'dose_records', userId, 'recorded_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
+    fetchOccurrenceRowsAsV1Compatible(supabase, userId, startDate, endDate),
     fetchSourceRows(supabase, 'external_health_daily_snapshots', userId, 'local_date', startDate, endDate),
     fetchSourceRows(supabase, 'daily_medication_exposures', userId, 'local_date', startDate, endDate),
   ]);
@@ -262,7 +298,7 @@ export async function buildAndPersistDailyLifestyleSnapshots(
     foodEntries,
     waterEntries,
     scheduledDoses,
-    doseRecords,
+    doseRecords: [],
     healthSnapshots,
     medicationExposures,
   });
