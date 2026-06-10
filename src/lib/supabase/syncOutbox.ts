@@ -26,7 +26,6 @@ import {
   syncCompleteProtocolCommand,
   syncPauseProtocolCommand,
   syncResumeProtocolCommand,
-  syncDoseAction,
   syncSnoozeDoseCommand,
   syncSkipDoseCommand,
   syncTakeDoseCommand,
@@ -45,7 +44,6 @@ type SyncKind =
   | 'activation'
   | 'activeStatus'
   | 'regeneratedDoses'
-  | 'doseAction'
   | 'takeCommand'
   | 'skipCommand'
   | 'snoozeCommand'
@@ -71,18 +69,6 @@ type SyncPayloadMap = {
     patch: { status: ActiveProtocol['status']; pausedAt?: string; completedAt?: string };
   };
   regeneratedDoses: { userId: string; active: ActiveProtocol; fromDate: string; newDoses: ScheduledDose[] };
-  doseAction: {
-    userId: string;
-    dose: ScheduledDose;
-    patch: {
-      status: ScheduledDose['status'];
-      snoozedUntil?: string;
-      scheduledDate?: string;
-      scheduledTime?: string;
-      replacementDose?: ScheduledDose;
-    };
-    record?: DoseRecord;
-  };
   takeCommand: {
     userId: string;
     dose: ScheduledDose;
@@ -147,7 +133,6 @@ export type SyncOperation =
   | { kind: 'activation'; payload: SyncPayloadMap['activation'] }
   | { kind: 'activeStatus'; payload: SyncPayloadMap['activeStatus'] }
   | { kind: 'regeneratedDoses'; payload: SyncPayloadMap['regeneratedDoses'] }
-  | { kind: 'doseAction'; payload: SyncPayloadMap['doseAction'] }
   | { kind: 'takeCommand'; payload: SyncPayloadMap['takeCommand'] }
   | { kind: 'skipCommand'; payload: SyncPayloadMap['skipCommand'] }
   | { kind: 'snoozeCommand'; payload: SyncPayloadMap['snoozeCommand'] }
@@ -266,7 +251,6 @@ function todayDateLocal() {
 
 function isFutureDoseOperation(op: SyncOperation): boolean {
   const today = todayDateLocal();
-  if (op.kind === 'doseAction') return op.payload.dose.scheduledDate > today;
   if (op.kind === 'takeCommand') return op.payload.dose.scheduledDate > today;
   if (op.kind === 'skipCommand') return op.payload.dose.scheduledDate > today;
   if (op.kind === 'snoozeCommand') return op.payload.dose.scheduledDate > today;
@@ -310,8 +294,6 @@ async function executeOperation(op: SyncOperation) {
       return syncActiveStatus(normalizedOp.payload.userId, normalizedOp.payload.activeId, normalizedOp.payload.patch);
     case 'regeneratedDoses':
       return syncRegeneratedDoses(normalizedOp.payload.userId, normalizedOp.payload.active, normalizedOp.payload.fromDate, normalizedOp.payload.newDoses);
-    case 'doseAction':
-      return syncDoseAction(normalizedOp.payload.userId, normalizedOp.payload.dose, normalizedOp.payload.patch, normalizedOp.payload.record);
     case 'takeCommand':
       return syncTakeDoseCommand(
         normalizedOp.payload.userId,

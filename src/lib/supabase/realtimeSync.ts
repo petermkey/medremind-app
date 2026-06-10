@@ -76,92 +76,10 @@ function toTimeString(value: Date): string {
   return `${h}:${m}`;
 }
 
-function isDoseSlotConflict(message: string | undefined): boolean {
-  if (!message) return false;
-  return message.includes('scheduled_doses_active_protocol_id_protocol_item_id_schedul_key');
-}
-
 function isUniqueViolation(error: { code?: string; message?: string } | null, constraintName: string): boolean {
   if (!error) return false;
   if (error.code === '23505') return true;
   return Boolean(error.message?.includes(constraintName));
-}
-
-async function ensureCommandDoseRow(
-  userId: string,
-  dose: ScheduledDose,
-  patch?: { status?: ScheduledDose['status']; snoozedUntil?: string | null },
-): Promise<string> {
-  const supabase = getSupabaseClient();
-  const cDoseId = cloudDoseId(userId, dose.id);
-  const cActiveId = cloudActiveId(userId, dose.activeProtocolId);
-  const cItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
-  const row = {
-    id: cDoseId,
-    user_id: userId,
-    active_protocol_id: cActiveId,
-    protocol_item_id: cItemId,
-    scheduled_date: dose.scheduledDate,
-    scheduled_time: dose.scheduledTime,
-    status: patch?.status ?? dose.status,
-    snoozed_until: patch?.snoozedUntil ?? dose.snoozedUntil ?? null,
-  };
-  const { error } = await supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
-  if (!error) return cDoseId;
-
-  if (isDoseSlotConflict(error.message)) {
-    const { data: existing, error: lookupErr } = await supabase
-      .from('scheduled_doses')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('active_protocol_id', cActiveId)
-      .eq('protocol_item_id', cItemId)
-      .eq('scheduled_date', dose.scheduledDate)
-      .eq('scheduled_time', dose.scheduledTime)
-      .maybeSingle();
-    if (lookupErr) throw new Error(`Ensure scheduled dose lookup failed: ${lookupErr.message}`);
-    if (existing?.id) return String(existing.id);
-  }
-
-  throw new Error(`Ensure scheduled dose sync failed: ${error.message}`);
-}
-
-async function findNextAvailableDoseSlot(
-  userId: string,
-  doseId: string,
-  activeProtocolId: string,
-  protocolId: string,
-  protocolItemId: string,
-  baseDate: string,
-  baseTime: string,
-): Promise<{ scheduledDate: string; scheduledTime: string } | null> {
-  const supabase = getSupabaseClient();
-  const start = new Date(`${baseDate}T${baseTime}:00`);
-  if (Number.isNaN(start.getTime())) return null;
-  const cDoseId = cloudDoseId(userId, doseId);
-  const cActiveId = cloudActiveId(userId, activeProtocolId);
-  const cItemId = cloudProtocolItemId(userId, protocolId, protocolItemId);
-
-  const cursor = new Date(start);
-  for (let i = 0; i < 72; i++) {
-    const slotDate = toDateString(cursor);
-    const slotTime = toTimeString(cursor);
-    const { data, error } = await supabase
-      .from('scheduled_doses')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('active_protocol_id', cActiveId)
-      .eq('protocol_item_id', cItemId)
-      .eq('scheduled_date', slotDate)
-      .eq('scheduled_time', slotTime);
-    if (error) return null;
-    const occupiedByAnother = (data ?? []).some((row: { id: string }) => row.id !== cDoseId);
-    if (!occupiedByAnother) {
-      return { scheduledDate: slotDate, scheduledTime: slotTime };
-    }
-    cursor.setMinutes(cursor.getMinutes() + 5);
-  }
-  return null;
 }
 
 async function upsertProtocolWithItems(userId: string, protocol: Protocol) {
@@ -239,17 +157,7 @@ export async function syncProtocolItemDelete(userId: string, protocolId: string,
     if (rErr) throw new Error(`Delete protocol item failed: ${rErr.message}`);
   }
 
-  // 3. Delete the scheduled_doses themselves.
-  for (const ids of chunk(doseIds, 250)) {
-    const { error: sErr } = await supabase
-      .from('scheduled_doses')
-      .delete()
-      .eq('user_id', userId)
-      .in('id', ids);
-    if (sErr) throw new Error(`Delete protocol item failed: ${sErr.message}`);
-  }
-
-  // 4. Delete the protocol item.
+  // 3. Delete the protocol item — cascade handles scheduled_doses and planned_occurrences.
   const { error } = await supabase.from('protocol_items').delete().eq('id', id);
   if (error) throw new Error(`Delete protocol item failed: ${error.message}`);
 }
@@ -287,15 +195,7 @@ export async function syncProtocolDelete(userId: string, protocolId: string) {
       if (rErr) throw new Error(`Delete dose records for protocol failed: ${rErr.message}`);
     }
 
-    for (const ids of chunk(activeIds, 250)) {
-      const { error: sErr } = await supabase
-        .from('scheduled_doses')
-        .delete()
-        .eq('user_id', userId)
-        .in('active_protocol_id', ids);
-      if (sErr) throw new Error(`Delete scheduled doses for protocol failed: ${sErr.message}`);
-    }
-
+    // Delete active_protocols — cascade handles scheduled_doses and planned_occurrences.
     for (const ids of chunk(activeIds, 250)) {
       const { error: aErr } = await supabase
         .from('active_protocols')
@@ -341,29 +241,11 @@ export async function syncActivation(
   const { error: aErr } = await supabase.from('active_protocols').upsert(activeRow, { onConflict: 'id' });
   if (aErr) throw new Error(`Activate protocol sync failed: ${aErr.message}`);
 
-  const doseRows = doses.map(d => ({
-    id: cloudDoseId(userId, d.id),
-    user_id: userId,
-    active_protocol_id: cActiveId,
-    protocol_item_id: cloudProtocolItemId(userId, active.protocolId, d.protocolItemId),
-    scheduled_date: d.scheduledDate,
-    scheduled_time: d.scheduledTime,
-    status: d.status,
-    snoozed_until: d.snoozedUntil ?? null,
-  }));
-
-  for (const part of chunk(doseRows, 250)) {
-    const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
-    if (error) throw new Error(`Scheduled doses sync failed: ${error.message}`);
-  }
-
-  // C4 additive bridge: write-through future plan rows without switching any reads.
   const todayDate = toDateString(new Date());
   const plannedRows = doses
     .filter(d => d.scheduledDate >= todayDate)
     .map(d => {
       const cItemId = cloudProtocolItemId(userId, active.protocolId, d.protocolItemId);
-      const cDoseId = cloudDoseId(userId, d.id);
       const occurrenceKey = `${cActiveId}|${cItemId}|${d.scheduledDate}|${d.scheduledTime.slice(0, 5)}`;
       return {
         id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
@@ -376,8 +258,8 @@ export async function syncActivation(
         occurrence_key: occurrenceKey,
         revision: 1,
         status: 'planned',
-        source_generation: 'activation_write_through_c4',
-        legacy_scheduled_dose_id: cDoseId,
+        source_generation: 'activation_write_through',
+        legacy_scheduled_dose_id: null,
       };
     });
 
@@ -415,285 +297,80 @@ export async function syncRegeneratedDoses(
 ) {
   const supabase = getSupabaseClient();
   const cActiveId = cloudActiveId(userId, active.id);
+  const cProtocolId = cloudProtocolId(userId, active.protocolId);
 
   const { data: existingRows, error: existingErr } = await supabase
-    .from('scheduled_doses')
-    .select('id, protocol_item_id, scheduled_date, scheduled_time, status, snoozed_until')
+    .from('planned_occurrences')
+    .select('id, protocol_item_id, occurrence_date, occurrence_time, status, supersedes_occurrence_id, execution_events(id)')
     .eq('user_id', userId)
     .eq('active_protocol_id', cActiveId)
-    .gte('scheduled_date', fromDate);
-  if (existingErr) throw new Error(`Load existing regenerated doses failed: ${existingErr.message}`);
+    .gte('occurrence_date', fromDate)
+    .is('superseded_by_occurrence_id', null);
+  if (existingErr) throw new Error(`Load existing regenerated occurrences failed: ${existingErr.message}`);
 
   const existing = (existingRows ?? []) as Array<{
     id: string;
     protocol_item_id: string;
-    scheduled_date: string;
-    scheduled_time: string;
-    status: ScheduledDose['status'];
-    snoozed_until: string | null;
+    occurrence_date: string;
+    occurrence_time: string;
+    status: string;
+    supersedes_occurrence_id: string | null;
+    execution_events: Array<{ id: string }> | null;
   }>;
 
-  const existingDoseIds = existing.map(row => row.id);
-  const protectedByRecord = new Set<string>();
-  if (existingDoseIds.length) {
-    for (const ids of chunk(existingDoseIds, 250)) {
-      const { data: recordRows, error: rErr } = await supabase
-        .from('dose_records')
-        .select('scheduled_dose_id')
-        .eq('user_id', userId)
-        .in('scheduled_dose_id', ids);
-      if (rErr) throw new Error(`Load dose records for regeneration failed: ${rErr.message}`);
-      for (const row of (recordRows ?? []) as Array<{ scheduled_dose_id: string }>) {
-        protectedByRecord.add(row.scheduled_dose_id);
-      }
-    }
-  }
-
   const retainedSlots = new Set<string>();
-  const deletableIds: string[] = [];
+  const deletableOccurrenceIds: string[] = [];
 
   for (const row of existing) {
-    const hasRecord = protectedByRecord.has(row.id);
-    const hasSnoozeLink = Boolean(row.snoozed_until);
-    const slot = `${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
-    const isPending = row.status === 'pending';
-    const shouldDelete = isPending && !hasRecord && !hasSnoozeLink;
+    const hasEvent = (row.execution_events ?? []).length > 0;
+    const isSnoozeSuccessor = Boolean(row.supersedes_occurrence_id);
+    const slot = `${row.protocol_item_id}|${row.occurrence_date}|${String(row.occurrence_time).slice(0, 5)}`;
+    const shouldDelete = row.status === 'planned' && !hasEvent && !isSnoozeSuccessor;
     if (shouldDelete) {
-      deletableIds.push(row.id);
+      deletableOccurrenceIds.push(row.id);
       continue;
     }
     retainedSlots.add(slot);
   }
 
-  // V2 dual-write: build occurrence IDs for stale V2 slots before deleting from V1.
-  // Computed here so we still have the `existing` row data (protocol_item_id / dates).
-  const cProtocolId = cloudProtocolId(userId, active.protocolId);
-  const deletableSet = new Set(deletableIds);
-  const deletableOccurrenceIds: string[] = [];
-  for (const row of existing) {
-    if (!deletableSet.has(row.id)) continue;
-    const occurrenceKey = `${cActiveId}|${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
-    deletableOccurrenceIds.push(stableUuid(`planned-occurrence:${userId}`, occurrenceKey));
-  }
-
-  for (const ids of chunk(deletableIds, 250)) {
-    const { error: delErr } = await supabase
-      .from('scheduled_doses')
-      .delete()
-      .eq('user_id', userId)
-      .in('id', ids);
-    if (delErr) throw new Error(`Delete regenerated doses failed: ${delErr.message}`);
-  }
-
-  // V2 dual-write: delete the corresponding stale planned_occurrences.
-  // Status guard ('planned') prevents touching any occurrence that already has events.
   for (const ids of chunk(deletableOccurrenceIds, 250)) {
-    const { error: v2DelErr } = await supabase
+    const { error: delErr } = await supabase
       .from('planned_occurrences')
       .delete()
       .eq('user_id', userId)
       .eq('status', 'planned')
       .in('id', ids);
-    if (v2DelErr) throw new Error(`Delete regenerated V2 occurrences failed: ${v2DelErr.message}`);
+    if (delErr) throw new Error(`Delete regenerated V2 occurrences failed: ${delErr.message}`);
   }
 
-  const rows = newDoses
-    .map(d => ({
-      id: cloudDoseId(userId, d.id),
-      user_id: userId,
-      active_protocol_id: cActiveId,
-      protocol_item_id: cloudProtocolItemId(userId, active.protocolId, d.protocolItemId),
-      scheduled_date: d.scheduledDate,
-      scheduled_time: d.scheduledTime,
-      status: d.status,
-      snoozed_until: d.snoozedUntil ?? null,
-    }))
-    .filter(row => {
-      const slot = `${row.protocol_item_id}|${row.scheduled_date}|${row.scheduled_time}`;
-      return !retainedSlots.has(slot);
-    });
-  for (const part of chunk(rows, 250)) {
-    const { error } = await supabase.from('scheduled_doses').upsert(part, { onConflict: 'id' });
-    if (error) throw new Error(`Insert regenerated doses failed: ${error.message}`);
-  }
+  const plannedRows = newDoses
+    .map(d => {
+      const cItemId = cloudProtocolItemId(userId, active.protocolId, d.protocolItemId);
+      const occurrenceKey = `${cActiveId}|${cItemId}|${d.scheduledDate}|${d.scheduledTime.slice(0, 5)}`;
+      const slot = `${cItemId}|${d.scheduledDate}|${d.scheduledTime.slice(0, 5)}`;
+      if (retainedSlots.has(slot)) return null;
+      return {
+        id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
+        user_id: userId,
+        active_protocol_id: cActiveId,
+        protocol_id: cProtocolId,
+        protocol_item_id: cItemId,
+        occurrence_date: d.scheduledDate,
+        occurrence_time: d.scheduledTime,
+        occurrence_key: occurrenceKey,
+        revision: 1,
+        status: 'planned',
+        source_generation: 'regeneration_write_through',
+        legacy_scheduled_dose_id: null,
+      };
+    })
+    .filter(Boolean) as Record<string, unknown>[];
 
-  // V2 dual-write: upsert new planned_occurrences.
-  // Mirrors the write-through in syncActivation; uses the same occurrence_key so
-  // duplicate regeneration calls coalesce cleanly.
-  const plannedRows = rows.map(row => {
-    const occurrenceKey = `${cActiveId}|${row.protocol_item_id}|${row.scheduled_date}|${String(row.scheduled_time).slice(0, 5)}`;
-    return {
-      id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
-      user_id: userId,
-      active_protocol_id: cActiveId,
-      protocol_id: cProtocolId,
-      protocol_item_id: row.protocol_item_id,
-      occurrence_date: row.scheduled_date,
-      occurrence_time: row.scheduled_time,
-      occurrence_key: occurrenceKey,
-      revision: 1,
-      status: 'planned',
-      source_generation: 'regeneration_write_through',
-      legacy_scheduled_dose_id: row.id,
-    };
-  });
   for (const part of chunk(plannedRows, 250)) {
     const { error: v2UpsertErr } = await supabase
       .from('planned_occurrences')
       .upsert(part, { onConflict: 'user_id,occurrence_key,revision' });
     if (v2UpsertErr) throw new Error(`Upsert regenerated V2 occurrences failed: ${v2UpsertErr.message}`);
-  }
-}
-
-export async function syncDoseAction(
-  userId: string,
-  dose: ScheduledDose,
-  patch: {
-    status: ScheduledDose['status'];
-    snoozedUntil?: string;
-    scheduledDate?: string;
-    scheduledTime?: string;
-    replacementDose?: ScheduledDose;
-  },
-  record?: DoseRecord,
-) {
-  const supabase = getSupabaseClient();
-  const cDoseId = cloudDoseId(userId, dose.id);
-  let syncError: { message: string } | null = null;
-  const replacementDose = patch.replacementDose;
-
-  if (replacementDose) {
-    const { error: originalErr } = await supabase
-      .from('scheduled_doses')
-      .update({
-        status: patch.status,
-        snoozed_until: patch.snoozedUntil ?? null,
-      })
-      .eq('id', cDoseId)
-      .eq('user_id', userId);
-    if (originalErr) syncError = originalErr;
-
-    if (!syncError) {
-      const cReplacementDoseId = cloudDoseId(userId, replacementDose.id);
-      const cReplacementActiveId = cloudActiveId(userId, replacementDose.activeProtocolId);
-      const cReplacementItemId = cloudProtocolItemId(
-        userId,
-        replacementDose.activeProtocol.protocolId,
-        replacementDose.protocolItemId,
-      );
-      const upsertReplacementAt = async (scheduledDate: string, scheduledTime: string) => {
-        const resolvedDateTime = new Date(`${scheduledDate}T${scheduledTime}:00`);
-        const row = {
-          id: cReplacementDoseId,
-          user_id: userId,
-          active_protocol_id: cReplacementActiveId,
-          protocol_item_id: cReplacementItemId,
-          scheduled_date: scheduledDate,
-          scheduled_time: scheduledTime,
-          status: 'pending',
-          snoozed_until: Number.isNaN(resolvedDateTime.getTime())
-            ? replacementDose.snoozedUntil ?? patch.snoozedUntil ?? null
-            : resolvedDateTime.toISOString(),
-        };
-        return supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
-      };
-
-      let targetDate = replacementDose.scheduledDate;
-      let targetTime = replacementDose.scheduledTime;
-      let { error: replacementErr } = await upsertReplacementAt(targetDate, targetTime);
-      if (replacementErr && isDoseSlotConflict(replacementErr.message)) {
-        const resolvedSlot = await findNextAvailableDoseSlot(
-          userId,
-          replacementDose.id,
-          replacementDose.activeProtocolId,
-          replacementDose.activeProtocol.protocolId,
-          replacementDose.protocolItemId,
-          targetDate,
-          targetTime,
-        );
-        if (resolvedSlot) {
-          targetDate = resolvedSlot.scheduledDate;
-          targetTime = resolvedSlot.scheduledTime;
-          const { error: retryErr } = await upsertReplacementAt(targetDate, targetTime);
-          replacementErr = retryErr;
-          if (!replacementErr) {
-            const resolvedDateTime = new Date(`${targetDate}T${targetTime}:00`);
-            const { error: updateOriginalErr } = await supabase
-              .from('scheduled_doses')
-              .update({
-                snoozed_until: Number.isNaN(resolvedDateTime.getTime())
-                  ? patch.snoozedUntil ?? null
-                  : resolvedDateTime.toISOString(),
-              })
-              .eq('id', cDoseId)
-              .eq('user_id', userId);
-            if (updateOriginalErr) replacementErr = updateOriginalErr;
-          }
-        }
-      }
-      if (replacementErr) syncError = replacementErr;
-    }
-  } else {
-    const targetDate = patch.scheduledDate ?? dose.scheduledDate;
-    const targetTime = patch.scheduledTime ?? dose.scheduledTime;
-    const baseUpdate = {
-      status: patch.status,
-      snoozed_until: patch.snoozedUntil ?? null,
-      scheduled_date: targetDate,
-      scheduled_time: targetTime,
-    };
-
-    let { error: dErr } = await supabase
-      .from('scheduled_doses')
-      .update(baseUpdate)
-      .eq('id', cDoseId)
-      .eq('user_id', userId);
-
-    if (
-      dErr &&
-      isDoseSlotConflict(dErr.message) &&
-      Boolean(patch.scheduledDate || patch.scheduledTime)
-    ) {
-      const resolvedSlot = await findNextAvailableDoseSlot(
-        userId,
-        dose.id,
-        dose.activeProtocolId,
-        dose.activeProtocol.protocolId,
-        dose.protocolItemId,
-        targetDate,
-        targetTime,
-      );
-      if (resolvedSlot) {
-        const resolvedDateTime = new Date(`${resolvedSlot.scheduledDate}T${resolvedSlot.scheduledTime}:00`);
-        const { error: retryErr } = await supabase
-          .from('scheduled_doses')
-          .update({
-            status: patch.status,
-            snoozed_until: Number.isNaN(resolvedDateTime.getTime()) ? patch.snoozedUntil ?? null : resolvedDateTime.toISOString(),
-            scheduled_date: resolvedSlot.scheduledDate,
-            scheduled_time: resolvedSlot.scheduledTime,
-          })
-          .eq('id', cDoseId)
-          .eq('user_id', userId);
-        dErr = retryErr;
-      }
-    }
-    if (dErr) syncError = dErr;
-  }
-
-  if (syncError) throw new Error(`Dose status sync failed: ${syncError.message}`);
-
-  if (record) {
-    const row = {
-      id: cloudRecordId(userId, record.id),
-      user_id: userId,
-      scheduled_dose_id: cDoseId,
-      action: record.action,
-      recorded_at: record.recordedAt,
-      note: record.note ?? null,
-    };
-    const { error: rErr } = await supabase.from('dose_records').upsert(row, { onConflict: 'id' });
-    if (rErr) throw new Error(`Dose record sync failed: ${rErr.message}`);
   }
 }
 
@@ -862,7 +539,7 @@ export async function syncTakeDoseCommand(
   clientOperationId: string,
 ): Promise<TakeCommandResult> {
   const supabase = getSupabaseClient();
-  let cDoseId = cloudDoseId(userId, dose.id);
+  const cDoseId = cloudDoseId(userId, dose.id);
   const cRecordId = cloudRecordId(userId, record.id);
   const commandPayload = {
     doseId: dose.id,
@@ -883,34 +560,12 @@ export async function syncTakeDoseCommand(
   );
 
   try {
-    cDoseId = await ensureCommandDoseRow(userId, dose);
-
-    const { error: doseErr } = await supabase
-      .from('scheduled_doses')
-      .update({
-        status: 'taken',
-      })
-      .eq('id', cDoseId)
-      .eq('user_id', userId);
-    if (doseErr) throw new Error(`Dose status sync failed: ${doseErr.message}`);
-
-    const recordRow = {
-      id: cRecordId,
-      user_id: userId,
-      scheduled_dose_id: cDoseId,
-      action: 'taken',
-      recorded_at: record.recordedAt,
-      note: record.note ?? null,
-    };
-    const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
-    if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
-
     const executionEventRow = {
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
       planned_occurrence_id: null,
-      legacy_scheduled_dose_id: cDoseId,
-      legacy_dose_record_id: cRecordId,
+      legacy_scheduled_dose_id: null,
+      legacy_dose_record_id: null,
       active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
       protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
       event_type: 'taken',
@@ -947,7 +602,7 @@ export async function syncTakeDoseCommand(
       status: 'taken',
       scheduledDate: dose.scheduledDate,
       scheduledTime: dose.scheduledTime,
-      recordId: cRecordId,
+      recordId: null,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -963,7 +618,7 @@ export async function syncSkipDoseCommand(
   clientOperationId: string,
 ): Promise<TakeCommandResult> {
   const supabase = getSupabaseClient();
-  let cDoseId = cloudDoseId(userId, dose.id);
+  const cDoseId = cloudDoseId(userId, dose.id);
   const cRecordId = cloudRecordId(userId, record.id);
   const commandPayload = {
     doseId: dose.id,
@@ -984,34 +639,12 @@ export async function syncSkipDoseCommand(
   );
 
   try {
-    cDoseId = await ensureCommandDoseRow(userId, dose);
-
-    const { error: doseErr } = await supabase
-      .from('scheduled_doses')
-      .update({
-        status: 'skipped',
-      })
-      .eq('id', cDoseId)
-      .eq('user_id', userId);
-    if (doseErr) throw new Error(`Dose status sync failed: ${doseErr.message}`);
-
-    const recordRow = {
-      id: cRecordId,
-      user_id: userId,
-      scheduled_dose_id: cDoseId,
-      action: 'skipped',
-      recorded_at: record.recordedAt,
-      note: record.note ?? null,
-    };
-    const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
-    if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
-
     const executionEventRow = {
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
       planned_occurrence_id: null,
-      legacy_scheduled_dose_id: cDoseId,
-      legacy_dose_record_id: cRecordId,
+      legacy_scheduled_dose_id: null,
+      legacy_dose_record_id: null,
       active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
       protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
       event_type: 'skipped',
@@ -1048,7 +681,7 @@ export async function syncSkipDoseCommand(
       status: 'skipped',
       scheduledDate: dose.scheduledDate,
       scheduledTime: dose.scheduledTime,
-      recordId: cRecordId,
+      recordId: null,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1065,10 +698,9 @@ export async function syncSnoozeDoseCommand(
   clientOperationId: string,
 ): Promise<TakeCommandResult> {
   const supabase = getSupabaseClient();
-  let cDoseId = cloudDoseId(userId, dose.id);
+  const cDoseId = cloudDoseId(userId, dose.id);
   const cRecordId = cloudRecordId(userId, record.id);
-  // When replacementDose is null, the snooze reuses an existing scheduled dose — no new row needed.
-  let cReplacementDoseId = replacementDose ? cloudDoseId(userId, replacementDose.id) : cDoseId;
+  const cReplacementDoseId = replacementDose ? cloudDoseId(userId, replacementDose.id) : cDoseId;
   const cReplacementActiveId = replacementDose ? cloudActiveId(userId, replacementDose.activeProtocolId) : cloudActiveId(userId, dose.activeProtocolId);
   const cReplacementItemId = replacementDose
     ? cloudProtocolItemId(userId, replacementDose.activeProtocol.protocolId, replacementDose.protocolItemId)
@@ -1093,97 +725,16 @@ export async function syncSnoozeDoseCommand(
     'snooze_command',
   );
 
-  const upsertReplacementAt = async (scheduledDate: string, scheduledTime: string) => {
-    const resolvedDateTime = new Date(`${scheduledDate}T${scheduledTime}:00`);
-    const row = {
-      id: cReplacementDoseId,
-      user_id: userId,
-      active_protocol_id: cReplacementActiveId,
-      protocol_item_id: cReplacementItemId,
-      scheduled_date: scheduledDate,
-      scheduled_time: scheduledTime,
-      status: 'pending',
-      snoozed_until: Number.isNaN(resolvedDateTime.getTime())
-        ? replacementDose?.snoozedUntil ?? null
-        : resolvedDateTime.toISOString(),
-    };
-    return supabase.from('scheduled_doses').upsert(row, { onConflict: 'id' });
-  };
-
   try {
-    cDoseId = await ensureCommandDoseRow(userId, dose, {
-      status: 'snoozed',
-      snoozedUntil: replacementDose?.snoozedUntil ?? null,
-    });
-    if (!replacementDose) cReplacementDoseId = cDoseId;
-
-    const { error: originalErr } = await supabase
-      .from('scheduled_doses')
-      .update({
-        status: 'snoozed',
-        snoozed_until: replacementDose?.snoozedUntil ?? null,
-      })
-      .eq('id', cDoseId)
-      .eq('user_id', userId);
-    if (originalErr) throw new Error(`Dose status sync failed: ${originalErr.message}`);
-
-    let targetDate = replacementDose?.scheduledDate ?? dose.scheduledDate;
-    let targetTime = replacementDose?.scheduledTime ?? dose.scheduledTime;
-
-    if (replacementDose) {
-      let { error: replacementErr } = await upsertReplacementAt(targetDate, targetTime);
-
-      if (replacementErr && isDoseSlotConflict(replacementErr.message)) {
-        const resolvedSlot = await findNextAvailableDoseSlot(
-          userId,
-          replacementDose.id,
-          replacementDose.activeProtocolId,
-          replacementDose.activeProtocol.protocolId,
-          replacementDose.protocolItemId,
-          targetDate,
-          targetTime,
-        );
-        if (resolvedSlot) {
-          targetDate = resolvedSlot.scheduledDate;
-          targetTime = resolvedSlot.scheduledTime;
-          const { error: retryErr } = await upsertReplacementAt(targetDate, targetTime);
-          replacementErr = retryErr;
-          if (!replacementErr) {
-            const resolvedDateTime = new Date(`${targetDate}T${targetTime}:00`);
-            const { error: updateOriginalErr } = await supabase
-              .from('scheduled_doses')
-              .update({
-                snoozed_until: Number.isNaN(resolvedDateTime.getTime())
-                  ? replacementDose.snoozedUntil ?? null
-                  : resolvedDateTime.toISOString(),
-              })
-              .eq('id', cDoseId)
-              .eq('user_id', userId);
-            if (updateOriginalErr) replacementErr = updateOriginalErr;
-          }
-        }
-      }
-
-      if (replacementErr) throw new Error(`Dose status sync failed: ${replacementErr.message}`);
-    }
-
-    const recordRow = {
-      id: cRecordId,
-      user_id: userId,
-      scheduled_dose_id: cDoseId,
-      action: 'snoozed',
-      recorded_at: record.recordedAt,
-      note: record.note ?? null,
-    };
-    const { error: recordErr } = await supabase.from('dose_records').upsert(recordRow, { onConflict: 'id' });
-    if (recordErr) throw new Error(`Dose record sync failed: ${recordErr.message}`);
+    const targetDate = replacementDose?.scheduledDate ?? dose.scheduledDate;
+    const targetTime = replacementDose?.scheduledTime ?? dose.scheduledTime;
 
     const executionEventRow = {
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
       planned_occurrence_id: null,
-      legacy_scheduled_dose_id: cDoseId,
-      legacy_dose_record_id: cRecordId,
+      legacy_scheduled_dose_id: null,
+      legacy_dose_record_id: null,
       active_protocol_id: cReplacementActiveId,
       protocol_item_id: cReplacementItemId,
       event_type: 'snoozed',
@@ -1213,23 +764,26 @@ export async function syncSnoozeDoseCommand(
       }
     }
 
-    // F4: update planned_occurrences lineage for snooze.
-    // Mark the origin occurrence as superseded and create a successor occurrence for
-    // the replacement slot. Failures here are non-fatal — the scheduled_doses path
-    // already succeeded, and planned_occurrences is still a write-through bridge.
+    // Update planned_occurrences lineage for snooze.
+    // Look up origin by occurrence_key (works for both pre- and post-Phase-2 occurrences).
+    // Non-fatal — execution_event already written above.
     try {
+      const cOriginActiveId = cloudActiveId(userId, dose.activeProtocolId);
+      const cOriginItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
+      const originOccurrenceKey = `${cOriginActiveId}|${cOriginItemId}|${dose.scheduledDate}|${dose.scheduledTime.slice(0, 5)}`;
+
       const { data: originOccurrence } = await supabase
         .from('planned_occurrences')
         .select('id, occurrence_key, revision')
         .eq('user_id', userId)
-        .eq('legacy_scheduled_dose_id', cDoseId)
+        .eq('occurrence_key', originOccurrenceKey)
+        .is('superseded_by_occurrence_id', null)
         .maybeSingle();
 
       if (originOccurrence) {
-        const successorOccurrenceKey = `${cReplacementActiveId}|${cReplacementItemId}|${targetDate}|${targetTime}`;
+        const successorOccurrenceKey = `${cReplacementActiveId}|${cReplacementItemId}|${targetDate}|${targetTime.slice(0, 5)}`;
         const successorOccurrenceId = stableUuid(`planned-occurrence:${userId}`, successorOccurrenceKey);
 
-        // Create successor occurrence row for the replacement slot.
         await supabase.from('planned_occurrences').upsert({
           id: successorOccurrenceId,
           user_id: userId,
@@ -1243,10 +797,9 @@ export async function syncSnoozeDoseCommand(
           status: 'planned',
           supersedes_occurrence_id: originOccurrence.id,
           source_generation: 'snooze_command',
-          legacy_scheduled_dose_id: cReplacementDoseId,
+          legacy_scheduled_dose_id: null,
         }, { onConflict: 'user_id,occurrence_key,revision' });
 
-        // Mark origin as superseded.
         await supabase.from('planned_occurrences').update({
           status: 'superseded',
           superseded_by_occurrence_id: successorOccurrenceId,
@@ -1264,7 +817,7 @@ export async function syncSnoozeDoseCommand(
       status: 'snoozed',
       scheduledDate: targetDate,
       scheduledTime: targetTime,
-      recordId: cRecordId,
+      recordId: null,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1464,6 +1017,16 @@ export async function syncRemoveDoseCommand(
 ): Promise<void> {
   const supabase = getSupabaseClient();
   const cDoseId = cloudDoseId(userId, doseId);
+
+  // V2: delete the matching planned occurrence (safety-net V1 delete follows).
+  const { error: v2Err } = await supabase
+    .from('planned_occurrences')
+    .delete()
+    .eq('user_id', userId)
+    .eq('legacy_scheduled_dose_id', cDoseId)
+    .eq('status', 'planned');
+  if (v2Err) throw new Error(`removeDose V2 occurrence delete failed: ${v2Err.message}`);
+
   const { error } = await supabase
     .from('scheduled_doses')
     .delete()
@@ -1492,7 +1055,17 @@ export async function syncEndProtocolFromTodayCommand(
     .eq('user_id', userId);
   if (updateError) throw new Error(`endProtocolFromToday update failed: ${updateError.message}`);
 
-  // Delete the target dose and all doses on or after cutoffDate.
+  // V2: delete future planned occurrences for this protocol.
+  const { error: v2Err } = await supabase
+    .from('planned_occurrences')
+    .delete()
+    .eq('active_protocol_id', cActiveId)
+    .eq('user_id', userId)
+    .gte('occurrence_date', todayDate)
+    .eq('status', 'planned');
+  if (v2Err) throw new Error(`endProtocolFromToday delete V2 occurrences failed: ${v2Err.message}`);
+
+  // Safety-net: delete V1 scheduled_doses on or after cutoffDate.
   const { error: deleteError } = await supabase
     .from('scheduled_doses')
     .delete()
