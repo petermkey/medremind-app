@@ -10,6 +10,12 @@ export default withSentryConfig(nextConfig, {
   // Route Sentry events through our own origin so ad-blockers don't drop them.
   // The /monitoring path is excluded from the middleware matcher.
   tunnelRoute: "/monitoring",
-  // To upload source maps for readable stack traces, set org/project slugs and
-  // a SENTRY_AUTH_TOKEN env var here. Runtime error capture works without them.
+  // Source map upload — active only when SENTRY_AUTH_TOKEN is set (CI/Vercel).
+  // Without it, error capture still works but stack traces are minified.
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
 });
