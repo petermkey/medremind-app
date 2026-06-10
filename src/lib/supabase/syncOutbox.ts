@@ -119,6 +119,7 @@ type SyncPayloadMap = {
   removeDose: {
     userId: string;
     doseId: string;
+    dose?: ScheduledDose;
   };
   foodEntrySave: { userId: string; entry: FoodEntry };
   foodEntryDelete: { userId: string; entryId: string };
@@ -350,7 +351,8 @@ async function executeOperation(op: SyncOperation) {
         normalizedOp.payload.today,
       );
     case 'removeDose':
-      return syncRemoveDoseCommand(normalizedOp.payload.userId, normalizedOp.payload.doseId);
+      if (!normalizedOp.payload.dose) return Promise.resolve();
+      return syncRemoveDoseCommand(normalizedOp.payload.userId, normalizedOp.payload.dose);
     case 'foodEntrySave':
       if (readPendingDeletedFoodEntryIds().includes(normalizedOp.payload.entry.id)) {
         return Promise.resolve();

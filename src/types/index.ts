@@ -170,7 +170,7 @@ export interface PlannedOccurrence extends ScheduledDose {
 export interface ExecutionEvent {
   id: string;
   userId: string;
-  legacyScheduledDoseId: string;  // bridge to scheduled_doses
+  legacyScheduledDoseId: string;  // local dose ID cross-reference for client store
   activeProtocolId: string;
   protocolItemId: string;
   eventType: 'taken' | 'skipped' | 'snoozed';

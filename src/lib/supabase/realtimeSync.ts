@@ -136,28 +136,7 @@ export async function syncProtocolUpsert(userId: string, protocol: Protocol) {
 export async function syncProtocolItemDelete(userId: string, protocolId: string, itemId: string) {
   const supabase = getSupabaseClient();
   const id = cloudProtocolItemId(userId, protocolId, itemId);
-
-  // 1. Find all scheduled_doses that reference this protocol item.
-  const { data: doseRows, error: doseErr } = await supabase
-    .from('scheduled_doses')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('protocol_item_id', id);
-  if (doseErr) throw new Error(`Delete protocol item failed: ${doseErr.message}`);
-
-  const doseIds = ((doseRows ?? []) as Array<{ id: string }>).map(r => r.id);
-
-  // 2. Delete dose_records referencing those doses (FK constraint).
-  for (const ids of chunk(doseIds, 250)) {
-    const { error: rErr } = await supabase
-      .from('dose_records')
-      .delete()
-      .eq('user_id', userId)
-      .in('scheduled_dose_id', ids);
-    if (rErr) throw new Error(`Delete protocol item failed: ${rErr.message}`);
-  }
-
-  // 3. Delete the protocol item — cascade handles scheduled_doses and planned_occurrences.
+  // Cascade on protocol_items → planned_occurrences handles occurrence cleanup.
   const { error } = await supabase.from('protocol_items').delete().eq('id', id);
   if (error) throw new Error(`Delete protocol item failed: ${error.message}`);
 }
@@ -175,27 +154,7 @@ export async function syncProtocolDelete(userId: string, protocolId: string) {
 
   const activeIds = ((activeRows ?? []) as Array<{ id: string }>).map(row => row.id);
   if (activeIds.length) {
-    const doseIds: string[] = [];
-    for (const ids of chunk(activeIds, 250)) {
-      const { data: dRows, error: dErr } = await supabase
-        .from('scheduled_doses')
-        .select('id')
-        .eq('user_id', userId)
-        .in('active_protocol_id', ids);
-      if (dErr) throw new Error(`Load scheduled doses for delete failed: ${dErr.message}`);
-      doseIds.push(...(((dRows ?? []) as Array<{ id: string }>).map(row => row.id)));
-    }
-
-    for (const ids of chunk(doseIds, 250)) {
-      const { error: rErr } = await supabase
-        .from('dose_records')
-        .delete()
-        .eq('user_id', userId)
-        .in('scheduled_dose_id', ids);
-      if (rErr) throw new Error(`Delete dose records for protocol failed: ${rErr.message}`);
-    }
-
-    // Delete active_protocols — cascade handles scheduled_doses and planned_occurrences.
+    // Delete active_protocols — cascade handles planned_occurrences.
     for (const ids of chunk(activeIds, 250)) {
       const { error: aErr } = await supabase
         .from('active_protocols')
@@ -259,7 +218,6 @@ export async function syncActivation(
         revision: 1,
         status: 'planned',
         source_generation: 'activation_write_through',
-        legacy_scheduled_dose_id: null,
       };
     });
 
@@ -361,7 +319,6 @@ export async function syncRegeneratedDoses(
         revision: 1,
         status: 'planned',
         source_generation: 'regeneration_write_through',
-        legacy_scheduled_dose_id: null,
       };
     })
     .filter(Boolean) as Record<string, unknown>[];
@@ -564,8 +521,6 @@ export async function syncTakeDoseCommand(
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
       planned_occurrence_id: null,
-      legacy_scheduled_dose_id: null,
-      legacy_dose_record_id: null,
       active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
       protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
       event_type: 'taken',
@@ -643,8 +598,6 @@ export async function syncSkipDoseCommand(
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
       planned_occurrence_id: null,
-      legacy_scheduled_dose_id: null,
-      legacy_dose_record_id: null,
       active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
       protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
       event_type: 'skipped',
@@ -733,8 +686,6 @@ export async function syncSnoozeDoseCommand(
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
       planned_occurrence_id: null,
-      legacy_scheduled_dose_id: null,
-      legacy_dose_record_id: null,
       active_protocol_id: cReplacementActiveId,
       protocol_item_id: cReplacementItemId,
       event_type: 'snoozed',
@@ -797,7 +748,6 @@ export async function syncSnoozeDoseCommand(
           status: 'planned',
           supersedes_occurrence_id: originOccurrence.id,
           source_generation: 'snooze_command',
-          legacy_scheduled_dose_id: null,
         }, { onConflict: 'user_id,occurrence_key,revision' });
 
         await supabase.from('planned_occurrences').update({
@@ -1013,26 +963,20 @@ export async function syncArchiveProtocolCommand(
 
 export async function syncRemoveDoseCommand(
   userId: string,
-  doseId: string,
+  dose: ScheduledDose,
 ): Promise<void> {
   const supabase = getSupabaseClient();
-  const cDoseId = cloudDoseId(userId, doseId);
+  const cActiveId = cloudActiveId(userId, dose.activeProtocolId);
+  const cItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
+  const occKey = `${cActiveId}|${cItemId}|${dose.scheduledDate}|${dose.scheduledTime.slice(0, 5)}`;
 
-  // V2: delete the matching planned occurrence (safety-net V1 delete follows).
-  const { error: v2Err } = await supabase
+  const { error } = await supabase
     .from('planned_occurrences')
     .delete()
     .eq('user_id', userId)
-    .eq('legacy_scheduled_dose_id', cDoseId)
+    .eq('occurrence_key', occKey)
     .eq('status', 'planned');
-  if (v2Err) throw new Error(`removeDose V2 occurrence delete failed: ${v2Err.message}`);
-
-  const { error } = await supabase
-    .from('scheduled_doses')
-    .delete()
-    .eq('id', cDoseId)
-    .eq('user_id', userId);
-  if (error) throw new Error(`removeDose failed: ${error.message}`);
+  if (error) throw new Error(`removeDose occurrence delete failed: ${error.message}`);
 }
 
 export async function syncEndProtocolFromTodayCommand(
@@ -1055,7 +999,6 @@ export async function syncEndProtocolFromTodayCommand(
     .eq('user_id', userId);
   if (updateError) throw new Error(`endProtocolFromToday update failed: ${updateError.message}`);
 
-  // V2: delete future planned occurrences for this protocol.
   const { error: v2Err } = await supabase
     .from('planned_occurrences')
     .delete()
@@ -1063,14 +1006,5 @@ export async function syncEndProtocolFromTodayCommand(
     .eq('user_id', userId)
     .gte('occurrence_date', todayDate)
     .eq('status', 'planned');
-  if (v2Err) throw new Error(`endProtocolFromToday delete V2 occurrences failed: ${v2Err.message}`);
-
-  // Safety-net: delete V1 scheduled_doses on or after cutoffDate.
-  const { error: deleteError } = await supabase
-    .from('scheduled_doses')
-    .delete()
-    .eq('active_protocol_id', cActiveId)
-    .eq('user_id', userId)
-    .gte('scheduled_date', todayDate);
-  if (deleteError) throw new Error(`endProtocolFromToday delete doses failed: ${deleteError.message}`);
+  if (v2Err) throw new Error(`endProtocolFromToday delete occurrences failed: ${v2Err.message}`);
 }

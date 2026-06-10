@@ -1237,13 +1237,14 @@ export const useStore = create<AppState>()(
       removeDose: (doseId) => {
         const state = get();
         const profileId = state.profile?.id;
+        const dose = state.scheduledDoses.find(d => d.id === doseId);
         set(s => ({
           scheduledDoses: s.scheduledDoses.filter(d => d.id !== doseId),
         }));
-        if (profileId) {
+        if (profileId && dose) {
           syncFireAndForget(
-            syncRemoveDoseCommand(profileId, doseId),
-            { kind: 'removeDose', payload: { userId: profileId, doseId } },
+            syncRemoveDoseCommand(profileId, dose),
+            { kind: 'removeDose', payload: { userId: profileId, doseId, dose } },
           );
         }
       },
