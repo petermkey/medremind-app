@@ -225,12 +225,14 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
   }
 
   const activeIdMap = new Map<string, string>();
+  const activeToProtocolIdMap = new Map<string, string>(); // local active ID → mapped protocol ID
   const activeRows = (state.activeProtocols ?? [])
     .map(ap => {
       const mappedProtocolId = protocolIdMap.get(ap.protocolId) ?? null;
       if (!mappedProtocolId) return null;
       const newActiveId = isUuid(ap.id) ? ap.id : stableUuid(`active:${userId}`, ap.id);
       activeIdMap.set(ap.id, newActiveId);
+      activeToProtocolIdMap.set(ap.id, mappedProtocolId);
       return {
         id: newActiveId,
         user_id: userId,
@@ -254,59 +256,74 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
     summary.activeProtocols = activeRows.length;
   }
 
-  const doseIdMap = new Map<string, string>();
-  const scheduledRows = (state.scheduledDoses ?? [])
+  interface DoseInfo { scheduledDate: string; scheduledTime: string; cloudActiveId: string; cloudItemId: string }
+  const doseScheduleMap = new Map<string, DoseInfo>();
+  const occurrenceRows = (state.scheduledDoses ?? [])
     .map(d => {
       const mappedActiveId = activeIdMap.get(d.activeProtocolId) ?? null;
       const mappedItemId = protocolItemIdMap.get(d.protocolItemId) ?? null;
-      if (!mappedActiveId || !mappedItemId) return null;
-      const newDoseId = isUuid(d.id) ? d.id : stableUuid(`dose:${mappedActiveId}`, d.id);
-      doseIdMap.set(d.id, newDoseId);
+      const mappedProtocolId = activeToProtocolIdMap.get(d.activeProtocolId) ?? null;
+      if (!mappedActiveId || !mappedItemId || !mappedProtocolId) return null;
+      doseScheduleMap.set(d.id, { scheduledDate: d.scheduledDate, scheduledTime: d.scheduledTime, cloudActiveId: mappedActiveId, cloudItemId: mappedItemId });
+      const occurrenceKey = `${mappedActiveId}|${mappedItemId}|${d.scheduledDate}|${d.scheduledTime.slice(0, 5)}`;
+      const occurrenceStatus = 'planned';
       return {
-        id: newDoseId,
+        id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
         user_id: userId,
         active_protocol_id: mappedActiveId,
+        protocol_id: mappedProtocolId,
         protocol_item_id: mappedItemId,
-        scheduled_date: d.scheduledDate,
-        scheduled_time: d.scheduledTime,
-        status: d.status,
-        snoozed_until: toIso(d.snoozedUntil),
+        occurrence_date: d.scheduledDate,
+        occurrence_time: d.scheduledTime,
+        occurrence_key: occurrenceKey,
+        revision: 1,
+        status: occurrenceStatus,
+        source_generation: 'import',
+        legacy_scheduled_dose_id: null,
       };
     })
     .filter(Boolean) as Record<string, unknown>[];
 
-  if (scheduledRows.length) {
-    for (const part of chunk(scheduledRows, 250)) {
-      const { error } = await supabase.from('scheduled_doses').upsert(part, {
-        onConflict: 'active_protocol_id,protocol_item_id,scheduled_date,scheduled_time',
+  if (occurrenceRows.length) {
+    for (const part of chunk(occurrenceRows, 250)) {
+      const { error } = await supabase.from('planned_occurrences').upsert(part, {
+        onConflict: 'user_id,occurrence_key,revision',
       });
-      if (error) throw new Error(`Scheduled doses import failed: ${error.message}`);
+      if (error) throw new Error(`Planned occurrences import failed: ${error.message}`);
     }
-    summary.scheduledDoses = scheduledRows.length;
+    summary.scheduledDoses = occurrenceRows.length;
   }
 
-  const recordRows = (state.doseRecords ?? [])
+  const executionEventRows = (state.doseRecords ?? [])
     .map(r => {
-      const mappedDoseId = doseIdMap.get(r.scheduledDoseId) ?? null;
-      if (!mappedDoseId) return null;
-      const newRecordId = isUuid(r.id) ? r.id : stableUuid(`record:${userId}`, r.id);
+      const doseInfo = doseScheduleMap.get(r.scheduledDoseId) ?? null;
+      if (!doseInfo) return null;
+      const newEventId = isUuid(r.id) ? r.id : stableUuid(`event:${userId}`, r.id);
       return {
-        id: newRecordId,
+        id: newEventId,
         user_id: userId,
-        scheduled_dose_id: mappedDoseId,
-        action: r.action,
-        recorded_at: toIso(r.recordedAt) ?? new Date().toISOString(),
+        planned_occurrence_id: null,
+        legacy_scheduled_dose_id: null,
+        legacy_dose_record_id: null,
+        active_protocol_id: doseInfo.cloudActiveId,
+        protocol_item_id: doseInfo.cloudItemId,
+        event_type: r.action,
+        event_at: toIso(r.recordedAt) ?? new Date().toISOString(),
+        effective_date: doseInfo.scheduledDate,
+        effective_time: doseInfo.scheduledTime,
         note: r.note ?? null,
+        source: 'import',
+        idempotency_key: stableUuid(`event-idempotency:${userId}`, r.id),
       };
     })
     .filter(Boolean) as Record<string, unknown>[];
 
-  if (recordRows.length) {
-    for (const part of chunk(recordRows, 250)) {
-      const { error } = await supabase.from('dose_records').upsert(part, { onConflict: 'id' });
-      if (error) throw new Error(`Dose records import failed: ${error.message}`);
+  if (executionEventRows.length) {
+    for (const part of chunk(executionEventRows, 250)) {
+      const { error } = await supabase.from('execution_events').upsert(part, { onConflict: 'idempotency_key' });
+      if (error) throw new Error(`Execution events import failed: ${error.message}`);
     }
-    summary.doseRecords = recordRows.length;
+    summary.doseRecords = executionEventRows.length;
   }
 
   return summary;
