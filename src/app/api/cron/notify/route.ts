@@ -12,6 +12,7 @@
 //   - Pass B (reminders): re-fires every REMINDER_INTERVAL_MINUTES while dose is still pending/overdue.
 //   - Fire window: doses due in [now - 1 min, now + 1 min] (scheduler cadence tolerance).
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
     .eq('push_enabled', true);
 
   if (notifErr) {
+    Sentry.captureException(notifErr, { tags: { route: 'cron/notify', stage: 'notification_settings' } });
     console.error('[cron/notify] notification_settings fetch failed', notifErr);
     return NextResponse.json({ error: 'DB error' }, { status: 500 });
   }

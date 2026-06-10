@@ -2,6 +2,7 @@
 // and /api/cron/notify (direct in-process call — no self-fetch). Fetches all of
 // a user's push subscriptions, delivers the payload, and prunes expired ones.
 
+import * as Sentry from '@sentry/nextjs';
 import webpush from 'web-push';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -77,6 +78,8 @@ export async function sendPushToUser(
           staleEndpoints.push(sub.endpoint);
           stale++;
         } else {
+          // Unexpected delivery failure (e.g. 403 bad VAPID, 5xx) — surface it.
+          Sentry.captureException(err, { tags: { route: 'push/send', statusCode: String(status ?? 'unknown') } });
           console.error('[push/send] delivery failed', sub.endpoint.slice(-20), err);
         }
       }
