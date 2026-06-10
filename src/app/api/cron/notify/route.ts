@@ -27,10 +27,10 @@ const REMINDER_INTERVAL_MINUTES = 10;
 const MAX_NOTIFICATIONS = 3;
 
 export async function GET(request: NextRequest) {
-  // Vercel sets this header on cron invocations; also accept CRON_SECRET bearer.
+  // Fail closed: reject unless CRON_SECRET is configured and matches.
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -90,18 +90,20 @@ export async function GET(request: NextRequest) {
       const tz = profileRow?.timezone ?? 'UTC';
 
       // ── Stale-claim recovery ─────────────────────────────────────────────
-      // If a cron worker crashed after writing the Pass A lock but before
-      // delivering the push, the row stays and blocks retries indefinitely.
-      // Treat any notification_count=1 row whose sent_at is older than
-      // 2× the fire window (i.e. the writer is clearly gone) as stale and
-      // delete it so the next Pass A window can re-claim it.
+      // Pass A writes an in-flight claim (notification_count=0) before sending
+      // and promotes it to 1 only after successful delivery. If a cron worker
+      // crashed between claim and delivery, the count=0 row stays and blocks
+      // retries indefinitely. Treat any count=0 claim whose sent_at is older
+      // than 2× the fire window (i.e. the writer is clearly gone) as stale and
+      // delete it so the next Pass A window can re-claim it. Delivered rows
+      // (count>=1) are never touched — Pass B needs them for reminders.
       {
         const staleCutoff = new Date(now.getTime() - WINDOW_MINUTES * 2 * 60 * 1000);
         await supabase
           .from('notification_log')
           .delete()
           .eq('user_id', userId)
-          .eq('notification_count', 1)
+          .eq('notification_count', 0)
           .lt('sent_at', staleCutoff.toISOString());
       }
 
@@ -175,8 +177,9 @@ export async function GET(request: NextRequest) {
             const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
 
             for (const dose of eligibleDoses) {
-              // Atomic Pass A lock: only one concurrent cron invocation may claim
+              // Atomic Pass A claim: only one concurrent cron invocation may claim
               // the initial send for this (user_id, scheduled_dose_id).
+              // count=0 marks an in-flight claim; promoted to 1 after delivery.
               const { data: lockRows, error: lockErr } = await supabase
                 .from('notification_log')
                 .upsert(
@@ -184,7 +187,7 @@ export async function GET(request: NextRequest) {
                     user_id: userId,
                     scheduled_dose_id: dose.id,
                     sent_at: now.toISOString(),
-                    notification_count: 1,
+                    notification_count: 0,
                   },
                   { onConflict: 'user_id,scheduled_dose_id', ignoreDuplicates: true },
                 )
@@ -211,15 +214,23 @@ export async function GET(request: NextRequest) {
 
               const ok = await sendPush(userId, title, body, tag);
               if (ok) {
+                // Promote the claim to delivered (count=1) so Pass B can
+                // schedule reminders and stale recovery leaves it alone.
+                await supabase
+                  .from('notification_log')
+                  .update({ notification_count: 1 })
+                  .eq('user_id', userId)
+                  .eq('scheduled_dose_id', dose.id)
+                  .eq('notification_count', 0);
                 results.push({ userId, doseId: dose.id, status: 'sent', pass: 'A' });
               } else {
-                // Release Pass A lock so the next cron window can retry.
+                // Release the claim so the next cron window can retry.
                 await supabase
                   .from('notification_log')
                   .delete()
                   .eq('user_id', userId)
                   .eq('scheduled_dose_id', dose.id)
-                  .eq('notification_count', 1);
+                  .eq('notification_count', 0);
                 results.push({ userId, doseId: dose.id, status: 'send-failed', pass: 'A' });
               }
             }
@@ -238,6 +249,7 @@ export async function GET(request: NextRequest) {
           .select('scheduled_dose_id, notification_count, sent_at')
           .eq('user_id', userId)
           .lte('sent_at', reminderCutoff.toISOString())
+          .gte('notification_count', 1) // exclude in-flight Pass A claims
           .lt('notification_count', MAX_NOTIFICATIONS);
 
         if (logErr) {
