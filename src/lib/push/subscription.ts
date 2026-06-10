@@ -20,6 +20,14 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function subscriptionMatchesKey(subscription: PushSubscription, key: ArrayBuffer): boolean {
+  const current = subscription.options.applicationServerKey;
+  if (!current) return false;
+  const a = new Uint8Array(current);
+  const b = new Uint8Array(key);
+  return a.length === b.length && a.every((value, i) => value === b[i]);
+}
+
 export type PushSubscribeResult =
   | { ok: true }
   | { ok: false; reason: 'not-supported' | 'permission-denied' | 'not-installed' | 'error'; message?: string };
@@ -62,14 +70,25 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
 
   let subscription: PushSubscription;
   try {
-    // Reuse an existing subscription if one already exists for this device.
-    subscription = await registration.pushManager.getSubscription()
-      ?? await registration.pushManager.subscribe(subscribeOptions);
+    // Reuse an existing subscription only if it was created with the current
+    // VAPID key. After a key rotation the old subscription still exists but
+    // every delivery to it fails with 403, and subscribing over it throws
+    // InvalidStateError — so drop it and subscribe fresh.
+    const existing = await registration.pushManager.getSubscription();
+    if (existing && !subscriptionMatchesKey(existing, subscribeOptions.applicationServerKey)) {
+      await existing.unsubscribe();
+      subscription = await registration.pushManager.subscribe(subscribeOptions);
+    } else {
+      subscription = existing ?? await registration.pushManager.subscribe(subscribeOptions);
+    }
   } catch (err) {
-    const isQuota = err instanceof Error && err.name === 'QuotaExceededError';
-    if (isQuota) {
-      // iOS quirk: subscription exists internally but getSubscription() returned null.
-      // Unregister the SW and re-register to clear the stale state, then subscribe.
+    const isRetryable = err instanceof Error
+      && (err.name === 'QuotaExceededError' || err.name === 'InvalidStateError');
+    if (isRetryable) {
+      // iOS quirk: a subscription exists internally but getSubscription()
+      // returned null (QuotaExceededError), or a stale subscription with a
+      // different key survived (InvalidStateError). Unregister the SW and
+      // re-register to clear the stale state, then subscribe.
       try {
         await registration.unregister();
         const newReg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
