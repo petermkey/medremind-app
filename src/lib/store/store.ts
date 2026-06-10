@@ -1,12 +1,11 @@
 'use client';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { v4 as uuid } from 'uuid';
-import { format, addDays, parseISO, isBefore, isAfter } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import type {
   UserProfile, ActiveProtocol, Protocol, ProtocolItem,
   ScheduledDose, DoseRecord, DoseStatus, NotificationSettings,
-  ProtocolStatus, PlannedOccurrence, OccurrenceStatus, ExecutionEvent,
+  ProtocolStatus, PlannedOccurrence, ExecutionEvent,
 } from '@/types';
 import { SEED_PROTOCOLS, SEED_DRUGS } from '@/lib/data/seed';
 import type { Drug } from '@/types';
@@ -27,335 +26,24 @@ import {
   syncRemoveDoseCommand,
 } from '@/lib/supabase/realtimeSync';
 import {
-  enqueueSyncOperation,
-  markSyncFailure,
-  markSyncSuccess,
-  pumpOutbox,
-  removeQueuedSyncOperation,
-  type SyncOperation,
-} from '@/lib/supabase/syncOutbox';
+  today,
+  isFutureDoseByDate,
+  isOverdue,
+  getDayScheduleFromState,
+  buildExecutionEvent,
+  projectToOccurrence,
+  generateId,
+  buildSnoozeReplacementDoseId,
+  resolveSnoozeTargetSlot,
+  normalizeDurationDays,
+  computeInclusiveEndDate,
+  doseSlotKey,
+  buildLifecycleCommandOperationId,
+  expandItemToDoses,
+} from './storeHelpers';
+import { syncFireAndForget, waitForRealtimeSyncIdle } from './syncState';
 
-const inflightRealtimeSync = new Set<Promise<unknown>>();
-
-function trackRealtimeSync(task: Promise<unknown>) {
-  inflightRealtimeSync.add(task);
-  void task.finally(() => {
-    inflightRealtimeSync.delete(task);
-  });
-  return task;
-}
-
-export async function waitForRealtimeSyncIdle(timeoutMs = 8_000): Promise<{ ok: boolean; pending: number }> {
-  const startedAt = Date.now();
-  while (inflightRealtimeSync.size > 0) {
-    if (Date.now() - startedAt >= timeoutMs) {
-      return { ok: false, pending: inflightRealtimeSync.size };
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  return { ok: true, pending: 0 };
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────
-
-function nowDateTimeForTimezone(timezone?: string): { date: string; time: string } {
-  const now = new Date();
-  const resolvedTimezone = timezone && timezone.trim().length > 0
-    ? timezone
-    : Intl.DateTimeFormat().resolvedOptions().timeZone;
-  try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: resolvedTimezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(now);
-    const lookup = new Map(parts.map(p => [p.type, p.value]));
-    const date = `${lookup.get('year')}-${lookup.get('month')}-${lookup.get('day')}`;
-    const time = `${lookup.get('hour')}:${lookup.get('minute')}`;
-    if (date.length === 10 && time.length === 5) return { date, time };
-  } catch (error) {
-    console.warn('[timezone-now-fallback]', error);
-  }
-  return {
-    date: format(now, 'yyyy-MM-dd'),
-    time: format(now, 'HH:mm'),
-  };
-}
-
-const today = () => nowDateTimeForTimezone().date;
-
-function isFutureDoseByDate(
-  dose: ScheduledDose,
-  profile?: UserProfile | null,
-): boolean {
-  const { date: todayDate } = nowDateTimeForTimezone(profile?.timezone);
-  return dose.scheduledDate > todayDate;
-}
-
-// overdue is a derived UI concept — never persisted as a terminal status.
-// A pending dose is overdue when its scheduled slot is in the past.
-function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): boolean {
-  if (dose.status !== 'pending') return false;
-  const { date: todayDate, time: currentTime } = nowDateTimeForTimezone(profile?.timezone);
-  return dose.scheduledDate < todayDate ||
-    (dose.scheduledDate === todayDate && dose.scheduledTime < currentTime);
-}
-
-// ─── F5: getDayScheduleFromState ──────────────────────────────────────
-// Pure helper — returns sorted doses for a date from raw state slices.
-// Past dates: all doses (any protocol status) to preserve history.
-// Today/future: only doses belonging to active protocol instances.
-function getDayScheduleFromState(
-  scheduledDoses: ScheduledDose[],
-  activeProtocols: ActiveProtocol[],
-  date: string,
-): ScheduledDose[] {
-  const todayDate = today();
-  const sorted = (arr: ScheduledDose[]) =>
-    [...arr].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-  if (date < todayDate) {
-    return sorted(scheduledDoses.filter(d => d.scheduledDate === date));
-  }
-  const activeIds = new Set(
-    activeProtocols.filter(ap => ap.status === 'active').map(ap => ap.id),
-  );
-  return sorted(
-    scheduledDoses.filter(d => d.scheduledDate === date && activeIds.has(d.activeProtocolId)),
-  );
-}
-
-// ─── F4: ExecutionEvent builder ────────────────────────────────────────
-// Constructs a local ExecutionEvent from a dose action at write time.
-// idempotencyKey matches the clientOperationId used in cloud sync so
-// the local and remote events can be correlated later.
-function buildExecutionEvent(
-  dose: ScheduledDose,
-  record: DoseRecord,
-  eventType: ExecutionEvent['eventType'],
-  idempotencyKey: string,
-): ExecutionEvent {
-  return {
-    id: record.id,
-    userId: record.userId,
-    legacyScheduledDoseId: dose.id,
-    activeProtocolId: dose.activeProtocolId,
-    protocolItemId: dose.protocolItemId,
-    eventType,
-    eventAt: record.recordedAt,
-    effectiveDate: dose.scheduledDate,
-    effectiveTime: dose.scheduledTime,
-    note: record.note,
-    idempotencyKey,
-  };
-}
-
-// ─── Occurrence model (F3) ─────────────────────────────────────────────
-//
-// Projects a ScheduledDose into a PlannedOccurrence at read time.
-// occurrenceStatus is derived — never written — following these rules:
-//   superseded: dose has an explicit successor (F2 lineage) OR legacy snoozed status
-//   cancelled:  dose was removed from the plan without an action record
-//   planned:    everything else (live, actionable slot)
-//
-// PlannedOccurrence extends ScheduledDose so all existing consumers
-// (MedCard, page.tsx, etc.) can receive it without modification.
-function projectToOccurrence(dose: ScheduledDose): PlannedOccurrence {
-  let occurrenceStatus: OccurrenceStatus = 'planned';
-  if (dose.successorDoseId || dose.status === 'snoozed') {
-    occurrenceStatus = 'superseded';
-  }
-  const occurrenceKey = `${dose.activeProtocolId}|${dose.protocolItemId}|${dose.scheduledDate}|${dose.scheduledTime}`;
-  return { ...dose, occurrenceStatus, occurrenceKey };
-}
-
-
-function generateId(prefix: string): string {
-  try {
-    return uuid();
-  } catch (error) {
-    console.error('[id-generation-fallback]', prefix, error);
-    const c = globalThis.crypto as { randomUUID?: () => string } | undefined;
-    if (c?.randomUUID) return c.randomUUID();
-    const rand = Math.random().toString(16).slice(2, 10);
-    return `${prefix}-${Date.now()}-${rand}`;
-  }
-}
-
-function hash32(input: string, seed: number): number {
-  let h = seed >>> 0;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function stableUuid(namespace: string, source: string): string {
-  const input = `${namespace}:${source}`;
-  const p1 = hash32(input, 0x811c9dc5).toString(16).padStart(8, '0');
-  const p2 = hash32(input, 0x9e3779b9).toString(16).padStart(8, '0');
-  const p3 = hash32(input, 0x85ebca6b).toString(16).padStart(8, '0');
-  const p4 = hash32(input, 0xc2b2ae35).toString(16).padStart(8, '0');
-  const hex = `${p1}${p2}${p3}${p4}`;
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
-
-function buildSnoozeReplacementDoseId(sourceDoseId: string, scheduledDate: string, scheduledTime: string): string {
-  return stableUuid(`dose-snooze-replacement:${sourceDoseId}`, `${scheduledDate}|${scheduledTime}`);
-}
-
-function resolveSnoozeTargetSlot(
-  doses: ScheduledDose[],
-  sourceDose: ScheduledDose,
-  baseTarget: Date,
-): { scheduledDate: string; scheduledTime: string; snoozedUntil: string; reuseExistingId?: string } {
-  const scheduledDate = format(baseTarget, 'yyyy-MM-dd');
-  const scheduledTime = format(baseTarget, 'HH:mm');
-  // If a pending dose for the same protocol item already exists at the target slot,
-  // reuse it — don't create a second dose.
-  const existing = doses.find(d =>
-    d.activeProtocolId === sourceDose.activeProtocolId
-    && d.protocolItemId === sourceDose.protocolItemId
-    && d.scheduledDate === scheduledDate
-    && d.scheduledTime === scheduledTime
-    && d.id !== sourceDose.id
-    && d.status === 'pending'
-  );
-  if (existing) {
-    return { scheduledDate, scheduledTime, snoozedUntil: baseTarget.toISOString(), reuseExistingId: existing.id };
-  }
-  return { scheduledDate, scheduledTime, snoozedUntil: baseTarget.toISOString() };
-}
-
-function normalizeDurationDays(value: unknown): number | undefined {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-  const days = Math.trunc(value);
-  return days > 0 ? days : undefined;
-}
-
-function computeInclusiveEndDate(startDate: string, durationDays: number | undefined): string | undefined {
-  if (!durationDays) return undefined;
-  return format(addDays(parseISO(startDate), durationDays - 1), 'yyyy-MM-dd');
-}
-
-function doseSlotKey(protocolItemId: string, scheduledDate: string, scheduledTime: string): string {
-  return `${protocolItemId}|${scheduledDate}|${scheduledTime.slice(0, 5)}`;
-}
-
-function buildLifecycleCommandOperationId(
-  kind: 'pause' | 'resume' | 'complete' | 'archive',
-  entityId: string,
-  at: string,
-): string {
-  return `${kind}:${entityId}:${at}`;
-}
-
-function syncFireAndForget(task: Promise<unknown>, fallbackOp?: SyncOperation) {
-  const queuedFallbackId = fallbackOp
-    ? enqueueSyncOperation(fallbackOp, { pump: false })
-    : null;
-  const tracked = trackRealtimeSync(task);
-  void tracked
-    .then(() => {
-      if (queuedFallbackId) removeQueuedSyncOperation(queuedFallbackId);
-      markSyncSuccess();
-    })
-    .catch((err: unknown) => {
-      markSyncFailure(err);
-      if (queuedFallbackId) {
-        void pumpOutbox({ force: true });
-      } else if (fallbackOp) {
-        enqueueSyncOperation(fallbackOp);
-      }
-    // Keep UX responsive; failed writes are queued for retry and logged for diagnostics.
-    console.error('[realtime-sync]', err);
-  });
-}
-
-/** Expand a protocol item into scheduled_doses for a date range */
-function expandItemToDoses(
-  item: ProtocolItem,
-  activeProtocol: ActiveProtocol,
-  fromDate: string,
-  toDate: string,
-): Omit<ScheduledDose, 'protocolItem' | 'activeProtocol'>[] {
-  const doses: Omit<ScheduledDose, 'protocolItem' | 'activeProtocol'>[] = [];
-  const start = parseISO(activeProtocol.startDate);
-  const from = parseISO(fromDate);
-  const to = parseISO(toDate);
-
-  // analyses / therapies with no times → generate a single reminder on target date
-  if (item.itemType === 'analysis' || item.times.length === 0) {
-    if (item.frequencyValue) {
-      const targetDate = addDays(start, (item.startDay - 1) + (item.frequencyValue - 1));
-      const td = format(targetDate, 'yyyy-MM-dd');
-      if (td >= fromDate && td <= toDate) {
-        doses.push({
-          id: generateId('dose'),
-          userId: activeProtocol.userId,
-          activeProtocolId: activeProtocol.id,
-          protocolItemId: item.id,
-          scheduledDate: td,
-          scheduledTime: '08:00',
-          status: 'pending',
-        });
-      }
-    }
-    return doses;
-  }
-
-  // Walk day by day within range
-  let cursor = new Date(Math.max(from.getTime(), start.getTime()));
-  let end = to;
-  if (activeProtocol.endDate) {
-    const protocolEnd = parseISO(activeProtocol.endDate);
-    if (isBefore(protocolEnd, end)) end = protocolEnd;
-  }
-
-  while (!isAfter(cursor, end)) {
-    const dateStr = format(cursor, 'yyyy-MM-dd');
-    const dayNum = Math.floor((cursor.getTime() - start.getTime()) / 86400000) + 1;
-
-    // Check start/end day bounds
-    if (dayNum < item.startDay) { cursor = addDays(cursor, 1); continue; }
-    if (item.endDay && dayNum > item.endDay) break;
-
-    // Check frequency
-    let include = false;
-    switch (item.frequencyType) {
-      case 'daily':
-      case 'twice_daily':
-      case 'three_times_daily':
-        include = true; break;
-      case 'every_n_days':
-        include = (dayNum - item.startDay) % (item.frequencyValue ?? 1) === 0; break;
-      case 'weekly':
-        include = (dayNum - item.startDay) % 7 === 0; break;
-      default:
-        include = true;
-    }
-
-    if (include) {
-      for (const time of item.times) {
-        doses.push({
-          id: generateId('dose'),
-          userId: activeProtocol.userId,
-          activeProtocolId: activeProtocol.id,
-          protocolItemId: item.id,
-          scheduledDate: dateStr,
-          scheduledTime: time,
-          status: 'pending',
-        });
-      }
-    }
-    cursor = addDays(cursor, 1);
-  }
-  return doses;
-}
+export { waitForRealtimeSyncIdle };
 
 // ─── Store shape ───────────────────────────────────────────────────────
 
