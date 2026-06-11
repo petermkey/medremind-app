@@ -12,6 +12,7 @@ import type {
 } from '@/types';
 import { addDays, format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
+import { doseSlotKey } from '@/lib/store/storeHelpers';
 import { SEED_DRUGS, SEED_PROTOCOLS } from '@/lib/data/seed';
 import { getSupabaseClient } from './client';
 import { importStoreSnapshotToSupabase, type ImportSummary } from './importStore';
@@ -405,6 +406,10 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   // snoozedUntil is omitted — V2 models snooze via occurrence revision, not a timestamp field.
   const doseRecords: DoseRecord[] = [];
   const droppedOccurrences: Record<string, unknown>[] = [];
+  // Cancelled occurrences without events are removal tombstones: excluded
+  // from the schedule, and their slots must not be recreated by the
+  // rolling-horizon regeneration below.
+  const removedSlotKeys = new Set<string>();
   const scheduledDoses: ScheduledDose[] = occurrencesRes.data
     .map(row => {
       const sourceActiveId = String(row.active_protocol_id);
@@ -422,6 +427,10 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         String(b.event_at ?? '').localeCompare(String(a.event_at ?? '')),
       )[0];
       const occStatus = String(row.status);
+      if (occStatus === 'cancelled' && !latestEvent) {
+        removedSlotKeys.add(doseSlotKey(itemId, String(row.occurrence_date), String(row.occurrence_time)));
+        return null;
+      }
       const derivedStatus: ScheduledDose['status'] = latestEvent
         ? (String(latestEvent.event_type) as ScheduledDose['status'])
         : occStatus === 'cancelled' ? 'skipped' : 'pending';
@@ -579,7 +588,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
       d => d.activeProtocolId === ap.id && d.scheduledDate >= horizonDate && d.status === 'pending',
     );
     if (!hasFutureDoses) {
-      storeActions.regenerateDoses(ap.id);
+      storeActions.regenerateDoses(ap.id, removedSlotKeys);
     }
   }
 

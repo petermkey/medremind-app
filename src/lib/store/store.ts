@@ -114,7 +114,9 @@ interface AppState {
   snoozeDose: (doseId: string, option: number | { until: string }) => void;
   removeDose: (doseId: string) => void;
   endProtocolFromToday: (activeProtocolId: string, fromDate?: string) => void;
-  regenerateDoses: (activeProtocolId: string) => void;
+  // excludeSlotKeys: removal tombstones (cancelled cloud occurrences) whose
+  // slots must not be recreated — see cloudStore pull.
+  regenerateDoses: (activeProtocolId: string, excludeSlotKeys?: ReadonlySet<string>) => void;
 
   // Actions — Settings
   updateNotificationSettings: (patch: Partial<NotificationSettings>) => void;
@@ -964,7 +966,7 @@ export const useStore = create<AppState>()(
         }
       },
 
-      regenerateDoses: (activeProtocolId) => {
+      regenerateDoses: (activeProtocolId, excludeSlotKeys) => {
         const state = get();
         const active = state.activeProtocols.find(a => a.id === activeProtocolId);
         if (!active) return;
@@ -1001,7 +1003,8 @@ export const useStore = create<AppState>()(
           candidateDoses.push(...raw.map(d => ({ ...d, protocolItem: item, activeProtocol: active })));
         }
         const newDoses = candidateDoses.filter(
-          d => !retainedFutureSlots.has(doseSlotKey(d.protocolItemId, d.scheduledDate, d.scheduledTime)),
+          d => !retainedFutureSlots.has(doseSlotKey(d.protocolItemId, d.scheduledDate, d.scheduledTime))
+            && !excludeSlotKeys?.has(doseSlotKey(d.protocolItemId, d.scheduledDate, d.scheduledTime)),
         );
         set(s => ({ scheduledDoses: [...s.scheduledDoses, ...newDoses] }));
         if (state.profile?.id) {

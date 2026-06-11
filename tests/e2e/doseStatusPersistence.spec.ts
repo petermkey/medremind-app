@@ -128,24 +128,40 @@ test.describe('dose status persistence', () => {
 
     await page.goto('/app');
     await expect(page.getByRole('button', { name: 'Mark as taken' }).first()).toBeVisible({ timeout: 20_000 });
-    const before = await page.evaluate(() => {
-      const store = (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string; scheduledDate: string }[]; removeDose(id: string): void } } }).__medremindStore;
+    // Capture the count BEFORE removal so the post-reload assertion proves
+    // the removed dose did not resurrect from the cloud.
+    const before = await page.evaluate(() =>
+      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
+        .__medremindStore.getState().scheduledDoses.length,
+    );
+    // Pick the earliest pending dose instead of filtering by date — the app
+    // schedules in the profile timezone, which need not match UTC.
+    const removed = await page.evaluate(() => {
+      const store = (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string; scheduledDate: string; status: string }[]; removeDose(id: string): void } } }).__medremindStore;
       const state = store.getState();
-      const today = new Date().toISOString().slice(0, 10);
-      const dose = state.scheduledDoses.find(d => d.scheduledDate === today);
-      if (dose) state.removeDose(dose.id);
-      return store.getState().scheduledDoses.length;
+      const dose = [...state.scheduledDoses]
+        .filter(d => d.status === 'pending')
+        .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))[0];
+      if (!dose) return false;
+      state.removeDose(dose.id);
+      return true;
     });
+    expect(removed).toBe(true);
     await waitForSyncFlushed(page);
     await page.waitForTimeout(2_000);
     await page.reload();
     await page.waitForURL(/\/app/, { timeout: 30_000 });
-    // wait for the boot pull to finish hydrating
-    await expect(page.getByRole('button', { name: /Mark as taken|Already marked as taken/ }).first()).toBeVisible({ timeout: 30_000 });
+    // Wait for the boot pull to hydrate the store. Today's only dose was
+    // removed, so the visible button is gone — the remaining future doses
+    // (days 2-3 of the protocol) are the hydration signal instead.
+    await page.waitForFunction(() => {
+      const store = (window as unknown as { __medremindStore?: { getState(): { scheduledDoses: unknown[] } } }).__medremindStore;
+      return (store?.getState().scheduledDoses.length ?? 0) > 0;
+    }, { timeout: 30_000 });
     const after = await page.evaluate(() =>
       (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
         .__medremindStore.getState().scheduledDoses.length,
     );
-    expect(after).toBeLessThanOrEqual(before);
+    expect(after).toBeLessThan(before);
   });
 });
