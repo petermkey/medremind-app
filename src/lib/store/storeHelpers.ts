@@ -4,6 +4,9 @@ import type {
   UserProfile, ActiveProtocol, ProtocolItem,
   ScheduledDose, DoseRecord, PlannedOccurrence, OccurrenceStatus, ExecutionEvent,
 } from '@/types';
+import { hash32, stableUuid, isUuid } from '@/lib/ids';
+
+export { hash32, stableUuid, isUuid };
 
 export function nowDateTimeForTimezone(timezone?: string): { date: string; time: string } {
   const now = new Date();
@@ -131,24 +134,6 @@ export function generateId(prefix: string): string {
   }
 }
 
-export function hash32(input: string, seed: number): number {
-  let h = seed >>> 0;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-export function stableUuid(namespace: string, source: string): string {
-  const input = `${namespace}:${source}`;
-  const p1 = hash32(input, 0x811c9dc5).toString(16).padStart(8, '0');
-  const p2 = hash32(input, 0x9e3779b9).toString(16).padStart(8, '0');
-  const p3 = hash32(input, 0x85ebca6b).toString(16).padStart(8, '0');
-  const p4 = hash32(input, 0xc2b2ae35).toString(16).padStart(8, '0');
-  const hex = `${p1}${p2}${p3}${p4}`;
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
 
 export function buildSnoozeReplacementDoseId(sourceDoseId: string, scheduledDate: string, scheduledTime: string): string {
   return stableUuid(`dose-snooze-replacement:${sourceDoseId}`, `${scheduledDate}|${scheduledTime}`);
