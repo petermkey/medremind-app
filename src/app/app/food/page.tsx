@@ -12,6 +12,7 @@ import {
   validateNutritionTargetProfileTargets,
 } from '@/lib/food/targetAlgorithm';
 import { consumedAtForSelectedDateInTimezone } from '@/lib/nutrition/waterEntryTime';
+import { compressImageForAnalysis } from '@/lib/food/imageCompression';
 import type { FoodAnalysisDraft, FoodEntry, FoodNutrients } from '@/types/food';
 import type {
   GeneratedNutritionTargets,
@@ -316,6 +317,7 @@ export default function FoodPage() {
     waterTotalForDate,
   } = useNutritionTargetsStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<FoodAnalysisDraft | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -373,8 +375,9 @@ export default function FoodPage() {
     setDraft(null);
 
     try {
+      const prepared = await compressImageForAnalysis(file);
       const body = new FormData();
-      body.append('image', file);
+      body.append('image', prepared);
 
       const response = await fetch('/api/food/analyze-photo', {
         method: 'POST',
@@ -392,6 +395,7 @@ export default function FoodPage() {
     } finally {
       setAnalyzing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   }
 
@@ -670,6 +674,27 @@ export default function FoodPage() {
               onChange={handleFileChange}
               disabled={analyzing}
             />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              onChange={handleFileChange}
+              disabled={analyzing}
+            />
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={analyzing}
+              className={[
+                'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
+                analyzing
+                  ? 'cursor-not-allowed bg-[#30363D] text-[#8B949E]'
+                  : 'bg-[#30363D] text-[#F0F6FC] hover:bg-[#363B42]',
+              ].join(' ')}
+            >
+              Gallery
+            </button>
             <button
               type="button"
               onClick={startEditingTargets}
