@@ -1,55 +1,63 @@
 # Current Status and Next Phase (Current Main)
 
-Date: 2026-04-17
-Source: current `main`
+Date: 2026-06-11
+Source: current `main` + branch `codex/phase5-realtime-sync-split` (PR #40, pending merge)
 
 ## 1. Current phase summary
 
-Implementation phase for lifecycle migration slices is largely complete on `main`.
-Current phase is operational execution and validation on real data.
+Lifecycle migration is complete on `main`. Active branch is Phase 5 — monolith split of
+`realtimeSync.ts` and `store.ts` into domain-focused modules. PR #40 is open and ready to merge.
 
-## 2. What is implementation-complete on main
+## 2. What is complete (on main or PR #40)
 
-- Additive schema readiness and runtime-safe coexistence with legacy tables.
+**Lifecycle migration (on main):**
+- Additive schema readiness and runtime-safe coexistence with legacy tables (V1 tables dropped in PR #39).
 - Command-based write paths for dose and lifecycle transitions.
-- Additive execution write-through for take/skip/snooze.
+- Execution write-through for take/skip/snooze.
 - Planned future write-through at activation time.
-- Lifecycle-aware selector/read-model migration for app/progress/protocol-detail/calendar/history surfaces.
-- Operational tooling scripts for D2, D3, C5, and D4.
+- Lifecycle-aware selector/read-model migration for all app surfaces.
 
-## 3. What remains operational (not new coding)
+**Phase 5 — monolith split (PR #40, not yet merged):**
+- `realtimeSync.ts` (1010 lines) → `src/lib/supabase/realtimeSync/` directory:
+  - `helpers.ts` — ID derivation, ledger upserts, shared types
+  - `protocols.ts` — `syncProtocolUpsert`, `syncProtocolItemDelete`, `syncProtocolDelete`
+  - `activation.ts` — `syncActivation`, `syncActiveStatus`, `syncRegeneratedDoses`, lifecycle commands
+  - `doses.ts` — `syncTakeDoseCommand`, `syncSkipDoseCommand`, `syncRemoveDoseCommand`
+  - `snooze.ts` — `syncSnoozeDoseCommand`
+  - `index.ts` — barrel re-export (all import paths unchanged)
+- `store.ts` pure helpers extracted to `src/lib/store/storeHelpers.ts` (282 lines)
+- `store.ts` sync state extracted to `src/lib/store/syncState.ts` (51 lines)
+- `store.ts` reduced from 1408 → 1095 lines
 
-Required live-run sequence:
+## 3. Backlog (next agent picks up here)
 
-1. Preflight (branch clean + required environment)
-2. D2 dry-run
-3. D2 user-scoped apply
-4. D2 user-scoped rerun convergence check
-5. D3 dry-run
-6. D3 user-scoped apply
-7. D3 user-scoped rerun convergence check
-8. C5 parity validation
-9. D4 consistency checker
-10. Consolidated anomaly triage + recommendation
+### Phase 5 remainder — store.ts Zustand slice split
 
-## 4. Safety gates for operational runs
+`store.ts` is still 1095 lines. The actions can be split into domain `StateCreator` slices:
 
-- Always run dry-run before apply.
-- Start with user-scoped runs before wider rollout.
-- Stop if required credentials are missing.
-- Stop broader apply when severe anomalies appear.
-- Keep exact command/output audit trail.
+- `src/lib/store/protocols.slice.ts` — `createCustomProtocol`, `updateProtocol`, `deleteProtocol`, `addProtocolItem`, `removeProtocolItem`
+- `src/lib/store/activation.slice.ts` — `activateProtocol`, `pauseProtocol`, `resumeProtocol`, `completeProtocol`
+- `src/lib/store/doses.slice.ts` — `takeDose`, `skipDose`, `snoozeDose`, `removeDose`, `endProtocolFromToday`, `regenerateDoses`
 
-## 5. Explicit deferred work
+**Key constraint:** `updateProtocol` calls `get().regenerateDoses()` — a cross-slice call. Pattern to use:
+```ts
+type ProtocolsSlice = { createCustomProtocol: ...; ... }
+type AppState = AuthSlice & ProtocolsSlice & ActivationSlice & DosesSlice & ...
+// Each slice:
+const createProtocolsSlice: StateCreator<AppState, [['zustand/persist', unknown]], [], ProtocolsSlice> = (set, get) => ({ ... })
+```
+Cross-slice calls work because `get()` returns full `AppState`.
 
-The following are deferred architecture tracks, not current behavior:
+Branch: start from `main` after PR #40 merges. Name: `codex/phase5-store-slices`.
+
+### Deferred architecture tracks
 
 1. Auth and email-confirmation redesign.
 2. Domain/schedule engine redesign.
 3. UI/PWA packaging and offline strategy audit.
 
-## 6. What not to do in this phase
+## 4. What not to do
 
-- Do not implement broad new runtime behavior while operational validation is pending.
-- Do not run migration apply operations without preflight and scoped dry-run evidence.
+- Do not push directly to `main`.
 - Do not treat historical branch docs as source-of-truth.
+- Do not start the slice split before PR #40 is merged.

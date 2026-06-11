@@ -6,7 +6,7 @@ Source of truth: current `main`
 ## 1. Runtime stack and boundaries
 
 - Framework: Next.js App Router (`next@16.2.2`), React (`react@19.2.4`), TypeScript (`v6`).
-- State: Zustand + `persist` in `src/lib/store/store.ts`.
+- State: Zustand + `persist` in `src/lib/store/store.ts` (~1095 lines). Pure helpers extracted to `src/lib/store/storeHelpers.ts`; sync-tracking to `src/lib/store/syncState.ts`.
 - Date/time logic: `date-fns`.
 - Cloud backend: Supabase auth + Postgres via browser/server clients.
 - UI: Tailwind CSS + local component primitives.
@@ -92,7 +92,7 @@ Write model:
 
 Modules:
 
-- direct writes: `src/lib/supabase/realtimeSync.ts`
+- direct writes: `src/lib/supabase/realtimeSync/` (barrel: `index.ts`; domains: `helpers.ts`, `protocols.ts`, `activation.ts`, `doses.ts`, `snooze.ts`)
 - outbox/retry: `src/lib/supabase/syncOutbox.ts`
 - cloud pull/backup/export: `src/lib/supabase/cloudStore.ts`
 - import/restore mapping: `src/lib/supabase/importStore.ts`
@@ -137,7 +137,7 @@ Selector-based read paths now cover:
 
 ## 9. Schedule and dose generation
 
-`expandItemToDoses` in `store.ts` generates `ScheduledDose` records from `ProtocolItem` definitions:
+`expandItemToDoses` in `src/lib/store/storeHelpers.ts` generates `ScheduledDose` records from `ProtocolItem` definitions:
 
 - daily/twice_daily/three_times_daily: generates per time per day
 - every_n_hours: uses `times[]` array (UI sets appropriate entries)
@@ -190,8 +190,10 @@ Correlation insight engine:
 
 ## 12. High-risk files
 
-- `src/lib/store/store.ts` — domain logic + sync wiring + selectors, 1234 lines
-- `src/lib/supabase/realtimeSync.ts` — all cloud command paths
+- `src/lib/store/store.ts` — Zustand store shell + AppState interface + persist config (~1095 lines)
+- `src/lib/store/storeHelpers.ts` — pure helper functions (date/time, ID generation, dose expansion, occurrence projection)
+- `src/lib/store/syncState.ts` — `inflightRealtimeSync` tracking, `waitForRealtimeSyncIdle`, `syncFireAndForget`
+- `src/lib/supabase/realtimeSync/` — all cloud command paths (split into domain modules)
 - `src/app/app/layout.tsx` — auth boot gate
 - `src/proxy.ts` — server-side route guard
 - `src/lib/supabase/importStore.ts` — import idempotency via deterministic ID mapping

@@ -64,7 +64,7 @@ test('segmentsToOrFilter builds AND groups joined by comma', () => {
   ]);
   assert.equal(
     filter,
-    'and(scheduled_date.eq.2026-06-09,scheduled_time.gte.23:59:00,scheduled_time.lte.23:59:59),' +
-      'and(scheduled_date.eq.2026-06-10,scheduled_time.gte.00:00:00,scheduled_time.lte.00:01:59)',
+    'and(occurrence_date.eq.2026-06-09,occurrence_time.gte.23:59:00,occurrence_time.lte.23:59:59),' +
+      'and(occurrence_date.eq.2026-06-10,occurrence_time.gte.00:00:00,occurrence_time.lte.00:01:59)',
   );
 });
