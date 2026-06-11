@@ -663,4 +663,28 @@ test.describe('food diary (requires authenticated Supabase E2E env)', () => {
     await expect(page.getByRole('heading', { name: cancelledDraft.title })).not.toBeVisible();
     await expect(page.getByText(cancelledDraft.summary)).not.toBeVisible();
   });
+
+  test('duplicates an entry and adds a second card with the same title', async ({ page }, testInfo) => {
+    const uniqueSuffix = `duplicate-${testInfo.workerIndex}-${Date.now()}`;
+    const originalDraft = {
+      ...foodDraft,
+      title: `E2E Duplicate Meal ${uniqueSuffix}`,
+      summary: 'A meal to be duplicated.',
+    };
+
+    await mockFoodAnalysis(page, originalDraft);
+    await loginAndOpenFood(page);
+    await saveAnalyzedMealPhoto(page, pngFile, originalDraft);
+
+    const firstCard = savedEntryCardByTitle(page, originalDraft.title);
+    await expect(firstCard.getByRole('heading', { name: originalDraft.title, exact: true })).toBeVisible();
+    
+    // Click the duplicate button on the first card
+    await page.getByRole('button', { name: '↺ Ate this again' }).first().click();
+
+    // Verify two cards now exist with the same title
+    const cardCount = await page.locator(`[role="heading"][name="${originalDraft.title}"]`).count();
+    await expect(page.locator(`[role="heading"][name="${originalDraft.title}"]`).nth(1)).toBeVisible();
+  });
+
 });
