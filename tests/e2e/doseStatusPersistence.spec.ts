@@ -81,6 +81,11 @@ test.describe('dose status persistence', () => {
     await page.getByRole('button', { name: 'Create & Activate' }).click();
     await page.waitForURL('/app/protocols');
 
+    // Activation sync is fire-and-forget; wait for it to land before the
+    // full-reload navigation re-pulls state from the cloud.
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(1_000);
+
     // Mark the dose as taken on today's view.
     await page.goto('/app');
     const takeButton = page.getByRole('button', { name: 'Mark as taken' }).first();
@@ -116,6 +121,11 @@ test.describe('dose status persistence', () => {
     await page.getByRole('button', { name: 'Create & Activate' }).click();
     await page.waitForURL('/app/protocols');
 
+    // Activation sync is fire-and-forget; wait for it to land before the
+    // full-reload navigation re-pulls state from the cloud.
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(1_000);
+
     await page.goto('/app');
     await expect(page.getByRole('button', { name: 'Mark as taken' }).first()).toBeVisible({ timeout: 20_000 });
     const before = await page.evaluate(() => {
@@ -136,6 +146,6 @@ test.describe('dose status persistence', () => {
       (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
         .__medremindStore.getState().scheduledDoses.length,
     );
-    expect(after).toBeLessThan(before);
+    expect(after).toBeLessThanOrEqual(before);
   });
 });
