@@ -37,6 +37,17 @@ update sync_operations
 
 -- 3) Remove throwaway E2E accounts (register-flow runs without E2E_EMAIL).
 --    profiles.id → auth.users(id) cascade removes all dependent app data.
+--    protocols.owner_id, drugs.created_by, analyses.created_by and
+--    active_protocols.protocol_id are NO ACTION (not cascade), so clear
+--    those rows in dependency order before deleting the users.
+delete from active_protocols
+ where user_id in (select id from auth.users where email like 'e2e-%@example.com');
+delete from protocols
+ where owner_id in (select id from auth.users where email like 'e2e-%@example.com');
+delete from drugs
+ where created_by in (select id from auth.users where email like 'e2e-%@example.com');
+delete from analyses
+ where created_by in (select id from auth.users where email like 'e2e-%@example.com');
 delete from auth.users where email like 'e2e-%@example.com';
 
 commit;

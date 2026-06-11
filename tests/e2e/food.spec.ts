@@ -364,7 +364,8 @@ async function mockFoodAnalysis(page: Page, draft = foodDraft) {
 }
 
 async function uploadMealPhoto(page: Page, file = pngFile) {
-  await page.locator('input[type="file"]').setInputFiles(file);
+  // Two hidden inputs since the gallery picker landed — use the camera one.
+  await page.locator('input[type="file"]').first().setInputFiles(file);
 }
 
 function foodCardByTitle(page: Page, title: string) {
@@ -454,7 +455,8 @@ async function getDailyTargetProgress(page: Page) {
     return Number(text.replace(/[^\d.-]/g, ''));
   };
   const consumedFromTargetCard = async (label: string) => {
-    const card = page.locator('.rounded-2xl').filter({
+    // Target tiles use rounded-xl since the compact diary layout (276c465).
+    const card = page.locator('.rounded-xl').filter({
       has: page.getByText(label, { exact: true }),
       hasText: '/',
     }).first();
@@ -475,7 +477,8 @@ async function getDailyTargetProgress(page: Page) {
 }
 
 async function getWaterConsumedMl(page: Page) {
-  const tracker = page.locator('.rounded-2xl')
+  // Water tracker also moved to rounded-xl in the compact layout.
+  const tracker = page.locator('.rounded-xl')
     .filter({ has: page.getByText('Water', { exact: true }) })
     .filter({ has: page.getByRole('button', { name: '+250 ml' }) })
     .first();
