@@ -48,7 +48,6 @@ export interface FoodEntry {
   components: FoodEntryComponent[];
   createdAt: string;
   updatedAt: string;
-  photoPath?: string;
 }
 
 export interface FoodAnalysisComponentDraft {
@@ -71,7 +70,6 @@ export interface FoodAnalysisDraft {
   estimationConfidence: number;
   model: string;
   schemaVersion: 'food-analysis-v1';
-  photoPath?: string;
 }
 
 export interface FoodDailyTotals extends FoodNutrients {
