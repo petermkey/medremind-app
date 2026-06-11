@@ -9,6 +9,7 @@ import {
   cloudProtocolItemId,
   cloudRecordId,
   isUniqueViolation,
+  resolvePlannedOccurrenceId,
   stableUuid,
   updateDoseSyncOperationLedger,
   upsertDoseSyncOperationLedger,
@@ -36,10 +37,11 @@ export async function syncTakeDoseCommand(
   await upsertDoseSyncOperationLedger(userId, clientOperationId, dose, commandPayload, 'take_command');
 
   try {
+    const plannedOccurrenceId = await resolvePlannedOccurrenceId(userId, dose);
     const executionEventRow = {
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
-      planned_occurrence_id: null,
+      planned_occurrence_id: plannedOccurrenceId,
       active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
       protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
       event_type: 'taken',
@@ -104,10 +106,11 @@ export async function syncSkipDoseCommand(
   await upsertDoseSyncOperationLedger(userId, clientOperationId, dose, commandPayload, 'skip_command');
 
   try {
+    const plannedOccurrenceId = await resolvePlannedOccurrenceId(userId, dose);
     const executionEventRow = {
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
-      planned_occurrence_id: null,
+      planned_occurrence_id: plannedOccurrenceId,
       active_protocol_id: cloudActiveId(userId, dose.activeProtocolId),
       protocol_item_id: cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId),
       event_type: 'skipped',

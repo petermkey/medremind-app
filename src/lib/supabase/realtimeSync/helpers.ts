@@ -80,6 +80,83 @@ export function isUniqueViolation(
   return Boolean(error.message?.includes(constraintName));
 }
 
+// Resolve the planned_occurrences row a dose action belongs to, so the
+// execution_event can be linked via planned_occurrence_id (the cloud pull
+// derives dose status exclusively from events nested under occurrences —
+// an unlinked event is invisible on the next boot).
+// Tier 1: dose.id IS the occurrence uuid (doses hydrated by cloud pull).
+// Tier 2: canonical occurrence_key (doses generated locally).
+// Tier 3: any live row at the same slot (covers legacy-keyed backfill rows).
+// Tier 4: create the occurrence write-through so the event has an anchor.
+export async function resolvePlannedOccurrenceId(
+  userId: string,
+  dose: ScheduledDose,
+): Promise<string | null> {
+  const supabase = getSupabaseClient();
+  const time = dose.scheduledTime.slice(0, 5);
+
+  if (isUuid(dose.id)) {
+    const { data } = await supabase
+      .from('planned_occurrences')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('id', dose.id)
+      .maybeSingle();
+    if (data?.id) return String(data.id);
+  }
+
+  const cActiveId = cloudActiveId(userId, dose.activeProtocolId);
+  const cItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
+  const occurrenceKey = `${cActiveId}|${cItemId}|${dose.scheduledDate}|${time}`;
+  const { data: byKey } = await supabase
+    .from('planned_occurrences')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('occurrence_key', occurrenceKey)
+    .is('superseded_by_occurrence_id', null)
+    .maybeSingle();
+  if (byKey?.id) return String(byKey.id);
+
+  const { data: bySlot } = await supabase
+    .from('planned_occurrences')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('protocol_item_id', cItemId)
+    .eq('occurrence_date', dose.scheduledDate)
+    .eq('occurrence_time', time)
+    .is('superseded_by_occurrence_id', null)
+    .limit(1);
+  if (bySlot?.length) return String(bySlot[0].id);
+
+  const { error: createErr } = await supabase
+    .from('planned_occurrences')
+    .upsert({
+      id: stableUuid(`planned-occurrence:${userId}`, occurrenceKey),
+      user_id: userId,
+      active_protocol_id: cActiveId,
+      protocol_id: cloudProtocolId(userId, dose.activeProtocol.protocolId),
+      protocol_item_id: cItemId,
+      occurrence_date: dose.scheduledDate,
+      occurrence_time: dose.scheduledTime,
+      occurrence_key: occurrenceKey,
+      revision: 1,
+      status: 'planned',
+      source_generation: 'dose_command_write_through',
+    }, { onConflict: 'user_id,occurrence_key,revision', ignoreDuplicates: true });
+  if (createErr) {
+    console.warn('[resolve-occurrence]', createErr.message);
+    return null;
+  }
+  const { data: anyByKey } = await supabase
+    .from('planned_occurrences')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('occurrence_key', occurrenceKey)
+    .order('revision', { ascending: false })
+    .limit(1);
+  return anyByKey?.length ? String(anyByKey[0].id) : null;
+}
+
 export type TakeCommandResult = {
   clientOperationId: string;
   status: ScheduledDose['status'];

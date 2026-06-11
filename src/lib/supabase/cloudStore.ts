@@ -180,6 +180,45 @@ async function fetchAllOccurrencesWithEvents(
   return { data: rows, error: null };
 }
 
+// Fallback for execution_events written without planned_occurrence_id
+// (all client writes before the linking fix): they are invisible to the
+// nested embed above, so fetch them separately and match by slot.
+async function fetchUnlinkedExecutionEvents(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  userId: string,
+): Promise<{ data: OccurrenceRow[]; error: { message: string } | null }> {
+  const rows: OccurrenceRow[] = [];
+  type UnlinkedQuery = {
+    order: (column: string, options: { ascending: boolean }) => UnlinkedQuery;
+    range: (from: number, to: number) => Promise<{ data: OccurrenceRow[] | null; error: { message: string } | null }>;
+  };
+  const client = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          is: (column: string, value: null) => UnlinkedQuery;
+        };
+      };
+    };
+  };
+
+  for (let from = 0; ; from += CLOUD_PULL_PAGE_SIZE) {
+    const query = client
+      .from('execution_events')
+      .select('id, protocol_item_id, event_type, event_at, effective_date, effective_time, note')
+      .eq('user_id', userId)
+      .is('planned_occurrence_id', null)
+      .order('event_at', { ascending: true });
+    const page = await query.range(from, from + CLOUD_PULL_PAGE_SIZE - 1);
+
+    if (page.error) return { data: rows, error: page.error };
+    rows.push(...(page.data ?? []));
+    if ((page.data ?? []).length < CLOUD_PULL_PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 export async function pullStoreFromSupabase(): Promise<PullSummary> {
   const supabase = getSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -202,6 +241,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
 
   // V2 Phase 1 step 3: read from planned_occurrences + execution_events.
   const occurrencesRes = await fetchAllOccurrencesWithEvents(supabase, user.id);
+  const unlinkedEventsRes = await fetchUnlinkedExecutionEvents(supabase, user.id);
 
   if (profileRes.error) {
     throw new Error(`Profile read failed: ${profileRes.error.message}`);
@@ -213,6 +253,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   if (protocolsRes.error) throw new Error(`Protocols read failed: ${protocolsRes.error.message}`);
   if (activeRes.error) throw new Error(`Active protocols read failed: ${activeRes.error.message}`);
   if (occurrencesRes.error) throw new Error(`Occurrences read failed: ${occurrencesRes.error.message}`);
+  if (unlinkedEventsRes.error) throw new Error(`Unlinked events read failed: ${unlinkedEventsRes.error.message}`);
 
   const ownedProtocolsRaw = (protocolsRes.data ?? []) as Record<string, unknown>[];
   const activeProtocolRows = (activeRes.data ?? []) as Record<string, unknown>[];
@@ -414,6 +455,41 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
       };
     })
     .filter(Boolean) as ScheduledDose[];
+
+  // Apply unlinked events (written before the planned_occurrence_id linking
+  // fix) by slot match: protocol item + date + time. Only terminal actions —
+  // snooze states are reconstructed from occurrence lineage, not from events.
+  const unlinkedBySlot = new Map<string, Record<string, unknown>[]>();
+  for (const ev of unlinkedEventsRes.data) {
+    const evType = String(ev.event_type);
+    if (evType !== 'taken' && evType !== 'skipped') continue;
+    if (!ev.effective_date || !ev.effective_time) continue;
+    const slot = `${String(ev.protocol_item_id)}|${String(ev.effective_date)}|${String(ev.effective_time).slice(0, 5)}`;
+    const list = unlinkedBySlot.get(slot) ?? [];
+    list.push(ev);
+    unlinkedBySlot.set(slot, list);
+  }
+  if (unlinkedBySlot.size > 0) {
+    for (const dose of scheduledDoses) {
+      if (dose.status !== 'pending') continue;
+      const events = unlinkedBySlot.get(`${dose.protocolItemId}|${dose.scheduledDate}|${dose.scheduledTime}`);
+      if (!events?.length) continue;
+      const latest = events.slice().sort((a, b) =>
+        String(b.event_at ?? '').localeCompare(String(a.event_at ?? '')),
+      )[0];
+      dose.status = String(latest.event_type) as ScheduledDose['status'];
+      for (const ev of events) {
+        doseRecords.push({
+          id: String(ev.id),
+          userId: user.id,
+          scheduledDoseId: dose.id,
+          action: String(ev.event_type) as DoseRecord['action'],
+          recordedAt: ev.event_at ? String(ev.event_at) : new Date().toISOString(),
+          note: ev.note ? String(ev.note) : undefined,
+        });
+      }
+    }
+  }
 
   const profileRow = profileRes.data as Record<string, unknown> | null;
   const profile: UserProfile = {
