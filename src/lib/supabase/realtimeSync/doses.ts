@@ -155,15 +155,16 @@ export async function syncSkipDoseCommand(
 
 export async function syncRemoveDoseCommand(userId: string, dose: ScheduledDose): Promise<void> {
   const supabase = getSupabaseClient();
-  const cActiveId = cloudActiveId(userId, dose.activeProtocolId);
-  const cItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
-  const occKey = `${cActiveId}|${cItemId}|${dose.scheduledDate}|${dose.scheduledTime.slice(0, 5)}`;
+  const occurrenceId = await resolvePlannedOccurrenceId(userId, dose, { createIfMissing: false });
+  if (!occurrenceId) return; // nothing in the cloud to remove
 
+  // Cancel instead of delete: the cancelled row is a tombstone that stops
+  // rolling-horizon regeneration from recreating the slot, and keeps any
+  // linked execution_events anchored (their FK is on-delete-set-null).
   const { error } = await supabase
     .from('planned_occurrences')
-    .delete()
+    .update({ status: 'cancelled' })
     .eq('user_id', userId)
-    .eq('occurrence_key', occKey)
-    .eq('status', 'planned');
-  if (error) throw new Error(`removeDose occurrence delete failed: ${error.message}`);
+    .eq('id', occurrenceId);
+  if (error) throw new Error(`removeDose occurrence cancel failed: ${error.message}`);
 }

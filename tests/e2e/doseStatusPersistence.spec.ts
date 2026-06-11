@@ -81,6 +81,11 @@ test.describe('dose status persistence', () => {
     await page.getByRole('button', { name: 'Create & Activate' }).click();
     await page.waitForURL('/app/protocols');
 
+    // Activation sync is fire-and-forget; wait for it to land before the
+    // full-reload navigation re-pulls state from the cloud.
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(1_000);
+
     // Mark the dose as taken on today's view.
     await page.goto('/app');
     const takeButton = page.getByRole('button', { name: 'Mark as taken' }).first();
@@ -100,5 +105,63 @@ test.describe('dose status persistence', () => {
     await expect(
       page.getByRole('button', { name: 'Already marked as taken' }).first(),
     ).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('removed dose stays removed after reload', async ({ page }) => {
+    await ensureAuthenticated(page);
+    const name = `RemoveTest ${Date.now()}`;
+    await page.goto('/app/protocols/new');
+    await page.getByLabel('Protocol name').fill(name);
+    await page.getByRole('button', { name: /Fixed/i }).click();
+    await page.getByLabel('Number of days').fill('3');
+    await page.getByRole('button', { name: 'Next →' }).click();
+    await page.getByLabel('Name').fill('Remove Med');
+    await page.getByRole('button', { name: '+ Add item' }).click();
+    await page.getByRole('button', { name: 'Review →' }).click();
+    await page.getByRole('button', { name: 'Create & Activate' }).click();
+    await page.waitForURL('/app/protocols');
+
+    // Activation sync is fire-and-forget; wait for it to land before the
+    // full-reload navigation re-pulls state from the cloud.
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(1_000);
+
+    await page.goto('/app');
+    await expect(page.getByRole('button', { name: 'Mark as taken' }).first()).toBeVisible({ timeout: 20_000 });
+    // Capture the count BEFORE removal so the post-reload assertion proves
+    // the removed dose did not resurrect from the cloud.
+    const before = await page.evaluate(() =>
+      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
+        .__medremindStore.getState().scheduledDoses.length,
+    );
+    // Pick the earliest pending dose instead of filtering by date — the app
+    // schedules in the profile timezone, which need not match UTC.
+    const removed = await page.evaluate(() => {
+      const store = (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string; scheduledDate: string; status: string }[]; removeDose(id: string): void } } }).__medremindStore;
+      const state = store.getState();
+      const dose = [...state.scheduledDoses]
+        .filter(d => d.status === 'pending')
+        .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))[0];
+      if (!dose) return false;
+      state.removeDose(dose.id);
+      return true;
+    });
+    expect(removed).toBe(true);
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(2_000);
+    await page.reload();
+    await page.waitForURL(/\/app/, { timeout: 30_000 });
+    // Wait for the boot pull to hydrate the store. Today's only dose was
+    // removed, so the visible button is gone — the remaining future doses
+    // (days 2-3 of the protocol) are the hydration signal instead.
+    await page.waitForFunction(() => {
+      const store = (window as unknown as { __medremindStore?: { getState(): { scheduledDoses: unknown[] } } }).__medremindStore;
+      return (store?.getState().scheduledDoses.length ?? 0) > 0;
+    }, { timeout: 30_000 });
+    const after = await page.evaluate(() =>
+      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
+        .__medremindStore.getState().scheduledDoses.length,
+    );
+    expect(after).toBeLessThan(before);
   });
 });

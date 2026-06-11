@@ -301,7 +301,10 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
       return {
         id: newEventId,
         user_id: userId,
-        planned_occurrence_id: null,
+        planned_occurrence_id: stableUuid(
+          `planned-occurrence:${userId}`,
+          `${doseInfo.cloudActiveId}|${doseInfo.cloudItemId}|${doseInfo.scheduledDate}|${doseInfo.scheduledTime.slice(0, 5)}`,
+        ),
         active_protocol_id: doseInfo.cloudActiveId,
         protocol_item_id: doseInfo.cloudItemId,
         event_type: r.action,
