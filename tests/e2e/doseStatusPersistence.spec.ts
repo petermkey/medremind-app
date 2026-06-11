@@ -136,6 +136,6 @@ test.describe('dose status persistence', () => {
       (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
         .__medremindStore.getState().scheduledDoses.length,
     );
-    expect(after).toBeLessThanOrEqual(before);
+    expect(after).toBeLessThan(before);
   });
 });
