@@ -12,6 +12,7 @@ import {
   validateNutritionTargetProfileTargets,
 } from '@/lib/food/targetAlgorithm';
 import { consumedAtForSelectedDateInTimezone } from '@/lib/nutrition/waterEntryTime';
+import { compressImageForAnalysis } from '@/lib/food/imageCompression';
 import type { FoodAnalysisDraft, FoodEntry, FoodNutrients } from '@/types/food';
 import type {
   GeneratedNutritionTargets,
@@ -373,8 +374,9 @@ export default function FoodPage() {
     setDraft(null);
 
     try {
+      const prepared = await compressImageForAnalysis(file);
       const body = new FormData();
-      body.append('image', file);
+      body.append('image', prepared);
 
       const response = await fetch('/api/food/analyze-photo', {
         method: 'POST',
