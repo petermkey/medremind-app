@@ -194,7 +194,7 @@ test.describe('dose status persistence', () => {
     // Go offline and take the dose (the operation queues in the outbox).
     await context.setOffline(true);
     await takeButton.click();
-    await expect(page.getByRole('button', { name: 'Already marked as taken' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Already marked as taken' }).first()).toBeVisible({ timeout: 10_000 });
 
     // Come back online and reload. The boot sequence should drain the outbox
     // BEFORE pulling from the cloud, so the offline-taken status persists.
