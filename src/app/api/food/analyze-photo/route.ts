@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 
 import { analyzeFoodImage } from '@/lib/food/analyze/providers';
 import { createClient } from '@/lib/supabase/server';
@@ -55,7 +56,10 @@ export async function POST(request: Request) {
     const draft = await analyzeFoodImage({ imageDataUrl, imageType: image.type });
 
     return NextResponse.json({ draft });
-  } catch {
-    return NextResponse.json({ error: 'Food analysis failed.' }, { status: 502 });
+  } catch (error) {
+    console.error('[food-analyze]', error);
+    Sentry.captureException(error);
+    const reason = error instanceof Error && /^food_/.test(error.message) ? error.message : 'unknown';
+    return NextResponse.json({ error: 'Food analysis failed.', reason }, { status: 502 });
   }
 }

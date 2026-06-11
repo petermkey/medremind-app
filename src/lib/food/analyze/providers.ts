@@ -205,7 +205,7 @@ async function analyzeWithOpenAI(input: FoodAnalysisInput): Promise<FoodAnalysis
   );
 
   if (!response.ok) {
-    throw new Error('Food analysis failed.');
+    throw new Error(`food_provider_openai_${response.status}`);
   }
 
   const payload = await response.json();
@@ -234,7 +234,7 @@ async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnal
         continue;
       }
 
-      throw new Error('Food analysis failed.');
+      throw new Error(`food_provider_openrouter_${response.status}`);
     }
 
     const payload = await response.json();
@@ -246,7 +246,7 @@ async function analyzeWithOpenRouter(input: FoodAnalysisInput): Promise<FoodAnal
     return validateProviderDraft(parseStructuredOutput(outputText), model);
   }
 
-  throw new Error('Food analysis failed.');
+  throw new Error('food_provider_openrouter_exhausted');
 }
 
 function fetchOpenRouterFoodAnalysis(
@@ -327,7 +327,7 @@ async function analyzeWithGemini(input: FoodAnalysisInput): Promise<FoodAnalysis
   );
 
   if (!response.ok) {
-    throw new Error('Food analysis failed.');
+    throw new Error(`food_provider_gemini_${response.status}`);
   }
 
   const payload = await response.json();
@@ -354,7 +354,7 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
     });
   } catch (error) {
     if (isAbortError(error)) {
-      throw new Error('Food analysis failed.');
+      throw new Error('food_provider_timeout');
     }
 
     throw error;
