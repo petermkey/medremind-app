@@ -686,7 +686,12 @@ export default function FoodPage() {
               type="button"
               onClick={() => galleryInputRef.current?.click()}
               disabled={analyzing}
-              className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]"
+              className={[
+                'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
+                analyzing
+                  ? 'cursor-not-allowed bg-[#30363D] text-[#8B949E]'
+                  : 'bg-[#30363D] text-[#F0F6FC] hover:bg-[#363B42]',
+              ].join(' ')}
             >
               Gallery
             </button>
