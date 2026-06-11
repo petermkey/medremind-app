@@ -164,4 +164,45 @@ test.describe('dose status persistence', () => {
     );
     expect(after).toBeLessThan(before);
   });
+
+  test('offline take survives reload once back online', async ({ page, context }) => {
+    await ensureAuthenticated(page);
+
+    // Create & activate a protocol with one daily med so today has a dose.
+    const name = `OfflineTest ${Date.now()}`;
+    await page.goto('/app/protocols/new');
+    await page.getByLabel('Protocol name').fill(name);
+    await page.getByRole('button', { name: /Fixed/i }).click();
+    await page.getByLabel('Number of days').fill('3');
+    await page.getByRole('button', { name: 'Next →' }).click();
+    await page.getByLabel('Name').fill('Offline Med');
+    await page.getByRole('button', { name: '+ Add item' }).click();
+    await page.getByRole('button', { name: 'Review →' }).click();
+    await page.getByRole('button', { name: 'Create & Activate' }).click();
+    await page.waitForURL('/app/protocols');
+
+    // Activation sync is fire-and-forget; wait for it to land before the
+    // navigation that re-pulls state from the cloud.
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(1_000);
+
+    // Go to today's doses.
+    await page.goto('/app');
+    const takeButton = page.getByRole('button', { name: 'Mark as taken' }).first();
+    await expect(takeButton).toBeVisible({ timeout: 20_000 });
+
+    // Go offline and take the dose (the operation queues in the outbox).
+    await context.setOffline(true);
+    await takeButton.click();
+    await expect(page.getByRole('button', { name: 'Already marked as taken' }).first()).toBeVisible();
+
+    // Come back online and reload. The boot sequence should drain the outbox
+    // BEFORE pulling from the cloud, so the offline-taken status persists.
+    await context.setOffline(false);
+    await page.reload();
+    await page.waitForURL(/\/app/, { timeout: 30_000 });
+    await expect(
+      page.getByRole('button', { name: 'Already marked as taken' }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+  });
 });
