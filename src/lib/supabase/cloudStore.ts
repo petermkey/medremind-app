@@ -404,6 +404,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   // V2 Phase 1 step 3: map planned_occurrences → ScheduledDose[].
   // snoozedUntil is omitted — V2 models snooze via occurrence revision, not a timestamp field.
   const doseRecords: DoseRecord[] = [];
+  const droppedOccurrences: Record<string, unknown>[] = [];
   const scheduledDoses: ScheduledDose[] = occurrencesRes.data
     .map(row => {
       const sourceActiveId = String(row.active_protocol_id);
@@ -411,12 +412,8 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
       const activeProtocol = activeAliasMap.get(sourceActiveId);
       const protocolItem = itemMap.get(itemId);
       if (!activeProtocol || !protocolItem) {
-        // Warn so boot-time drops are visible in the browser console for debugging.
         // Common causes: duplicate active-protocol instance conflict, orphaned protocol item.
-        console.warn(
-          '[cloud-pull-occurrence-dropped]',
-          { id: String(row.id), date: String(row.occurrence_date), status: String(row.status), activeProtocolId: sourceActiveId, protocolItemId: itemId, missingActiveProtocol: !activeProtocol, missingProtocolItem: !protocolItem },
-        );
+        droppedOccurrences.push({ id: String(row.id), date: String(row.occurrence_date), status: String(row.status), activeProtocolId: sourceActiveId, protocolItemId: itemId, missingActiveProtocol: !activeProtocol, missingProtocolItem: !protocolItem });
         return null;
       }
 
@@ -456,6 +453,14 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     })
     .filter(Boolean) as ScheduledDose[];
 
+  if (droppedOccurrences.length > 0) {
+    // One consolidated warning per boot instead of one line per occurrence.
+    console.warn(
+      '[cloud-pull-occurrences-dropped]',
+      { count: droppedOccurrences.length, sample: droppedOccurrences.slice(0, 3) },
+    );
+  }
+
   // Apply unlinked events (written before the planned_occurrence_id linking
   // fix) by slot match: protocol item + date + time. Only terminal actions —
   // snooze states are reconstructed from occurrence lineage, not from events.
@@ -489,6 +494,35 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         });
       }
     }
+  }
+
+  // Defensive slot dedupe: parallel rows for the same slot can still reach
+  // here (legacy-keyed + write-through rows, or duplicate protocol instances
+  // aliased onto one canonical instance). Keep the row that carries history
+  // (non-pending status), drop the rest and re-point their dose records.
+  const slotWinners = new Map<string, ScheduledDose>();
+  const slotOf = (d: ScheduledDose) =>
+    `${d.activeProtocolId}|${d.protocolItemId}|${d.scheduledDate}|${d.scheduledTime}`;
+  for (const dose of scheduledDoses) {
+    const slot = slotOf(dose);
+    const current = slotWinners.get(slot);
+    if (!current || (dose.status !== 'pending' && current.status === 'pending')) {
+      slotWinners.set(slot, dose);
+    }
+  }
+  let dedupedDoses = scheduledDoses;
+  if (slotWinners.size < scheduledDoses.length) {
+    const loserToWinner = new Map<string, string>();
+    for (const dose of scheduledDoses) {
+      const winner = slotWinners.get(slotOf(dose));
+      if (winner && winner.id !== dose.id) loserToWinner.set(dose.id, winner.id);
+    }
+    dedupedDoses = scheduledDoses.filter(d => !loserToWinner.has(d.id));
+    for (const record of doseRecords) {
+      const winnerId = loserToWinner.get(record.scheduledDoseId);
+      if (winnerId) record.scheduledDoseId = winnerId;
+    }
+    console.warn('[cloud-pull-slot-dedupe]', { dropped: loserToWinner.size });
   }
 
   const profileRow = profileRes.data as Record<string, unknown> | null;
@@ -529,7 +563,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     notificationSettings,
     protocols: allProtocols,
     activeProtocols,
-    scheduledDoses,
+    scheduledDoses: dedupedDoses,
     doseRecords,
     drugs: [...SEED_DRUGS, ...customDrugs],
   });
@@ -541,7 +575,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   const storeActions = useStore.getState();
   for (const ap of activeProtocols) {
     if (ap.status !== 'active') continue;
-    const hasFutureDoses = scheduledDoses.some(
+    const hasFutureDoses = dedupedDoses.some(
       d => d.activeProtocolId === ap.id && d.scheduledDate >= horizonDate && d.status === 'pending',
     );
     if (!hasFutureDoses) {
@@ -554,7 +588,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
     protocols: cloudProtocols.length,
     protocolItems: (protocolItemsRes.data ?? []).length,
     activeProtocols: activeProtocols.length,
-    scheduledDoses: scheduledDoses.length,   // occurrences count
+    scheduledDoses: dedupedDoses.length,     // occurrences count
     doseRecords: doseRecords.length,          // execution events count
   };
 }
