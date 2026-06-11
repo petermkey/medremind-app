@@ -101,4 +101,41 @@ test.describe('dose status persistence', () => {
       page.getByRole('button', { name: 'Already marked as taken' }).first(),
     ).toBeVisible({ timeout: 30_000 });
   });
+
+  test('removed dose stays removed after reload', async ({ page }) => {
+    await ensureAuthenticated(page);
+    const name = `RemoveTest ${Date.now()}`;
+    await page.goto('/app/protocols/new');
+    await page.getByLabel('Protocol name').fill(name);
+    await page.getByRole('button', { name: /Fixed/i }).click();
+    await page.getByLabel('Number of days').fill('3');
+    await page.getByRole('button', { name: 'Next →' }).click();
+    await page.getByLabel('Name').fill('Remove Med');
+    await page.getByRole('button', { name: '+ Add item' }).click();
+    await page.getByRole('button', { name: 'Review →' }).click();
+    await page.getByRole('button', { name: 'Create & Activate' }).click();
+    await page.waitForURL('/app/protocols');
+
+    await page.goto('/app');
+    await expect(page.getByRole('button', { name: 'Mark as taken' }).first()).toBeVisible({ timeout: 20_000 });
+    const before = await page.evaluate(() => {
+      const store = (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string; scheduledDate: string }[]; removeDose(id: string): void } } }).__medremindStore;
+      const state = store.getState();
+      const today = new Date().toISOString().slice(0, 10);
+      const dose = state.scheduledDoses.find(d => d.scheduledDate === today);
+      if (dose) state.removeDose(dose.id);
+      return store.getState().scheduledDoses.length;
+    });
+    await waitForSyncFlushed(page);
+    await page.waitForTimeout(2_000);
+    await page.reload();
+    await page.waitForURL(/\/app/, { timeout: 30_000 });
+    // wait for the boot pull to finish hydrating
+    await expect(page.getByRole('button', { name: /Mark as taken|Already marked as taken/ }).first()).toBeVisible({ timeout: 30_000 });
+    const after = await page.evaluate(() =>
+      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
+        .__medremindStore.getState().scheduledDoses.length,
+    );
+    expect(after).toBeLessThanOrEqual(before);
+  });
 });

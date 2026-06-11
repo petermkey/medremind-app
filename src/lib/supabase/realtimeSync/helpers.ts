@@ -91,6 +91,7 @@ export function isUniqueViolation(
 export async function resolvePlannedOccurrenceId(
   userId: string,
   dose: ScheduledDose,
+  options?: { createIfMissing?: boolean },
 ): Promise<string | null> {
   const supabase = getSupabaseClient();
   const time = dose.scheduledTime.slice(0, 5);
@@ -127,6 +128,8 @@ export async function resolvePlannedOccurrenceId(
     .is('superseded_by_occurrence_id', null)
     .limit(1);
   if (bySlot?.length) return String(bySlot[0].id);
+
+  if (options?.createIfMissing === false) return null;
 
   const { error: createErr } = await supabase
     .from('planned_occurrences')

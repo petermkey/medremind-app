@@ -155,15 +155,34 @@ export async function syncSkipDoseCommand(
 
 export async function syncRemoveDoseCommand(userId: string, dose: ScheduledDose): Promise<void> {
   const supabase = getSupabaseClient();
-  const cActiveId = cloudActiveId(userId, dose.activeProtocolId);
-  const cItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
-  const occKey = `${cActiveId}|${cItemId}|${dose.scheduledDate}|${dose.scheduledTime.slice(0, 5)}`;
+  const occurrenceId = await resolvePlannedOccurrenceId(userId, dose, { createIfMissing: false });
+  if (!occurrenceId) return; // nothing in the cloud to remove
+
+  const { data: events, error: eventsErr } = await supabase
+    .from('execution_events')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('planned_occurrence_id', occurrenceId)
+    .limit(1);
+  if (eventsErr) throw new Error(`removeDose events check failed: ${eventsErr.message}`);
+
+  if (events?.length) {
+    // History exists — cancel the slot instead of deleting (a delete would
+    // orphan the events via the on-delete-set-null FK).
+    const { error } = await supabase
+      .from('planned_occurrences')
+      .update({ status: 'cancelled' })
+      .eq('user_id', userId)
+      .eq('id', occurrenceId);
+    if (error) throw new Error(`removeDose occurrence cancel failed: ${error.message}`);
+    return;
+  }
 
   const { error } = await supabase
     .from('planned_occurrences')
     .delete()
     .eq('user_id', userId)
-    .eq('occurrence_key', occKey)
+    .eq('id', occurrenceId)
     .eq('status', 'planned');
   if (error) throw new Error(`removeDose occurrence delete failed: ${error.message}`);
 }
