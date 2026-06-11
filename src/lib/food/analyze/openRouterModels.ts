@@ -1,4 +1,4 @@
-export const DEFAULT_OPENROUTER_FOOD_VISION_MODEL = 'google/gemma-4-31b-it:free';
+export const DEFAULT_OPENROUTER_FOOD_VISION_MODEL = 'google/gemini-2.5-flash';
 
 const FALLBACKABLE_OPENROUTER_STATUSES = new Set([404, 408, 409, 429, 500, 502, 503, 504]);
 

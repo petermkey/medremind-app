@@ -317,6 +317,7 @@ export default function FoodPage() {
     waterTotalForDate,
   } = useNutritionTargetsStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<FoodAnalysisDraft | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -394,6 +395,7 @@ export default function FoodPage() {
     } finally {
       setAnalyzing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   }
 
@@ -672,6 +674,22 @@ export default function FoodPage() {
               onChange={handleFileChange}
               disabled={analyzing}
             />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              onChange={handleFileChange}
+              disabled={analyzing}
+            />
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={analyzing}
+              className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]"
+            >
+              Gallery
+            </button>
             <button
               type="button"
               onClick={startEditingTargets}
