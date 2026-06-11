@@ -10,6 +10,7 @@ import {
   cloudProtocolItemId,
   cloudRecordId,
   isUniqueViolation,
+  resolvePlannedOccurrenceId,
   stableUuid,
   updateDoseSyncOperationLedger,
   upsertDoseSyncOperationLedger,
@@ -50,10 +51,11 @@ export async function syncSnoozeDoseCommand(
     const targetDate = replacementDose?.scheduledDate ?? dose.scheduledDate;
     const targetTime = replacementDose?.scheduledTime ?? dose.scheduledTime;
 
+    const originOccurrenceId = await resolvePlannedOccurrenceId(userId, dose);
     const executionEventRow = {
       id: stableUuid(`execution-event:${userId}`, clientOperationId),
       user_id: userId,
-      planned_occurrence_id: null,
+      planned_occurrence_id: originOccurrenceId,
       active_protocol_id: cReplacementActiveId,
       protocol_item_id: cReplacementItemId,
       event_type: 'snoozed',
@@ -82,22 +84,10 @@ export async function syncSnoozeDoseCommand(
     }
 
     // Update planned_occurrences lineage for snooze.
-    // Look up origin by occurrence_key (works for both pre- and post-Phase-2 occurrences).
-    // Non-fatal — execution_event already written above.
+    // Origin resolved above (same row the event is linked to).
+    // Non-fatal — execution_event already written.
     try {
-      const cOriginActiveId = cloudActiveId(userId, dose.activeProtocolId);
-      const cOriginItemId = cloudProtocolItemId(userId, dose.activeProtocol.protocolId, dose.protocolItemId);
-      const originOccurrenceKey = `${cOriginActiveId}|${cOriginItemId}|${dose.scheduledDate}|${dose.scheduledTime.slice(0, 5)}`;
-
-      const { data: originOccurrence } = await supabase
-        .from('planned_occurrences')
-        .select('id, occurrence_key, revision')
-        .eq('user_id', userId)
-        .eq('occurrence_key', originOccurrenceKey)
-        .is('superseded_by_occurrence_id', null)
-        .maybeSingle();
-
-      if (originOccurrence) {
+      if (originOccurrenceId) {
         const successorOccurrenceKey = `${cReplacementActiveId}|${cReplacementItemId}|${targetDate}|${targetTime.slice(0, 5)}`;
         const successorOccurrenceId = stableUuid(`planned-occurrence:${userId}`, successorOccurrenceKey);
 
@@ -112,7 +102,7 @@ export async function syncSnoozeDoseCommand(
           occurrence_key: successorOccurrenceKey,
           revision: 1,
           status: 'planned',
-          supersedes_occurrence_id: originOccurrence.id,
+          supersedes_occurrence_id: originOccurrenceId,
           source_generation: 'snooze_command',
         }, { onConflict: 'user_id,occurrence_key,revision' });
 
@@ -120,7 +110,7 @@ export async function syncSnoozeDoseCommand(
           status: 'superseded',
           superseded_by_occurrence_id: successorOccurrenceId,
           superseded_at: record.recordedAt,
-        }).eq('id', originOccurrence.id).eq('user_id', userId);
+        }).eq('id', originOccurrenceId).eq('user_id', userId);
       }
     } catch (occurrenceErr) {
       console.warn('[snooze-occurrence-lineage]', occurrenceErr instanceof Error ? occurrenceErr.message : occurrenceErr);
