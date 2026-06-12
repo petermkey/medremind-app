@@ -321,9 +321,11 @@ export default function FoodPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<FoodAnalysisDraft | null>(null);
+  const [draftSource, setDraftSource] = useState<'photo_ai' | 'text_ai'>('photo_ai');
   const [portionFactor, setPortionFactor] = useState(1);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [mealText, setMealText] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [setupStep, setSetupStep] = useState<SetupStep>('input');
   const [editingTargets, setEditingTargets] = useState(false);
@@ -395,6 +397,7 @@ export default function FoodPage() {
 
       setPortionFactor(1);
       setDraft(payload.draft as FoodAnalysisDraft);
+      setDraftSource('photo_ai');
     } catch {
       setAnalysisError('Unable to analyze this meal photo. Please try again.');
     } finally {
@@ -408,6 +411,32 @@ export default function FoodPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     void analyzeImage(file);
+  }
+
+  async function analyzeText() {
+    const text = mealText.trim();
+    if (text.length < 3) return;
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setPortionFactor(1);
+    setDraft(null);
+    try {
+      const response = await fetch('/api/food/analyze-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.draft) throw new Error('analysis_failed');
+      setPortionFactor(1);
+      setDraft(payload.draft as FoodAnalysisDraft);
+      setDraftSource('text_ai');
+      setMealText('');
+    } catch {
+      setAnalysisError('Unable to analyze this description. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   function handleSaveDraft() {
@@ -426,9 +455,11 @@ export default function FoodPage() {
       timezone,
       draft: scaledDraft,
       consumedAt: consumedAtForSelectedDateInTimezone(activeDate, timezone),
+      source: draftSource,
     });
     setDraft(null);
     setPortionFactor(1);
+    setDraftSource('photo_ai');
     setAnalysisError(null);
     setExpandedEntryIds(new Set());
   }
@@ -719,6 +750,27 @@ export default function FoodPage() {
               {targetProfile ? 'Targets' : 'Set targets'}
             </button>
           </div>
+
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={mealText}
+              onChange={e => setMealText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void analyzeText(); }}
+              placeholder="Describe your meal…"
+              aria-label="Describe your meal"
+              disabled={analyzing}
+              className="flex-1 rounded-xl bg-[#161B22] px-3 py-2 text-sm text-[#F0F6FC] placeholder-[#8B949E]"
+            />
+            <button
+              type="button"
+              onClick={() => void analyzeText()}
+              disabled={analyzing || mealText.trim().length < 3}
+              className="rounded-xl bg-[#238636] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+            >
+              Analyze
+            </button>
+          </div>
         </div>
 
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
@@ -851,7 +903,10 @@ export default function FoodPage() {
               <button onClick={handleRetake} className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]">
                 Retake
               </button>
-              <button onClick={() => setDraft(null)} className="rounded-xl bg-transparent px-3 py-2 text-xs font-bold text-[#8B949E]">
+              <button onClick={() => {
+                setDraft(null);
+                setDraftSource('photo_ai');
+              }} className="rounded-xl bg-transparent px-3 py-2 text-xs font-bold text-[#8B949E]">
                 Cancel
               </button>
             </div>

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { v4 as uuid } from 'uuid';
-import type { FoodAnalysisDraft, FoodDailyTotals, FoodEntry } from '@/types/food';
+import type { FoodAnalysisDraft, FoodDailyTotals, FoodEntry, FoodEntrySource } from '@/types/food';
 import { filterFoodEntriesForLocalDate, sumFoodNutrients } from '@/lib/food/nutrition';
 import {
   addPendingDeletedFoodEntryId,
@@ -50,6 +50,7 @@ export interface FoodStoreState {
     timezone: string;
     draft: FoodAnalysisDraft;
     consumedAt?: string;
+    source?: FoodEntrySource;
   }): FoodEntry;
   deleteFoodEntry(entryId: string, userId?: string): void;
   duplicateEntry(entryId: string, consumedAt: string): FoodEntry | null;
@@ -202,7 +203,7 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
     }
   },
 
-  saveDraftAsEntry({ userId, timezone, draft, consumedAt }) {
+  saveDraftAsEntry({ userId, timezone, draft, consumedAt, source = 'photo_ai' }) {
     const now = new Date().toISOString();
     const entryId = uuid();
     const entry: FoodEntry = {
@@ -213,7 +214,7 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
       mealLabel: draft.mealLabel,
       title: draft.title,
       summary: draft.summary,
-      source: 'photo_ai',
+      source,
       estimationConfidence: clampConfidence(draft.estimationConfidence),
       analysisModel: draft.model,
       analysisSchemaVersion: draft.schemaVersion,
@@ -234,6 +235,7 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
       })),
       createdAt: now,
       updatedAt: now,
+      photoPath: draft.photoPath,
     };
 
     set(state => ({
