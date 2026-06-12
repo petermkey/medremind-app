@@ -6,7 +6,7 @@ import { useFoodStore } from '@/lib/store/foodStore';
 import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { getCurrentUser } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
-import { startSyncOutbox } from '@/lib/supabase/syncOutbox';
+import { startSyncOutbox, flushSyncOutbox, getSyncStatusSnapshot } from '@/lib/supabase/syncOutbox';
 import { registerServiceWorker } from '@/lib/push/swRegister';
 import { BottomNav } from '@/components/app/BottomNav';
 import { SyncStatusPill } from '@/components/app/SyncStatusPill';
@@ -84,6 +84,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
 
       try {
+        // Drain queued offline writes first — the pull below replaces local
+        // state from the cloud and would otherwise hide them until next boot.
+        if (getSyncStatusSnapshot().pending > 0) {
+          await flushSyncOutbox(8_000);
+        }
         await pullWithRetry();
       } catch (error) {
         console.error('[cloud-pull-on-boot-failed]', error);

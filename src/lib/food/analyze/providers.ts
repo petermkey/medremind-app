@@ -12,6 +12,9 @@ export type FoodAnalysisProvider = 'mock' | 'openai' | 'openrouter' | 'gemini';
 const FOOD_ANALYSIS_PROMPT =
   'Estimate the visible food and drink in this image. Return only JSON matching the schema. Include approximate portions, nutrients, confidence, and uncertainties. Do not provide medical advice.';
 
+const FOOD_TEXT_PROMPT =
+  'Estimate the nutrients of the meal described by the user. Return only JSON matching the schema. Include approximate portions, nutrients, confidence, and uncertainties. Do not provide medical advice.';
+
 const PROVIDER_TIMEOUT_MS = 30_000;
 
 const FOOD_ANALYSIS_SCHEMA = {
@@ -133,6 +136,52 @@ export async function analyzeFoodImage(input: FoodAnalysisInput): Promise<FoodAn
     default:
       return mockFoodAnalysis();
   }
+}
+
+export async function analyzeFoodText(description: string): Promise<FoodAnalysisDraft> {
+  const provider = getFoodAnalysisProvider();
+  if (provider === 'mock') return mockFoodAnalysis();
+  if (provider !== 'openrouter') {
+    // Production uses OpenRouter; other providers can be added when needed.
+    throw new Error('food_text_provider_unsupported');
+  }
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY is required for FOOD_AI_PROVIDER=openrouter.');
+  const models = getOpenRouterFoodVisionModels();
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'X-Title': 'MedRemind',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: FOOD_TEXT_PROMPT },
+          { role: 'user', content: description },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'food_analysis', strict: true, schema: FOOD_ANALYSIS_SCHEMA },
+        },
+      }),
+    });
+    if (!response.ok) {
+      if (shouldFallbackOpenRouterFoodModel(response.status, model, models[index + 1])) continue;
+      throw new Error(`food_provider_openrouter_${response.status}`);
+    }
+    const payload = await response.json();
+    const outputText = payload?.choices?.[0]?.message?.content;
+    if (typeof outputText !== 'string' || outputText.trim().length === 0) {
+      throw new Error('Food analysis returned no structured output.');
+    }
+    return validateProviderDraft(parseStructuredOutput(outputText), model);
+  }
+  throw new Error('food_provider_openrouter_exhausted');
 }
 
 function mockFoodAnalysis(): FoodAnalysisDraft {
