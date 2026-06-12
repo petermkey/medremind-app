@@ -363,6 +363,16 @@ async function mockFoodAnalysis(page: Page, draft = foodDraft) {
   });
 }
 
+async function mockFoodTextAnalysis(page: Page, draft = foodDraft) {
+  await page.route('**/api/food/analyze-text', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ draft }),
+    });
+  });
+}
+
 async function uploadMealPhoto(page: Page, file = pngFile) {
   // Two hidden inputs since the gallery picker landed — use the camera one.
   await page.locator('input[type="file"]').first().setInputFiles(file);
@@ -684,6 +694,36 @@ test.describe('food diary (requires authenticated Supabase E2E env)', () => {
 
     // Verify two cards now exist with the same title.
     await expect(page.getByRole('heading', { name: originalDraft.title, exact: true })).toHaveCount(2, { timeout: 10_000 });
+  });
+
+  test('analyzes a typed meal description and saves it', async ({ page }) => {
+    await mockFoodTextAnalysis(page);
+    await loginAndOpenFood(page);
+
+    const textInput = page.getByLabel('Describe your meal');
+    await expect(textInput).toBeVisible();
+    await textInput.fill('oatmeal with banana and coffee');
+
+    const responsePromise = page.waitForResponse(response => (
+      response.request().method() === 'POST' &&
+      response.url().includes('/api/food/analyze-text')
+    ));
+
+    await page.getByRole('button', { name: 'Analyze' }).click();
+    const response = await responsePromise;
+    expect(response.ok(), `analyze-text failed with ${response.status()}`).toBeTruthy();
+
+    const draftCard = foodCardByTitle(page, foodDraft.title);
+    await expect(draftCard.getByText('Draft', { exact: true })).toBeVisible();
+    await expect(draftCard.getByRole('heading', { name: foodDraft.title, exact: true })).toBeVisible();
+    await expect(draftCard.getByText(foodDraft.summary)).toBeVisible();
+
+    const waitForFoodEntrySave = await waitForNextFoodEntrySave(page);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await waitForFoodEntrySave();
+
+    const savedEntryCard = foodCardByTitle(page, foodDraft.title);
+    await expect(savedEntryCard.getByRole('heading', { name: foodDraft.title, exact: true })).toBeVisible();
   });
 
 });
