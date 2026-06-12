@@ -5,6 +5,7 @@ import type {
   ScheduledDose, DoseRecord, PlannedOccurrence, OccurrenceStatus, ExecutionEvent,
 } from '@/types';
 import { hash32, stableUuid, isUuid } from '@/lib/ids';
+import { getDayScheduleForDate } from './daySchedule';
 
 export { hash32, stableUuid, isUuid };
 
@@ -56,26 +57,13 @@ export function isOverdue(dose: ScheduledDose, profile?: UserProfile | null): bo
 }
 
 // ─── F5: getDayScheduleFromState ──────────────────────────────────────
-// Pure helper — returns sorted doses for a date from raw state slices.
-// Past dates: all doses (any protocol status) to preserve history.
-// Today/future: only doses belonging to active protocol instances.
+// Thin clock-binding wrapper; filtering semantics live in daySchedule.ts.
 export function getDayScheduleFromState(
   scheduledDoses: ScheduledDose[],
   activeProtocols: ActiveProtocol[],
   date: string,
 ): ScheduledDose[] {
-  const todayDate = today();
-  const sorted = (arr: ScheduledDose[]) =>
-    [...arr].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-  if (date < todayDate) {
-    return sorted(scheduledDoses.filter(d => d.scheduledDate === date));
-  }
-  const activeIds = new Set(
-    activeProtocols.filter(ap => ap.status === 'active').map(ap => ap.id),
-  );
-  return sorted(
-    scheduledDoses.filter(d => d.scheduledDate === date && activeIds.has(d.activeProtocolId)),
-  );
+  return getDayScheduleForDate(scheduledDoses, activeProtocols, date, today());
 }
 
 // ─── F4: ExecutionEvent builder ────────────────────────────────────────
