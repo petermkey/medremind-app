@@ -105,6 +105,7 @@ export function sanitizeFoodEntryForSync(entry: FoodEntry): FoodEntry {
     })),
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
+    photoPath: entry.photoPath,
   };
 }
 
@@ -135,6 +136,7 @@ function entryRow(entry: FoodEntry) {
     cholesterol_mg: nutrients.cholesterolMg ?? null,
     extended_nutrients: nutrients.extended ?? {},
     uncertainties: entry.uncertainties,
+    photo_path: entry.photoPath ?? null,
     created_at: entry.createdAt,
     updated_at: entry.updatedAt,
   };
@@ -190,6 +192,7 @@ function entryFromRow(row: FoodRow, components: FoodEntryComponent[]): FoodEntry
     components,
     createdAt: row.created_at ? String(row.created_at) : new Date().toISOString(),
     updatedAt: row.updated_at ? String(row.updated_at) : new Date().toISOString(),
+    photoPath: row.photo_path ? String(row.photo_path) : undefined,
   };
 }
 

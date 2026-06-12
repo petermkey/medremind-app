@@ -55,7 +55,15 @@ export async function POST(request: Request) {
     const imageDataUrl = `data:${image.type};base64,${imageBuffer.toString('base64')}`;
     const draft = await analyzeFoodImage({ imageDataUrl, imageType: image.type });
 
-    return NextResponse.json({ draft });
+    let photoPath: string | null = null;
+    const uploadPath = `${data.user.id}/${crypto.randomUUID()}.jpg`;
+    const { error: uploadErr } = await supabase.storage
+      .from('food-photos')
+      .upload(uploadPath, imageBuffer, { contentType: image.type });
+    if (!uploadErr) photoPath = uploadPath;
+    else console.warn('[food-photo-upload]', uploadErr.message);
+
+    return NextResponse.json({ draft: { ...draft, photoPath } });
   } catch (error) {
     console.error('[food-analyze]', error);
     Sentry.captureException(error);
