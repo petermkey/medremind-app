@@ -1,6 +1,6 @@
 export type FoodMealLabel = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'unknown';
 
-export type FoodEntrySource = 'photo_ai';
+export type FoodEntrySource = 'photo_ai' | 'text_ai' | 'duplicate';
 
 export interface FoodNutrients {
   caloriesKcal?: number;

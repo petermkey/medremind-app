@@ -52,6 +52,7 @@ export interface FoodStoreState {
     consumedAt?: string;
   }): FoodEntry;
   deleteFoodEntry(entryId: string, userId?: string): void;
+  duplicateEntry(entryId: string, consumedAt: string): FoodEntry | null;
   entriesForDate(date: string, timezone?: string): FoodEntry[];
   totalsForDate(date: string, timezone?: string): FoodDailyTotals;
   resetFoodEntries(): void;
@@ -247,6 +248,30 @@ export const useFoodStore = create<FoodStoreState>((set, get) => ({
       if (readPendingDeletedFoodEntryIds().includes(entry.id)) return true;
       const state = get();
       return state.currentUserId === userId && !state.entries.some(existing => existing.userId === userId && existing.id === entry.id);
+    });
+    return entry;
+  },
+
+  duplicateEntry(entryId, consumedAt) {
+    const state = get();
+    const original = state.entries.find(entry => entry.id === entryId);
+    if (!original || !state.currentUserId) return null;
+    const now = new Date().toISOString();
+    const newId = uuid();
+    const entry: FoodEntry = {
+      ...original,
+      id: newId,
+      consumedAt,
+      source: 'duplicate',
+      components: original.components.map(c => ({ ...c, id: uuid(), entryId: newId })),
+      createdAt: now,
+      updatedAt: now,
+    };
+    set(s => ({ entries: [entry, ...s.entries] }));
+    syncFoodFireAndForget(state.currentUserId, entry, () => {
+      if (readPendingDeletedFoodEntryIds().includes(entry.id)) return true;
+      const s = get();
+      return !s.entries.some(existing => existing.id === entry.id);
     });
     return entry;
   },

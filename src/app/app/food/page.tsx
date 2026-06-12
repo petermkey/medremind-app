@@ -13,6 +13,7 @@ import {
 } from '@/lib/food/targetAlgorithm';
 import { consumedAtForSelectedDateInTimezone } from '@/lib/nutrition/waterEntryTime';
 import { compressImageForAnalysis } from '@/lib/food/imageCompression';
+import { scaleNutrients } from '@/lib/food/scaleNutrients';
 import type { FoodAnalysisDraft, FoodEntry, FoodNutrients } from '@/types/food';
 import type {
   GeneratedNutritionTargets,
@@ -300,6 +301,7 @@ export default function FoodPage() {
     loading,
     error,
     loadEntriesForRange,
+    duplicateEntry,
     saveDraftAsEntry,
     entriesForDate,
     totalsForDate,
@@ -319,6 +321,7 @@ export default function FoodPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<FoodAnalysisDraft | null>(null);
+  const [portionFactor, setPortionFactor] = useState(1);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -372,6 +375,7 @@ export default function FoodPage() {
   async function analyzeImage(file: File) {
     setAnalyzing(true);
     setAnalysisError(null);
+    setPortionFactor(1);
     setDraft(null);
 
     try {
@@ -389,6 +393,7 @@ export default function FoodPage() {
         throw new Error('analysis_failed');
       }
 
+      setPortionFactor(1);
       setDraft(payload.draft as FoodAnalysisDraft);
     } catch {
       setAnalysisError('Unable to analyze this meal photo. Please try again.');
@@ -407,19 +412,30 @@ export default function FoodPage() {
 
   function handleSaveDraft() {
     if (!profile?.id || !draft) return;
+    const scaledDraft: FoodAnalysisDraft = portionFactor === 1 ? draft : {
+      ...draft,
+      nutrients: scaleNutrients(draft.nutrients, portionFactor),
+      components: draft.components.map(c => ({
+        ...c,
+        gramsEstimate: typeof c.gramsEstimate === 'number' ? Math.round(c.gramsEstimate * portionFactor) : c.gramsEstimate,
+      })),
+      uncertainties: [...draft.uncertainties, `Portion adjusted ×${portionFactor} by user.`],
+    };
     saveDraftAsEntry({
       userId: profile.id,
       timezone,
-      draft,
+      draft: scaledDraft,
       consumedAt: consumedAtForSelectedDateInTimezone(activeDate, timezone),
     });
     setDraft(null);
+    setPortionFactor(1);
     setAnalysisError(null);
     setExpandedEntryIds(new Set());
   }
 
   function handleRetake() {
     setDraft(null);
+    setPortionFactor(1);
     setAnalysisError(null);
     fileInputRef.current?.click();
   }
@@ -798,7 +814,7 @@ export default function FoodPage() {
                 {confidenceLabel(draft.estimationConfidence)}
               </div>
             </div>
-            <NutrientGrid nutrients={draft.nutrients} />
+            <NutrientGrid nutrients={scaleNutrients(draft.nutrients, portionFactor)} />
             <div className="space-y-2">
               {draft.components.map((component, index) => (
                 <div key={`${component.name}-${index}`} className="rounded-xl bg-[rgba(13,17,23,0.7)] px-3 py-2">
@@ -812,6 +828,22 @@ export default function FoodPage() {
                 {draft.uncertainties.join(' ')}
               </div>
             )}
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="text-xs text-[#8B949E]">Portion</span>
+              {[0.5, 1, 1.5, 2].map(factor => (
+                <button
+                  key={factor}
+                  type="button"
+                  onClick={() => setPortionFactor(factor)}
+                  className={[
+                    'rounded-lg px-2.5 py-1 text-xs font-bold',
+                    portionFactor === factor ? 'bg-[#3B82F6] text-white' : 'bg-[#30363D] text-[#C9D1D9]',
+                  ].join(' ')}
+                >
+                  ×{factor}
+                </button>
+              ))}
+            </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
               <button onClick={handleSaveDraft} className="rounded-xl bg-[#10B981] px-3 py-2 text-xs font-bold text-white">
                 Save
@@ -856,6 +888,7 @@ export default function FoodPage() {
                 canDelete={Boolean(deleteFoodEntry)}
                 onToggle={() => toggleEntry(entry.id)}
                 onDelete={() => setConfirmDeleteEntry(entry)}
+                onDuplicate={() => duplicateEntry(entry.id, new Date().toISOString())}
               />
             ))}
           </div>
@@ -1047,6 +1080,7 @@ function FoodEntryCard({
   canDelete,
   onToggle,
   onDelete,
+  onDuplicate,
 }: {
   entry: FoodEntry;
   timezone: string;
@@ -1054,6 +1088,7 @@ function FoodEntryCard({
   canDelete: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   const [swiped, setSwiped] = useState(false);
   const gesture = useRef({ pointerId: null as number | null, startX: 0, startY: 0 });
@@ -1191,14 +1226,25 @@ function FoodEntryCard({
           )}
         </div>
 
-        {canDelete && expanded && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="mt-3 w-full rounded-xl border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-xs font-bold text-[#F87171]"
-          >
-            Delete entry
-          </button>
+        {expanded && (
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={onDuplicate}
+              className="flex-1 rounded-lg bg-[#30363D] px-2.5 py-1 text-xs font-bold text-[#C9D1D9]"
+            >
+              ↺ Ate this again
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex-1 rounded-lg border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.08)] px-2.5 py-1 text-xs font-bold text-[#F87171]"
+              >
+                Delete entry
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
