@@ -12,6 +12,7 @@ import {
   validateNutritionTargetProfileTargets,
 } from '@/lib/food/targetAlgorithm';
 import { consumedAtForSelectedDateInTimezone } from '@/lib/nutrition/waterEntryTime';
+import { getSupabaseClient } from '@/lib/supabase/client';
 import { compressImageForAnalysis } from '@/lib/food/imageCompression';
 import { scaleNutrients } from '@/lib/food/scaleNutrients';
 import type { FoodAnalysisDraft, FoodEntry, FoodNutrients } from '@/types/food';
@@ -1048,6 +1049,25 @@ function SelectField({
   );
 }
 
+function FoodPhotoThumb({ photoPath, title }: { photoPath: string; title: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getSupabaseClient()
+      .storage.from('food-photos')
+      .createSignedUrl(photoPath, 3600)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setUrl(data.signedUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [photoPath]);
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not an optimizable static asset
+  return <img src={url} alt={`Photo of ${title}`} className="h-11 w-11 flex-shrink-0 rounded-[10px] object-cover" />;
+}
+
 function TargetCard({
   label,
   unit,
@@ -1226,6 +1246,7 @@ function FoodEntryCard({
           className="outline-none"
         >
           <div className="flex items-start justify-between gap-3">
+            {entry.photoPath && <FoodPhotoThumb photoPath={entry.photoPath} title={entry.title} />}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-[#8B949E]">
                 {formatEntryTime(entry.consumedAt, timezone)} · Photo · {confidenceLabel(entry.estimationConfidence)}
