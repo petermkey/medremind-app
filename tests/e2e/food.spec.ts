@@ -682,9 +682,8 @@ test.describe('food diary (requires authenticated Supabase E2E env)', () => {
     // Click the duplicate button on the first card
     await page.getByRole('button', { name: '↺ Ate this again' }).first().click();
 
-    // Verify two cards now exist with the same title
-    const cardCount = await page.locator(`[role="heading"][name="${originalDraft.title}"]`).count();
-    await expect(page.locator(`[role="heading"][name="${originalDraft.title}"]`).nth(1)).toBeVisible();
+    // Verify two cards now exist with the same title.
+    await expect(page.getByRole('heading', { name: originalDraft.title, exact: true })).toHaveCount(2, { timeout: 10_000 });
   });
 
 });
