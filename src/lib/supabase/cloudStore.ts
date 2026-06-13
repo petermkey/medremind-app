@@ -481,9 +481,11 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         removedSlotKeys.add(doseSlotKey(itemId, String(row.occurrence_date), String(row.occurrence_time)));
         return null;
       }
+      // cancelled-without-event already returned null above, so a missing
+      // latestEvent here always means a live planned slot.
       const derivedStatus: ScheduledDose['status'] = latestEvent
         ? (String(latestEvent.event_type) as ScheduledDose['status'])
-        : occStatus === 'cancelled' ? 'skipped' : 'pending';
+        : 'pending';
 
       // Collect execution_events as DoseRecord equivalents.
       for (const ev of events) {
