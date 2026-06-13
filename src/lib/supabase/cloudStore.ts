@@ -141,44 +141,94 @@ async function fetchAllUserRows(
 
 // V2: paginated fetch of planned_occurrences with nested execution_events.
 // Uses unknown-cast because planned_occurrences is not in the generated schema types.
+// Cancelled occurrences are only worth pulling for two reasons: today/future
+// removal tombstones (so rolling-horizon regeneration won't recreate a
+// removed slot) and cancelled-with-events (history-safe removeDose keeps the
+// action). Past cancelled-no-event rows — the bulk left by lifecycle cleanup
+// migrations — are pure boot-time payload weight. This query keeps
+// non-cancelled rows (any date) plus today/future cancelled; the small
+// cancelled-with-events history set is fetched separately via an inner join.
+const V2_SELECT = 'id, user_id, active_protocol_id, protocol_item_id, occurrence_date, occurrence_time, status, execution_events(id, event_type, event_at, note)';
+
+type V2RangeQuery = {
+  order: (column: string, options: { ascending: boolean }) => V2RangeQuery;
+  range: (from: number, to: number) => Promise<{ data: OccurrenceRow[] | null; error: { message: string } | null }>;
+};
+
+async function paginate(
+  build: (from: number, to: number) => Promise<{ data: OccurrenceRow[] | null; error: { message: string } | null }>,
+): Promise<{ data: OccurrenceRow[]; error: { message: string } | null }> {
+  const rows: OccurrenceRow[] = [];
+  for (let from = 0; ; from += CLOUD_PULL_PAGE_SIZE) {
+    const page = await build(from, from + CLOUD_PULL_PAGE_SIZE - 1);
+    if (page.error) return { data: rows, error: page.error };
+    rows.push(...(page.data ?? []));
+    if ((page.data ?? []).length < CLOUD_PULL_PAGE_SIZE) break;
+  }
+  return { data: rows, error: null };
+}
+
 async function fetchAllOccurrencesWithEvents(
   supabase: ReturnType<typeof getSupabaseClient>,
   userId: string,
 ): Promise<{ data: OccurrenceRow[]; error: { message: string } | null }> {
-  const rows: OccurrenceRow[] = [];
-  type V2RangeQuery = {
-    order: (column: string, options: { ascending: boolean }) => V2RangeQuery;
-    range: (from: number, to: number) => Promise<{ data: OccurrenceRow[] | null; error: { message: string } | null }>;
-  };
+  const todayDate = format(new Date(), 'yyyy-MM-dd');
   const client = supabase as unknown as {
     from: (table: string) => {
       select: (columns: string) => {
         eq: (column: string, value: string) => {
-          is: (column: string, value: null) => {
-            order: (column: string, options: { ascending: boolean }) => V2RangeQuery;
-          };
+          is: (column: string, value: null) => { or: (filter: string) => V2RangeQuery } & V2RangeQuery;
         };
       };
     };
   };
 
-  for (let from = 0; ; from += CLOUD_PULL_PAGE_SIZE) {
-    let query = client
-      .from('planned_occurrences')
-      .select('id, user_id, active_protocol_id, protocol_item_id, occurrence_date, occurrence_time, status, execution_events(id, event_type, event_at, note)')
-      .eq('user_id', userId)
-      .is('superseded_by_occurrence_id', null)
-      .order('occurrence_date', { ascending: true });
-    query = query.order('occurrence_time', { ascending: true });
-    query = query.order('id', { ascending: true });
-    const page = await query.range(from, from + CLOUD_PULL_PAGE_SIZE - 1);
+  const ordered = (q: V2RangeQuery): V2RangeQuery =>
+    q.order('occurrence_date', { ascending: true })
+      .order('occurrence_time', { ascending: true })
+      .order('id', { ascending: true });
 
-    if (page.error) return { data: rows, error: page.error };
-    rows.push(...(page.data ?? []));
-    if ((page.data ?? []).length < CLOUD_PULL_PAGE_SIZE) break;
-  }
+  // Main set: everything except past cancelled tombstones.
+  const main = await paginate((from, to) =>
+    ordered(
+      client
+        .from('planned_occurrences')
+        .select(V2_SELECT)
+        .eq('user_id', userId)
+        .is('superseded_by_occurrence_id', null)
+        .or(`status.neq.cancelled,occurrence_date.gte.${todayDate}`),
+    ).range(from, to),
+  );
+  if (main.error) return main;
 
-  return { data: rows, error: null };
+  // History recovery: cancelled occurrences that still carry an action
+  // (inner join → only rows with ≥1 execution_event). Small, rarely paged.
+  const innerClient = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          eq: (column: string, value: string) => {
+            is: (column: string, value: null) => V2RangeQuery;
+          };
+        };
+      };
+    };
+  };
+  const cancelledHistory = await paginate((from, to) =>
+    ordered(
+      innerClient
+        .from('planned_occurrences')
+        .select('id, user_id, active_protocol_id, protocol_item_id, occurrence_date, occurrence_time, status, execution_events!inner(id, event_type, event_at, note)')
+        .eq('user_id', userId)
+        .eq('status', 'cancelled')
+        .is('superseded_by_occurrence_id', null),
+    ).range(from, to),
+  );
+  if (cancelledHistory.error) return cancelledHistory;
+
+  const seen = new Set(main.data.map(row => String(row.id)));
+  const merged = main.data.concat(cancelledHistory.data.filter(row => !seen.has(String(row.id))));
+  return { data: merged, error: null };
 }
 
 // Fallback for execution_events written without planned_occurrence_id
