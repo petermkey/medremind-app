@@ -29,3 +29,12 @@ export function getDayScheduleForDate(
     scheduledDoses.filter(d => d.scheduledDate === date && activeIds.has(d.activeProtocolId)),
   );
 }
+
+// Calendar day number of `targetDate` within a protocol that started on
+// `startDate` (both YYYY-MM-DD). Day of startDate is 1. Pure UTC math so DST
+// transitions never shift the count.
+export function protocolDayNumber(startDate: string, targetDate: string): number {
+  const [sy, sm, sd] = startDate.slice(0, 10).split('-').map(Number);
+  const [ty, tm, td] = targetDate.slice(0, 10).split('-').map(Number);
+  return Math.floor((Date.UTC(ty, tm - 1, td) - Date.UTC(sy, sm - 1, sd)) / 86400000) + 1;
+}

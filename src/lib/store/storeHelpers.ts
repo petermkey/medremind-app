@@ -5,7 +5,7 @@ import type {
   ScheduledDose, DoseRecord, PlannedOccurrence, OccurrenceStatus, ExecutionEvent,
 } from '@/types';
 import { hash32, stableUuid, isUuid } from '@/lib/ids';
-import { getDayScheduleForDate } from './daySchedule';
+import { getDayScheduleForDate, protocolDayNumber } from './daySchedule';
 
 export { hash32, stableUuid, isUuid };
 
@@ -215,7 +215,7 @@ export function expandItemToDoses(
 
   while (!isAfter(cursor, end)) {
     const dateStr = format(cursor, 'yyyy-MM-dd');
-    const dayNum = Math.floor((cursor.getTime() - start.getTime()) / 86400000) + 1;
+    const dayNum = protocolDayNumber(activeProtocol.startDate, dateStr);
 
     // Check start/end day bounds
     if (dayNum < item.startDay) { cursor = addDays(cursor, 1); continue; }

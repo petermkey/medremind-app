@@ -42,6 +42,8 @@ import {
   expandItemToDoses,
 } from './storeHelpers';
 import { syncFireAndForget, waitForRealtimeSyncIdle } from './syncState';
+import { computeStreak } from './streak';
+import type { StreakDay } from './streak';
 
 export { waitForRealtimeSyncIdle };
 
@@ -1034,16 +1036,17 @@ export const useStore = create<AppState>()(
       },
 
       getStreak: () => {
-        let streak = 0;
+        const days: StreakDay[] = [];
         let cursor = new Date();
         for (let i = 0; i < 365; i++) {
-          const dateStr = format(cursor, 'yyyy-MM-dd');
-          const pct = get().getAdherencePct(dateStr);
-          if (pct === 100) streak++;
-          else if (i > 0) break; // streak ends
+          const doses = get().selectProgressDayDoses(format(cursor, 'yyyy-MM-dd'));
+          days.push({
+            scheduled: doses.length,
+            taken: doses.filter(d => d.status === 'taken').length,
+          });
           cursor = addDays(cursor, -1);
         }
-        return streak;
+        return computeStreak(days);
       },
     }),
     {
