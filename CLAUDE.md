@@ -37,6 +37,12 @@ docs/             # architecture (read before coding)
 - Run `npm run build` before declaring work done
 - Conventional commits: `feat|fix|docs|refactor|test|chore: description`
 
+## Parallel agents & deploys
+
+- One agent = one branch = non-overlapping files; before starting: `bash scripts/git-state-check.sh`.
+- **Merging a PR to `main` triggers a Vercel production deploy** — merge only on an explicit owner ask (global deploy hook also applies).
+- Supabase auth: use the `supabase` CLI / documented env vars — never scan the keychain.
+
 ## Supabase
 
 - `createServerClient` in API routes and Server Components
