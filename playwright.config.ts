@@ -10,6 +10,10 @@ export default defineConfig({
     timeout: 10_000,
   },
   fullyParallel: false,
+  // All E2E suites authenticate as the SAME shared Supabase account, so
+  // running spec files on parallel workers cross-interferes (one suite's boot
+  // pull races another's writes). Force a single worker: correctness over speed.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
