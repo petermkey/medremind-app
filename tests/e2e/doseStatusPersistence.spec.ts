@@ -64,7 +64,41 @@ async function waitForSyncFlushed(page: Page) {
   }, { timeout: 20_000 });
 }
 
+// Best-effort teardown: this suite creates PersistTest/RemoveTest/OfflineTest
+// protocols on a SHARED test account every run. Without cleanup they pile up,
+// growing the boot pull until later tests flake on hydration timeouts. Delete
+// (or archive) them via the store so the account stays lean.
+async function cleanupTestProtocols(page: Page) {
+  // Fire the deletes but never block on the outbox draining — waiting here can
+  // hang the hook. The deletes sync in the background; combined with periodic
+  // account purges this keeps accumulation bounded without risking the run.
+  try {
+    await page.evaluate(() => {
+      const store = (window as unknown as {
+        __medremindStore?: {
+          getState(): {
+            protocols: { id: string; name: string; isTemplate?: boolean }[];
+            deleteProtocol(id: string): unknown;
+          };
+        };
+      }).__medremindStore;
+      if (!store) return;
+      const state = store.getState();
+      state.protocols
+        .filter(p => !p.isTemplate && /^(PersistTest|RemoveTest|OfflineTest) /.test(p.name))
+        .forEach(p => { try { state.deleteProtocol(p.id); } catch { /* keep going */ } });
+    });
+    await page.waitForTimeout(1_500);
+  } catch {
+    // Teardown must never fail a passing test.
+  }
+}
+
 test.describe('dose status persistence', () => {
+  test.afterEach(async ({ page }) => {
+    await cleanupTestProtocols(page);
+  });
+
   test('taken status survives a full reload (cloud round-trip)', async ({ page }) => {
     await ensureAuthenticated(page);
 
@@ -128,41 +162,36 @@ test.describe('dose status persistence', () => {
 
     await page.goto('/app');
     await expect(page.getByRole('button', { name: 'Mark as taken' }).first()).toBeVisible({ timeout: 20_000 });
-    // Capture the count BEFORE removal so the post-reload assertion proves
-    // the removed dose did not resurrect from the cloud.
-    const before = await page.evaluate(() =>
-      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
-        .__medremindStore.getState().scheduledDoses.length,
-    );
-    // Pick the earliest pending dose instead of filtering by date — the app
-    // schedules in the profile timezone, which need not match UTC.
-    const removed = await page.evaluate(() => {
-      const store = (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string; scheduledDate: string; status: string }[]; removeDose(id: string): void } } }).__medremindStore;
+    // Remove the earliest pending dose of THIS test's protocol (scoped by the
+    // "Remove Med" item name) and capture its exact id. Asserting that this
+    // specific id does not resurrect is the true invariant — robust to other
+    // protocols' doses and to rolling-horizon regeneration, which a raw
+    // total-count comparison is not.
+    const removedId = await page.evaluate(() => {
+      const store = (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string; scheduledDate: string; status: string; protocolItem?: { name?: string } }[]; removeDose(id: string): void } } }).__medremindStore;
       const state = store.getState();
-      const dose = [...state.scheduledDoses]
-        .filter(d => d.status === 'pending')
+      const dose = state.scheduledDoses
+        .filter(d => d.status === 'pending' && d.protocolItem?.name === 'Remove Med')
         .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))[0];
-      if (!dose) return false;
-      state.removeDose(dose.id);
-      return true;
+      if (!dose) return null;
+      store.getState().removeDose(dose.id);
+      return dose.id;
     });
-    expect(removed).toBe(true);
+    expect(removedId).not.toBeNull();
     await waitForSyncFlushed(page);
     await page.waitForTimeout(2_000);
     await page.reload();
     await page.waitForURL(/\/app/, { timeout: 30_000 });
-    // Wait for the boot pull to hydrate the store. Today's only dose was
-    // removed, so the visible button is gone — the remaining future doses
-    // (days 2-3 of the protocol) are the hydration signal instead.
+    // Wait for the boot pull to hydrate the store (future days 2-3 remain).
     await page.waitForFunction(() => {
       const store = (window as unknown as { __medremindStore?: { getState(): { scheduledDoses: unknown[] } } }).__medremindStore;
       return (store?.getState().scheduledDoses.length ?? 0) > 0;
     }, { timeout: 30_000 });
-    const after = await page.evaluate(() =>
-      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: unknown[] } } })
-        .__medremindStore.getState().scheduledDoses.length,
-    );
-    expect(after).toBeLessThan(before);
+    const resurrected = await page.evaluate((id: string) =>
+      (window as unknown as { __medremindStore: { getState(): { scheduledDoses: { id: string }[] } } })
+        .__medremindStore.getState().scheduledDoses.some(d => d.id === id),
+    removedId!);
+    expect(resurrected).toBe(false);
   });
 
   test('offline take survives reload once back online', async ({ page, context }) => {
