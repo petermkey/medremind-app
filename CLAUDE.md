@@ -1,6 +1,6 @@
 # CLAUDE.md — medremind-app
 
-> Agent workflow policy: `docs/project-rules-and-current-operating-model.md`. Architecture: `docs/architecture-current-main.md`.
+> Agent workflow policy: `docs/project-rules-and-current-operating-model.md`. Architecture: `docs/architecture-current-main.md`. Backlog: `docs/project-backlog.md`.
 
 ## Stack
 
