@@ -74,7 +74,11 @@ export async function sendPushToUser(
         sent++;
       } catch (err: unknown) {
         const status = (err as { statusCode?: number }).statusCode;
-        if (status === 410 || status === 404) {
+        // 403 happens on every delivery after a VAPID key rotation — the
+        // subscription was created with the old key and can never succeed
+        // again, so it's just as stale as an explicit 410/404 (see
+        // docs/system-audit-2026-07-09.md §2).
+        if (status === 410 || status === 404 || status === 403) {
           staleEndpoints.push(sub.endpoint);
           stale++;
         } else {

@@ -5,7 +5,12 @@ import { useStore, waitForRealtimeSyncIdle } from '@/lib/store/store';
 import { useFoodStore } from '@/lib/store/foodStore';
 import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { supabaseSignOut, saveProfile } from '@/lib/supabase/auth';
-import { subscribeToPush, unsubscribeFromPush, saveNotificationSettingsToSupabase } from '@/lib/push/subscription';
+import {
+  subscribeToPush,
+  unsubscribeFromPush,
+  saveNotificationSettingsToSupabase,
+  getPushSubscriptionCount,
+} from '@/lib/push/subscription';
 import { useInstallState } from '@/lib/push/useInstallState';
 import {
   backupCurrentStoreToSupabase,
@@ -63,7 +68,24 @@ export default function SettingsPage() {
   const [disconnectingOura, setDisconnectingOura] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [zeroPushSubscriptions, setZeroPushSubscriptions] = useState(false);
   const installState = useInstallState();
+
+  // Push can be "enabled" in settings with nothing actually registered on
+  // this account (failed re-subscribe, VAPID rotation) — the cron used to
+  // silently mark those reminders as delivered. Surface it here instead of
+  // letting it go unnoticed (docs/system-audit-2026-07-09.md §2).
+  useEffect(() => {
+    if (!pushEnabled) {
+      setZeroPushSubscriptions(false);
+      return;
+    }
+    let cancelled = false;
+    getPushSubscriptionCount().then(count => {
+      if (!cancelled) setZeroPushSubscriptions(count === 0);
+    });
+    return () => { cancelled = true; };
+  }, [pushEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +159,7 @@ export default function SettingsPage() {
         }
         return;
       }
+      setZeroPushSubscriptions(false);
       show('✓ Push notifications enabled');
     } catch (err) {
       console.error('[settings] subscribeToPush threw', err);
@@ -370,6 +393,14 @@ export default function SettingsPage() {
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
+          {pushEnabled && zeroPushSubscriptions && (
+            <div className="bg-[rgba(248,81,73,0.08)] border border-[rgba(248,81,73,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+              <p className="text-xs font-semibold text-[#F85149]">Push isn&apos;t actually reaching this device</p>
+              <p className="text-xs text-[#8B949E] leading-relaxed">
+                Push notifications are turned on, but no subscription is on file for your account. Toggle push off and back on to re-subscribe.
+              </p>
+            </div>
+          )}
           {installState === 'browser' && (
             <div className="bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
               <p className="text-xs font-semibold text-[#FBB924]">Add to Home Screen for push notifications</p>
