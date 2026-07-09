@@ -178,6 +178,7 @@ Authenticated E2E specs, including `tests/e2e/food.spec.ts`, require `E2E_EMAIL`
 - Scheduler pipeline:
   - `vercel.json` keeps `"crons": []` (Vercel cron disabled on Hobby constraints)
   - external cron-job.org job calls `GET /api/cron/notify` every minute with `Authorization: Bearer <CRON_SECRET>`
+  - `GET /api/cron/food-model-check` (same `CRON_SECRET` auth) verifies the configured OpenRouter food-vision model chain still resolves to a working provider endpoint; needs its own low-frequency (e.g. daily) external cron-job.org job — not yet wired up, see `docs/project-backlog.md` P-5
 
 ## Branch and Governance Rules
 
