@@ -7,6 +7,22 @@
 
 ## 1. Ready for execution
 
+### 1.0 Production fixes 🔴 highest priority
+**Sources:** [`docs/system-audit-2026-07-09.md`](system-audit-2026-07-09.md) (full audit, 3-wave plan) · [`docs/incident-food-analyze-2026-07-09.md`](incident-food-analyze-2026-07-09.md) (live-reproduced incident)
+
+Two confirmed user-facing production breakages, both currently silent:
+
+| # | Fix | Source | Effort | Needs deploy |
+|---|---|---|---|---|
+| P-1 | **Food photo analysis restore (F1):** set Vercel `OPENROUTER_FOOD_VISION_MODEL=google/gemini-2.5-flash`, `OPENROUTER_FOOD_VISION_FALLBACK_MODEL=google/gemini-3.5-flash` → redeploy → verify with live repro | incident F1 | 10 min | ✅ env + redeploy |
+| P-2 | **Food model-chain hardening (F2):** append code-default model as terminal fallback; surface `food_provider_*` reason codes in client UI; fix stale README model docs | incident F2 | S | PR merge |
+| P-3 | **Phantom push fix:** zero-delivery detection (don't mark `sent:0` as delivered) + Settings warning; treat 403 as stale like 410/404; upsert-not-delete-all in `subscribeToPush`; then re-subscribe owner's device | audit §2 / Wave 0.1 | S | PR merge |
+| P-4 | **Cron heartbeat:** alert when cron-job.org silently disables (has happened before); optional Vercel Cron fallback | audit Wave 0.2 | S | PR merge |
+| P-5 | **Model-config healthcheck (F3):** daily check that configured OpenRouter models still exist (`GET /models`, free) → Sentry on failure | incident F3 | S–M | PR merge |
+| P-6 | 409 idempotent-retry log noise → `upsert(ignoreDuplicates)` (F4) | audit §6.2 / incident F4 | S | PR merge |
+
+Order: P-1 first (restores the feature the owner uses today), P-2/P-3 as the next two small PRs, P-4/P-5 can ride the Oura cron work (§1.1), P-6 whenever convenient.
+
 ### 1.1 Oura sync overhaul ⭐ next up
 **Spec:** [`docs/superpowers/plans/2026-07-05-oura-sync-overhaul.md`](superpowers/plans/2026-07-05-oura-sync-overhaul.md) (full TDD plan, 4 sequential tasks, ready for `subagent-driven-development`)
 **Root doc:** [`docs/oura-integration-stack.md`](oura-integration-stack.md) (live audit + target architecture)
