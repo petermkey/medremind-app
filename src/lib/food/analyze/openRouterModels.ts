@@ -1,4 +1,4 @@
-export const DEFAULT_OPENROUTER_FOOD_VISION_MODEL = 'google/gemini-2.5-flash';
+export const DEFAULT_OPENROUTER_FOOD_VISION_MODEL = 'openai/gpt-4o-mini';
 
 const FALLBACKABLE_OPENROUTER_STATUSES = new Set([404, 408, 409, 429, 500, 502, 503, 504]);
 
