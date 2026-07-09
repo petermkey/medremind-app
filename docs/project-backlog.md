@@ -12,16 +12,16 @@
 
 Two confirmed user-facing production breakages, both currently silent:
 
-| # | Fix | Source | Effort | Needs deploy |
+| # | Fix | Source | Effort | Status |
 |---|---|---|---|---|
-| P-1 | **Food photo analysis restore (F1):** set Vercel `OPENROUTER_FOOD_VISION_MODEL=google/gemini-2.5-flash`, `OPENROUTER_FOOD_VISION_FALLBACK_MODEL=google/gemini-3.5-flash` → redeploy → verify with live repro | incident F1 | 10 min | ✅ env + redeploy |
-| P-2 | **Food model-chain hardening (F2):** append code-default model as terminal fallback; surface `food_provider_*` reason codes in client UI; fix stale README model docs | incident F2 | S | PR merge |
-| P-3 | **Phantom push fix:** zero-delivery detection (don't mark `sent:0` as delivered) + Settings warning; treat 403 as stale like 410/404; upsert-not-delete-all in `subscribeToPush`; then re-subscribe owner's device | audit §2 / Wave 0.1 | S | PR merge |
-| P-4 | **Cron heartbeat:** alert when cron-job.org silently disables (has happened before); optional Vercel Cron fallback | audit Wave 0.2 | S | PR merge |
-| P-5 | **Model-config healthcheck (F3):** daily check that configured OpenRouter models still exist (`GET /models`, free) → Sentry on failure | incident F3 | S–M | PR merge |
-| P-6 | 409 idempotent-retry log noise → `upsert(ignoreDuplicates)` (F4) | audit §6.2 / incident F4 | S | PR merge |
+| P-1 | **Food photo analysis restore (F1):** set Vercel `OPENROUTER_FOOD_VISION_MODEL`/`_FALLBACK_MODEL` → redeploy → verify with live repro | incident F1 | 10 min | ✅ shipped (PR #70), then **re-fixed 2026-07-10**: `google/gemini-2.5-flash`/`gemini-3.5-flash` both 404 account-wide on this OpenRouter account's data-policy/guardrail settings (`openrouter.ai/settings/privacy`) — different failure than the retired-model incident. Now `google/gemma-4-31b-it:free` primary, `openai/gpt-4o-mini` fallback (both verified end-to-end against the real request shape) — PR #72 |
+| P-2 | **Food model-chain hardening (F2):** append code-default model as terminal fallback; surface `food_provider_*` reason codes in client UI; fix stale README model docs | incident F2 | S | ✅ shipped (PR #70) |
+| P-3 | **Phantom push fix:** zero-delivery detection (don't mark `sent:0` as delivered) + Settings warning; treat 403 as stale like 410/404; upsert-not-delete-all in `subscribeToPush`; then re-subscribe owner's device | audit §2 / Wave 0.1 | S | ✅ shipped (PR #71) |
+| P-4 | **Cron heartbeat:** alert when cron-job.org silently disables (has happened before); optional Vercel Cron fallback | audit Wave 0.2 | S | ✅ shipped: `Sentry.captureCheckIn` added to `cron/notify` (monitor slug `cron-notify`), PR #73 |
+| P-5 | **Model-config healthcheck (F3):** check that configured OpenRouter models actually pass a live completion call (not just `GET /models` existence — that would have missed the 2026-07-10 data-policy block) → Sentry on failure | incident F3 | S–M | ✅ route shipped: `GET /api/cron/food-model-check` (monitor slug `cron-food-model-check`), PR #73. ⚠️ **still needs a cron-job.org job wired up** (daily cadence recommended) — not yet scheduled |
+| P-6 | 409 idempotent-retry log noise → `upsert(ignoreDuplicates)` (F4) | audit §6.2 / incident F4 | S | ✅ shipped (PR #70) |
 
-Order: P-1 first (restores the feature the owner uses today), P-2/P-3 as the next two small PRs, P-4/P-5 can ride the Oura cron work (§1.1), P-6 whenever convenient.
+All six items shipped 2026-07-09/10. Remaining follow-up: create the external cron-job.org job for P-5 (see README "CI/CD and Runtime Pipelines").
 
 ### 1.1 Oura sync overhaul ⭐ next up
 **Spec:** [`docs/superpowers/plans/2026-07-05-oura-sync-overhaul.md`](superpowers/plans/2026-07-05-oura-sync-overhaul.md) (full TDD plan, 4 sequential tasks, ready for `subagent-driven-development`)

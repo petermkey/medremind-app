@@ -41,7 +41,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Heartbeat: lets Sentry alert if this route stops being invoked by the
+  // external cron-job.org scheduler, independent of any in-request error.
+  const checkInId = Sentry.captureCheckIn({
+    monitorSlug: 'cron-notify',
+    status: 'in_progress',
+  });
+
   if (!isVapidConfigured()) {
+    Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-notify', status: 'error' });
     return NextResponse.json({ error: 'VAPID not configured' }, { status: 500 });
   }
 
@@ -61,11 +69,13 @@ export async function GET(request: NextRequest) {
 
   if (notifErr) {
     Sentry.captureException(notifErr, { tags: { route: 'cron/notify', stage: 'notification_settings' } });
+    Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-notify', status: 'error' });
     console.error('[cron/notify] notification_settings fetch failed', notifErr);
     return NextResponse.json({ error: 'DB error' }, { status: 500 });
   }
 
   if (!notifRows || notifRows.length === 0) {
+    Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-notify', status: 'ok' });
     return NextResponse.json({ processed: 0 });
   }
 
@@ -349,5 +359,6 @@ export async function GET(request: NextRequest) {
     }),
   );
 
+  Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-notify', status: 'ok' });
   return NextResponse.json({ processed: results.length, results });
 }
