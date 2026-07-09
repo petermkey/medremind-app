@@ -14,7 +14,16 @@ export function getOpenRouterFoodVisionModels(env: OpenRouterModelEnv = process.
     cleanModelId(env.OPENROUTER_FOOD_VISION_MODEL) ?? DEFAULT_OPENROUTER_FOOD_VISION_MODEL;
   const fallbackModel = cleanModelId(env.OPENROUTER_FOOD_VISION_FALLBACK_MODEL);
 
-  return Array.from(new Set([primaryModel, fallbackModel].filter((model): model is string => Boolean(model))));
+  // The code-default model is always appended as a terminal fallback so a
+  // stale/removed env-pinned model (which happens when OpenRouter retires a
+  // model id) can never take the whole chain below a model we know is live.
+  return Array.from(
+    new Set(
+      [primaryModel, fallbackModel, DEFAULT_OPENROUTER_FOOD_VISION_MODEL].filter(
+        (model): model is string => Boolean(model),
+      ),
+    ),
+  );
 }
 
 export function shouldFallbackOpenRouterFoodModel(

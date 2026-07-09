@@ -9,7 +9,6 @@ import {
   cloudProtocolId,
   cloudProtocolItemId,
   cloudRecordId,
-  isUniqueViolation,
   resolvePlannedOccurrenceId,
   stableUuid,
   updateDoseSyncOperationLedger,
@@ -66,21 +65,13 @@ export async function syncSnoozeDoseCommand(
       source: 'snooze_command',
       idempotency_key: clientOperationId,
     };
-    const { error: eventInsertErr } = await supabase.from('execution_events').insert(executionEventRow);
+    // See doses.ts syncTakeDoseCommand for why upsert+ignoreDuplicates
+    // replaces the old insert-then-catch-23505 pattern.
+    const { error: eventInsertErr } = await supabase
+      .from('execution_events')
+      .upsert(executionEventRow, { onConflict: 'id', ignoreDuplicates: true });
     if (eventInsertErr) {
-      if (isUniqueViolation(eventInsertErr, 'uq_execution_events_idempotency')) {
-        const { data: existingEvent, error: existingEventErr } = await supabase
-          .from('execution_events')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('idempotency_key', clientOperationId)
-          .maybeSingle();
-        if (existingEventErr || !existingEvent) {
-          throw new Error(`Execution event idempotency check failed: ${existingEventErr?.message ?? 'existing row not found'}`);
-        }
-      } else {
-        throw new Error(`Execution event sync failed: ${eventInsertErr.message}`);
-      }
+      throw new Error(`Execution event sync failed: ${eventInsertErr.message}`);
     }
 
     // Update planned_occurrences lineage for snooze.
