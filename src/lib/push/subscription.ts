@@ -114,26 +114,15 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: 'error', message: 'Not authenticated' };
 
-  // Single-device policy: replace all of the user's subscriptions with the
-  // current one. Delete-then-insert instead of upsert — the live table
-  // predates the (user_id, endpoint) unique constraint from migration 003,
-  // so ON CONFLICT has nothing to match against (see migration 011).
-  const { error: deleteError } = await supabase
-    .from('push_subscriptions')
-    .delete()
-    .eq('user_id', user.id);
-
-  if (deleteError) {
-    console.error('[push] clear old subscriptions failed', deleteError);
-    return { ok: false, reason: 'error', message: deleteError.message };
-  }
-
-  const { error } = await supabase.from('push_subscriptions').insert({
-    user_id: user.id,
-    endpoint,
-    p256dh,
-    auth,
-  });
+  // Multi-device: upsert on (user_id, endpoint) — that unique constraint has
+  // been live since migration 011 (2026-06-10). Previously this deleted ALL
+  // of the user's subscriptions before inserting the new one, so a second
+  // installed device (phone + tablet) silently lost notifications the
+  // moment either device re-subscribed — see docs/system-audit-2026-07-09.md §2.
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    { user_id: user.id, endpoint, p256dh, auth },
+    { onConflict: 'user_id,endpoint' },
+  );
 
   if (error) {
     console.error('[push] save subscription failed', error);
@@ -141,6 +130,29 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
   }
 
   return { ok: true };
+}
+
+/**
+ * Count this user's stored push subscriptions. Used by the Settings page to
+ * warn when push is enabled but no subscription is actually on file (see
+ * docs/system-audit-2026-07-09.md §2 — the cron previously marked these
+ * users as "delivered" even though nobody received anything).
+ */
+export async function getPushSubscriptionCount(): Promise<number> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from('push_subscriptions')
+    .select('endpoint', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('[push] subscription count check failed', error);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 /**

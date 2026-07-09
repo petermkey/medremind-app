@@ -1,5 +1,6 @@
 // GET /api/cron/notify
-// Vercel Cron Job — runs every minute.
+// Triggered every minute by an external scheduler (cron-job.org job
+// #7402449), not Vercel Cron — see docs/project_push_notifications memory.
 // Finds doses due for push notification and delivers them.
 //
 // Lifecycle contract rules honored:
@@ -70,9 +71,19 @@ export async function GET(request: NextRequest) {
 
   // Helper: send one push notification and return success boolean.
   // Calls the delivery core directly — no self-fetch over the public URL.
+  // sent===0 (no subscriptions on file, or every one was stale and pruned)
+  // must NOT be treated as success — it silently marked reminders "delivered"
+  // to nobody until this fix (docs/system-audit-2026-07-09.md §2).
   async function sendPush(userId: string, title: string, body: string, tag: string): Promise<boolean> {
     try {
-      await sendPushToUser(supabase, userId, { title, body, url: '/app', tag });
+      const result = await sendPushToUser(supabase, userId, { title, body, url: '/app', tag });
+      if (result.sent === 0) {
+        Sentry.captureMessage('[cron/notify] push_enabled user has zero deliverable subscriptions', {
+          level: 'warning',
+          tags: { route: 'cron/notify', userId },
+        });
+        return false;
+      }
       return true;
     } catch {
       return false;
