@@ -180,6 +180,32 @@ function confidenceLabel(value: number): string {
   return `${Math.round(value * 100)}% confidence`;
 }
 
+function foodAnalysisErrorMessage(reason: string | null | undefined, context: 'photo' | 'text'): string {
+  const fallback =
+    context === 'photo'
+      ? 'Unable to analyze this meal photo. Please try again.'
+      : 'Unable to analyze this description. Please try again.';
+
+  if (!reason) return fallback;
+
+  if (reason === 'food_provider_timeout') {
+    return 'The analysis took too long. Please try again in a moment.';
+  }
+  if (reason === 'food_provider_openrouter_exhausted' || reason === 'food_text_provider_unsupported') {
+    return 'Meal recognition is temporarily unavailable. Please try again later.';
+  }
+
+  const statusMatch = reason.match(/^food_provider_(?:openrouter|openai|gemini)_(\d+)$/);
+  if (statusMatch) {
+    const status = Number(statusMatch[1]);
+    if (status === 429) return 'Meal recognition is busy right now. Please try again in a moment.';
+    if (status === 404) return 'Meal recognition model is unavailable right now. Please try again later.';
+    if (status >= 500) return 'Meal recognition service is temporarily unavailable. Please try again shortly.';
+  }
+
+  return fallback;
+}
+
 function componentDetails(component: FoodAnalysisDraft['components'][number] | FoodEntry['components'][number]) {
   const quantity = component.estimatedQuantity && component.estimatedUnit
     ? `${formatAmount(component.estimatedQuantity)} ${component.estimatedUnit}`
@@ -393,14 +419,15 @@ export default function FoodPage() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload?.draft) {
-        throw new Error('analysis_failed');
+        setAnalysisError(foodAnalysisErrorMessage(payload?.reason, 'photo'));
+        return;
       }
 
       setPortionFactor(1);
       setDraft(payload.draft as FoodAnalysisDraft);
       setDraftSource('photo_ai');
     } catch {
-      setAnalysisError('Unable to analyze this meal photo. Please try again.');
+      setAnalysisError(foodAnalysisErrorMessage(null, 'photo'));
     } finally {
       setAnalyzing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -428,13 +455,16 @@ export default function FoodPage() {
         body: JSON.stringify({ text }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.draft) throw new Error('analysis_failed');
+      if (!response.ok || !payload?.draft) {
+        setAnalysisError(foodAnalysisErrorMessage(payload?.reason, 'text'));
+        return;
+      }
       setPortionFactor(1);
       setDraft(payload.draft as FoodAnalysisDraft);
       setDraftSource('text_ai');
       setMealText('');
     } catch {
-      setAnalysisError('Unable to analyze this description. Please try again.');
+      setAnalysisError(foodAnalysisErrorMessage(null, 'text'));
     } finally {
       setAnalyzing(false);
     }

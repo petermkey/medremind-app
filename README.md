@@ -121,8 +121,8 @@ Food photo analysis (server-side):
 - `FOOD_AI_PROVIDER`: unset or `mock` for mock mode; `openai`; `openrouter`; `gemini`
 - `OPENAI_API_KEY` and optional `OPENAI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openai`
 - `OPENROUTER_API_KEY` for `FOOD_AI_PROVIDER=openrouter`
-- `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to `google/gemma-4-31b-it:free`
-- `OPENROUTER_FOOD_VISION_FALLBACK_MODEL` for `FOOD_AI_PROVIDER=openrouter`; unset by default so food recognition fails closed instead of silently switching away from Gemma
+- `OPENROUTER_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=openrouter`; defaults to `google/gemini-2.5-flash`
+- `OPENROUTER_FOOD_VISION_FALLBACK_MODEL` for `FOOD_AI_PROVIDER=openrouter`; optional. Whatever is configured here, the code default (`google/gemini-2.5-flash`) is always appended as a terminal fallback, so a retired/removed pinned model id can never take the whole chain down (see `docs/incident-food-analyze-2026-07-09.md`)
 - `GEMINI_API_KEY` and optional `GEMINI_FOOD_VISION_MODEL` for `FOOD_AI_PROVIDER=gemini`
 - `NEXT_PUBLIC_APP_URL` is also used as the OpenRouter `HTTP-Referer`; it remains the optional app URL above.
 
