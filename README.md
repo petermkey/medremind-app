@@ -198,9 +198,9 @@ Key rules:
 For current behavior/process truth, start with:
 
 1. `docs/project-rules-and-current-operating-model.md`
-2. `docs/system-logic.md`
-3. `docs/current-status.md`
-4. `docs/agent-handoff-current-main.md`
+2. `docs/agent-handoff-current-main.md` — current pipeline health, active production landmines, schema drift
+3. `docs/system-logic.md`
+4. `docs/project-backlog.md` — what's next
 
 Historical incident/release/design docs in `docs/` are timeline artifacts.
 
