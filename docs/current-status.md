@@ -1,5 +1,7 @@
 # MedRemind Current Status
 
+> **Superseded 2026-07-10** — historical snapshot only. For current state, start with [`docs/agent-handoff-current-main.md`](agent-handoff-current-main.md).
+
 Date: 2026-04-26
 Owner: engineering runtime status on current `main`
 

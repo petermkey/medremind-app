@@ -1,5 +1,7 @@
 # Current Status and Next Phase (Current Main)
 
+> **Superseded 2026-07-10** — historical snapshot only. For current state, start with [`docs/agent-handoff-current-main.md`](agent-handoff-current-main.md). The Phase 5 remainder (`store.ts` Zustand slice split, §4 below) is still open and accurate as a backlog item.
+
 Date: 2026-06-12
 Source: current `main` with Phase 5 complete, V2 sync integrity fixes in progress
 

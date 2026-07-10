@@ -52,3 +52,8 @@ docs/             # architecture (read before coding)
 ## Secrets (never hardcode)
 
 `SUPABASE_SERVICE_ROLE_KEY` · `CRON_SECRET` · `VAPID_PRIVATE_KEY` — all in Vercel env vars
+
+## Known landmines
+
+- OpenRouter account privacy settings (`openrouter.ai/settings/privacy`) block some models account-wide with a 404 that looks like "model not found" but isn't — message is `"...guardrail restrictions and data policy"`. Before repinning `OPENROUTER_FOOD_VISION_MODEL`, verify with a live completion call, not just `GET /models` — see `docs/agent-handoff-current-main.md` §0.
+- `supabase/008_oura_analytics.sql` exists in the repo but has never been applied to production — see `docs/agent-handoff-current-main.md` §0b before touching Oura sync.

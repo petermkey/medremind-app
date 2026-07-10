@@ -1,183 +1,91 @@
 # Agent Handoff (Current Main)
 
-Date: 2026-04-25
+Date: 2026-07-10
 Audience: agents continuing work from current `main`
+
+## 0. Start here — most recent work (2026-07-09/10)
+
+A full stack/pipeline audit ([`docs/system-audit-2026-07-09.md`](system-audit-2026-07-09.md)) and a food-analyze incident diagnosis ([`docs/incident-food-analyze-2026-07-09.md`](incident-food-analyze-2026-07-09.md)) produced six production fixes (P-1..P-6, tracked in [`docs/project-backlog.md`](project-backlog.md) §1.0), all merged and deployed: PR #70, #71, #72, #73. Production SHA verified live via `GET /api/version` matches `main` HEAD.
+
+**Two things a new agent must know before touching food-analyze or push:**
+
+1. **OpenRouter data-policy landmine.** This account's `openrouter.ai/settings/privacy` settings block certain providers account-wide with a 404 whose message is `"No endpoints available matching your guardrail restrictions and data policy"` — this is a *different* failure from "model retired" (also a 404, different message). `google/gemini-2.5-flash` and `gemini-3.5-flash` are currently blocked this way; `google/gemma-4-31b-it:free` and `openai/gpt-4o-mini` are verified to pass. **Before repinning `OPENROUTER_FOOD_VISION_MODEL`/`_FALLBACK_MODEL` to any new model, test it with a live completion call** (`GET /models` existence is not sufficient — see `src/lib/food/analyze/modelHealthcheck.ts`), or wait for `GET /api/cron/food-model-check` results once it has a scheduler (see next point).
+2. **P-5's healthcheck route is deployed but not scheduled.** `GET /api/cron/food-model-check` (CRON_SECRET-gated) exists and works, but no external cron-job.org job calls it yet. This is a manual owner action (cron-job.org dashboard access), not something an agent can do from the repo.
+
+## 0a. Live pipeline status as of 2026-07-10 (verified this session)
+
+| Pipeline | Status | Evidence |
+|---|---|---|
+| Vercel production deploy | ✅ live, matches `main` HEAD | `GET /api/version` |
+| `cron-job.org` → `GET /api/cron/notify` | ✅ firing every ~60s, 200 OK | `vercel logs medremind-app-two.vercel.app` |
+| Push delivery | ⚠️ code path correct (P-3), but **zero rows in `push_subscriptions`** even though 1 user has `notification_settings.push_enabled = true` | live DB query; Settings now shows a warning banner for this exact case — the owner needs to open `/app/settings` once and re-toggle notifications to re-create a subscription row |
+| Food-analyze (OpenRouter) | ✅ verified end-to-end with the real request shape + a real image | primary (`gemma-4-31b-it:free`) was transiently 429 rate-limited at verification time, which correctly triggers fallback to `gpt-4o-mini` (200) |
+| `test:unit` / `test:correlation` / `test:med-knowledge` / `tsc` / `build` | ✅ all green on latest `main` | ran directly |
+| Oura sync / correlation insights | 🔴 **stalled since 2026-04-26** (known, pre-existing — not part of P-1..P-6) | `external_health_daily_snapshots`: 15 rows total, latest `local_date = 2026-04-26`; `correlation_insight_cards`: 0 rows. Tracked as `docs/project-backlog.md` §1.1 "Oura sync overhaul ⭐ next up" |
+
+## 0b. Schema drift found this session — read before starting the Oura overhaul
+
+`docs/superpowers/plans/2026-07-05-oura-sync-overhaul.md` references tables from `supabase/008_oura_analytics.sql` (`external_health_sync_runs`, `oura_sync_endpoint_coverage`, `oura_raw_documents`, `daily_health_features`) as if they already exist. **They do not — that migration has never been applied to production.** Confirmed live via `information_schema.tables`; only `008_external_health_snapshots.sql`'s tables (`external_health_connections`, `external_health_daily_snapshots`) and `010_correlation_insights.sql`'s tables (`correlation_consents`, `daily_lifestyle_snapshots`, `correlation_insight_cards`) exist. `019` is confirmed the last migration actually run against prod (matches the plan's own migration-collision note in `docs/project-backlog.md` §1.1).
+
+**Before starting Task 1 of the Oura overhaul plan**, decide explicitly whether to apply `008_oura_analytics.sql` as-is or redesign it — do not assume it is already live.
 
 ## 1. Source-of-truth scope
 
 - Code source of truth: `main`.
 - Process/governance source: `docs/project-rules-and-current-operating-model.md`.
 - **Lifecycle behavioral specification: `docs/lifecycle-contract-v1.md`** — authoritative, platform-neutral. Read before touching any lifecycle logic.
-- Behavior source: `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`, `docs/current-status.md`.
-- **Dose persistence continuation handoff: `docs/dose-persistence-handoff-2026-04-25.md`** — latest production evidence, fixes, and next debug steps for the restart-survival issue.
-- Historical snapshots in `docs/` are context only.
+- Behavior source: `docs/architecture-current-main.md`, `docs/auth-and-persistence-current-main.md`, `docs/domain-and-schedule-current-main.md`.
+- Production fixes and current pipeline health: this doc (§0) supersedes `docs/current-status.md` (2026-04-26) and `docs/current-status-and-next-phase.md` (2026-06-12) — those are historical snapshots only.
+- Historical incident/design docs in `docs/` are timeline artifacts.
 
 **Lifecycle contract note:** `src/lib/store/store.ts` is the current web implementation of the lifecycle model. It is not the contract. Do not treat Zustand store code as the authoritative specification for protocol states, dose states, persistence semantics, snooze lineage, or idempotency behavior. The lifecycle contract is the specification. Code discrepancies are bugs.
 
 ## 2. OAuth state on main
 
-OAuth changes are merged to `main` and CI is green.
-
-### What is committed on `main`
-
-| File | Change |
-|------|--------|
-| `middleware.ts` (root) | Delegates to `proxy()` — SSR session refresh + route guard entry point |
-| `src/app/auth/callback/route.ts` | OAuth PKCE code-exchange handler |
-| `src/app/(auth)/login/page.tsx` | Google OAuth button added; email-unconfirmed resend flow with 30s cooldown |
-| `src/app/(auth)/register/page.tsx` | Google OAuth button added; confirmation-pending resend flow |
-| `src/lib/supabase/auth.ts` | `signInWithOAuth('google')` added; provider type narrowed to `'google'` |
-
-**Apple sign-in: removed.** Apple button deleted from login/register pages. Not deferred — permanently removed.
-
-### OAuth build and verification state
-
-| Status | Detail |
-|--------|--------|
-| Build (`next build --webpack`) | **Passes.** All routes compile. TypeScript clean. |
-| CI (GitHub Actions) | **Green.** Source-based Vercel deploy confirmed working. |
-| `/login` render | Verified (HTTP 200) |
-| `/register` render | Verified (HTTP 200) |
-| Callback fallback | Verified — `/auth/callback` with no `?code` redirects to `/login?error=oauth` |
-| **Google OAuth end-to-end** | **VERIFIED LIVE — real browser, staging environment** |
-| Email auth | Verified intact and unchanged |
-| **Staging readiness** | **CONFIRMED WORKING** |
-| **Production readiness** | **Not ready — account-linking unverified** |
-
-### What is NOT yet verified
-
-- Account-linking behavior when a Google sign-in uses the same email as an existing email/password account
-- Onboarding redirect for a genuinely new OAuth user (no prior profile)
-- Logout and re-login via Google OAuth
-
-### Account-linking — do not assume safe
-
-Account linking is governed entirely by a Supabase dashboard setting ("Allow automatic linking") on project `hagypgvfkjkncznoctoq`. It is not confirmed enabled or tested live. A user who has an email/password account and signs in via Google with the same address may land in a **duplicate empty account** — medication data invisible. This is the primary production gate.
+OAuth changes are merged to `main` and CI is green. **Production readiness: not confirmed** — account-linking behavior (existing email/password user signs in via Google with the same address) has not been live-verified since this was written 2026-04-25. Re-verify before relying on this.
 
 Full detail: `docs/auth-and-persistence-current-main.md` §8 and §15.
 
-### Production prerequisites before OAuth goes live
-
-1. Google provider confirmed enabled in Supabase production project (Client ID + Secret)
-2. Production Supabase redirect URL allowlist includes `https://medremind-app-two.vercel.app/auth/callback`
-3. Google Cloud Console OAuth app lists `https://<project-ref>.supabase.co/auth/v1/callback` as authorized redirect URI
-4. **"Allow automatic linking" confirmed enabled** in Supabase Auth → Configuration
-5. Live browser-based verification of account-linking scenario (existing email/password user signs in via Google)
-
-### What is NOT implemented in OAuth
-
-- Account linking / conflict detection (Supabase config governs; unverified)
-- Provider-specific error messages (all failures → generic message)
-- Deep-link forwarding after OAuth (always lands at `/app` or `/onboarding`)
-- Password reset flow
-
 ## 3. Current product/runtime shape
 
-- Protocol-driven medication/adherence tracking.
-- Local-first store with cloud sync and outbox retry.
+- Protocol-driven medication/adherence tracking, local-first store with cloud sync and outbox retry.
 - Command-based lifecycle/dose sync with additive write-through coverage.
-- Selector-based lifecycle-aware read paths on key screens.
-- Auth: email/password + Google OAuth. Apple sign-in removed. Google OAuth is on `main` and staging-verified.
-- Health and medication insights: Oura integration, external health snapshots, Medication Knowledge Layer, OpenRouter model routing, and consent-gated correlation insights are landed.
+- Auth: email/password + Google OAuth (staging-verified, production account-linking unverified). Apple sign-in removed.
+- Food diary: photo + text AI-assisted analysis via OpenRouter (see §0 landmine above), Supabase-backed saved entries.
+- Push notifications: cron-driven (`/api/cron/notify`, cron-job.org job #7402449, every minute), zero-delivery detection and stale-subscription pruning landed 2026-07-09 (P-3).
+- Health/insights: Oura integration + correlation insights are landed in code but the data pipeline is stalled (§0a) — do not assume live data exists when testing these surfaces.
 
-## 4. Recent landed features (latest on main)
-
-| Commit | What landed |
-|--------|------------|
-| paginated cloud-pull fix | fix(doses): paginate Supabase boot pull for `scheduled_doses` and `dose_records` so accounts above 1000 rows do not regenerate pending local doses after refresh |
-| `6e47068` | production merge: stale persisted dose-state hydration scrub, deployed to `medremind-app-two.vercel.app` |
-| `e0123ff` | fix(store): ignore stale `scheduledDoses`, `doseRecords`, and `executionEvents` from old localStorage payloads |
-| `016d7e0` | fix(doses): make dose action fallback outbox durable before direct sync settles and resolve cloud dose slot conflicts |
-| `6fd90dd` | fix(doses): recover missing scheduled dose rows before dose commands |
-| `51a8d13` | fix(import): resolve scheduled_doses upsert conflict on duplicate slot |
-| `8ef1a9e` | fix(doses): rolling horizon refresh on app boot |
-| `965ade9` | fix(doses): lift Supabase REST 1000-row default limit to 10000 |
-
-## 5a. Push notification infrastructure
-
-- **Cron:** cron-job.org job `#7402449`, every minute, `GET https://medremind-app-two.vercel.app/api/cron/notify`
-- **Auth:** `Authorization: Bearer <CRON_SECRET>` — value in `vercel-env-import.env`
-- **Fire window:** ±1 min around scheduled_time (adjusted for lead_time_min)
-- **Deduplication:** `notification_log` table (user_id + scheduled_dose_id unique)
-- **Delivery:** `web-push` via `/api/push/send` → `push_subscriptions` table
-
-
-## 5b. Health and medication insights status (2026-04-26)
-
-Landed surfaces:
-
-- Oura integration routes under `/api/integrations/oura`: `connect`, `callback`, `status`, `daily`, and `disconnect`.
-- Oura tokens are encrypted server-side in `user_integrations` via `supabase/007_oura_integrations.sql`; browser routes must never receive tokens.
-- External health snapshot boundary: `supabase/008_external_health_snapshots.sql`, `src/lib/health/*`, and `/api/integrations/health/sync`. It is source-compatible for Oura now and Apple Health later. Sync responses return counts only.
-- Oura analytics pipeline: `/api/integrations/health/sync` now writes `external_health_sync_runs`, `oura_sync_endpoint_coverage`, server-only `oura_raw_documents`, and derived `daily_health_features` through `src/lib/oura/analyticsStore.ts` / `analyticsSync.ts` before preserving the existing `external_health_daily_snapshots` write. Raw Oura payloads are pruned to the rolling 90-day retention window.
-- Medication Knowledge Layer: `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence handling.
-- OpenRouter routing boundary is server-side only. Do not log prompts, evidence excerpts, or user identifiers. Structured outputs require `provider.require_parameters`.
-- Correlation insight engine: `supabase/010_correlation_insights.sql`, `src/lib/correlation`, and `/api/insights/correlations`.
-- UI/API surfaces include Progress analytics cards in `/app/progress`, `/api/medication-knowledge/status`, `/api/medication-knowledge/refresh`, settings integration controls, and `/api/insights/correlations`.
-- `/app/insights` and `/app/insights/medications` are compatibility redirects to `/app/progress`; they are not primary product surfaces and are not in bottom navigation.
-
-Safety and consent requirements:
-
-- User consent is required before correlation insight generation and before insight read-card visibility.
-- Correlation evidence is aggregate only.
-- Never produce direct medication-change instructions. The product may flag patterns and recommend clinician review, but must not tell users to start, stop, increase, decrease, or reschedule medication.
-
-Verification commands:
-
-- `npm run test:med-knowledge`
-- `npm run test:correlation`
-
-
-## 5c. Dose persistence restart-survival status (2026-04-25)
-
-Production SHA observed during the 2026-04-25 live browser reproduction at `https://medremind-app-two.vercel.app/api/version`: `10a05b635dd1f3c99c63e932dcaf516e1b35f3d6`. After the paginated pull fix lands, re-check `/api/version` before retesting.
-
-Latest fixes landed:
-
-- `016d7e0`: dose take/skip/snooze command fallback is queued before direct sync completes; unique scheduled-dose slot conflicts resolve to the canonical cloud row.
-- `e0123ff`: Zustand hydration whitelists persisted slices so stale localStorage cannot restore old `scheduledDoses`, `doseRecords`, or `executionEvents`.
-- Paginated cloud-pull fix: `pullStoreFromSupabase()` paginates `scheduled_doses` and `dose_records`. Live production showed one `.limit(10000)` request still returned exactly 1000 scheduled rows for a user with more than 3000 rows, causing rolling-horizon regeneration and visible pending rows after refresh.
-
-Production DB evidence for `peter@alionuk.com` after the first fix: write path is persisting dose intake rows. On `2026-04-25`, Supabase contained 38 scheduled doses, 4 `taken` scheduled rows, 12 `taken` dose records, and successful post-deploy `take_command` sync operations with no post-deploy failures.
-
-If the symptom persists after the paginated pull fix is deployed, continue with authenticated browser read-path verification, not a generic write-path assumption. Use `docs/dose-persistence-handoff-2026-04-25.md` as the focused continuation guide.
-
-## 6. Most important code surfaces
+## 4. Most important code surfaces
 
 - Domain/store: `src/lib/store/store.ts`
-- Sync + commands: `src/lib/supabase/realtimeSync.ts`
+- Sync + commands: `src/lib/supabase/realtimeSync/` (split by concern: `protocols.ts`, `activation.ts`, `doses.ts`, `snooze.ts`, `helpers.ts`, barrel `index.ts`)
 - Outbox: `src/lib/supabase/syncOutbox.ts`
 - Auth functions: `src/lib/supabase/auth.ts`
 - App layout/boot gate: `src/app/app/layout.tsx`
-- Route guard: `src/proxy.ts` (server-side routing, committed on main) + `middleware.ts` (entry point, committed on main)
-- OAuth callback: `src/app/auth/callback/route.ts` (committed on main)
+- Route guard: `src/proxy.ts` + `middleware.ts`
 - Cloud pull/import/backup: `src/lib/supabase/cloudStore.ts`, `src/lib/supabase/importStore.ts`
+- Food analyze provider chain: `src/lib/food/analyze/providers.ts`, `openRouterModels.ts`, `modelHealthcheck.ts`
+- Cron routes: `src/app/api/cron/notify/route.ts` (dose reminders, Sentry heartbeat `cron-notify`), `src/app/api/cron/food-model-check/route.ts` (model healthcheck, Sentry heartbeat `cron-food-model-check`, not yet scheduled — see §0)
 - Icon registry: `src/lib/icons.ts` — `DOSE_FORM_ICONS`, `ROUTE_ICONS`
 
-## 7. Landed migration/tooling summary
+## 5. Landed migration/tooling summary
 
-Already landed on `main`:
+Already landed and applied to production: `001`–`007`, `008_external_health_snapshots.sql`, `009_medication_knowledge.sql`, `010_correlation_insights.sql`, `011`–`019`.
 
-- A1..A5, B1..B5, C1..C5, D1, D2, D4
-- D3 tooling implementation and command wiring
+**Not applied to production:** `008_oura_analytics.sql` (see §0b).
 
-Operationally pending (live environment execution, not code changes):
-
-- Live-run D2/D3 apply flow with scoped validation
-- C5 parity run and D4 consistency run on real data
-- Consolidated anomaly triage for rollout/decommission readiness
-
-## 8. Mandatory execution model
+## 6. Mandatory execution model
 
 1. Start from clean `main`.
-2. Create one correctly named slice branch when coding.
+2. Create one correctly named slice branch when coding (`codex/<sprint-id>-<slice-name>`).
 3. Keep one concern per branch.
 4. Stop/report on drift or unrelated file contamination.
 5. Use `main` only for merge/cleanup/operational run tasks.
+6. Never push directly to `main` — PR + squash-merge only. Merging to `main` triggers a production deploy.
 
-## 9. Operational run prerequisites
+## 7. Operational run prerequisites
 
-Required environment for D2/D3/C5/D4 scripts:
+Required environment for D2/D3/C5/D4 tooling scripts (`scripts/*.mjs`):
 
 - `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`

@@ -29,6 +29,8 @@ All six items shipped 2026-07-09/10. Remaining follow-up: create the external cr
 
 Oura sync has been **manual-only and stalled since 2026-04-26** — only 15 snapshot days exist, starving every downstream correlation feature. Task 1 (cron-driven sync) is effectively a bug fix and should merge first; the data gap keeps growing until it does.
 
+**⚠️ Verified 2026-07-10: `supabase/008_oura_analytics.sql` has never been applied to production.** The plan's T1 step (line 128 of the plan doc) references that migration's `sync_type` check constraint as if it's live — it isn't. `external_health_sync_runs`, `oura_sync_endpoint_coverage`, `oura_raw_documents`, and `daily_health_features` all don't exist yet (confirmed via `information_schema.tables`); `019` is the last migration actually run. Whoever starts T1 must apply `008_oura_analytics.sql` first (or redesign it) before writing any code against those tables.
+
 | Task | What | Migration |
 |---|---|---|
 | T1 | Extract sync engine → `/api/cron/oura-sync` (cron-job.org, 6h), fix `markHealthConnectionSyncSuccess` status-reset bug | none |
