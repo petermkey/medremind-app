@@ -1,5 +1,5 @@
 import { mapOuraDailyPayloadToHealthSnapshot } from '@/lib/health/ouraDailyMapper';
-import { upsertExternalHealthDailySnapshots } from '@/lib/health/persistence';
+import { upsertExternalHealthDailySnapshots, upsertOuraTags } from '@/lib/health/persistence';
 import { markHealthConnectionSyncSuccess } from '@/lib/health/sourceRegistry';
 import {
   finishOuraSyncRun,
@@ -42,6 +42,7 @@ type OuraDailyCollections = {
   heartHealth: Map<string, Record<string, unknown>>;
   sleepPeriods: Map<string, Record<string, unknown>>;
   workouts: Map<string, unknown[]>;
+  enhancedTags: OuraCollectionResponse;
   analyticsCollections: Record<string, OuraAnalyticsCollection>;
 };
 
@@ -270,7 +271,7 @@ async function fetchOuraDailyCollections(
   accessToken: string,
   range: { start_date: string; end_date: string },
 ): Promise<OuraDailyCollections> {
-  const [dailySleep, readiness, activity, spo2, stress, vo2MaxRes, resilienceRes, cardioAgeRes, sleepRes, workouts] = await Promise.all([
+  const [dailySleep, readiness, activity, spo2, stress, vo2MaxRes, resilienceRes, cardioAgeRes, sleepRes, workouts, enhancedTagsRes] = await Promise.all([
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_sleep', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_readiness', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
@@ -281,6 +282,7 @@ async function fetchOuraDailyCollections(
     fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_cardiovascular_age', range),
     fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/sleep', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
+    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/enhanced_tag', range),
   ]);
 
   const heartHealth = mergeHeartHealth(vo2MaxRes, resilienceRes, cardioAgeRes);
@@ -294,6 +296,7 @@ async function fetchOuraDailyCollections(
     heartHealth,
     sleepPeriods: pickMainSleepByDate(sleepRes),
     workouts: groupWorkoutData(workouts),
+    enhancedTags: enhancedTagsRes,
     analyticsCollections: {
       daily_sleep: { required: true, data: collectionData(dailySleep) },
       daily_readiness: { required: true, data: collectionData(readiness) },
@@ -305,6 +308,7 @@ async function fetchOuraDailyCollections(
       daily_resilience: { required: false, data: collectionData(resilienceRes) },
       daily_cardiovascular_age: { required: false, data: collectionData(cardioAgeRes) },
       sleep: { required: false, data: collectionData(sleepRes) },
+      enhanced_tag: { required: false, data: collectionData(enhancedTagsRes) },
     },
   };
 }
@@ -386,6 +390,21 @@ export async function syncOuraSnapshots(
     );
 
     const count = await upsertExternalHealthDailySnapshots(snapshots);
+
+    const tagRows = (collections.enhancedTags.data ?? [])
+      .map(asRecord)
+      .filter((doc): doc is Record<string, unknown> => doc !== null)
+      .map((doc) => ({
+        userId,
+        ouraId: String(doc.id ?? ''),
+        localDate: getLocalDate(doc) ?? range.end_date,
+        tagType: typeof doc.tag_type_code === 'string' ? doc.tag_type_code : null,
+        comment: typeof doc.comment === 'string' ? doc.comment : null,
+        startTime: typeof doc.start_time === 'string' ? doc.start_time : null,
+      }))
+      .filter((row) => row.ouraId.length > 0);
+    await upsertOuraTags(tagRows);
+
     await markOuraSyncSuccess(userId);
     await markHealthConnectionSyncSuccess(userId, 'oura');
     await finishOuraSyncRun({

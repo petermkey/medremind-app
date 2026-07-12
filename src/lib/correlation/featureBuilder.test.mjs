@@ -101,6 +101,10 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     missedMedicationCount: 2,
     medicationClassExposureScore: 3,
     medicationReviewSignalCount: 0,
+    caffeineTagged: false,
+    alcoholTagged: false,
+    saunaTagged: false,
+    ouraTagCount: 0,
     sourcePayload: {
       foodEntryCount: 2,
       waterEntryCount: 2,
@@ -179,4 +183,22 @@ test('buildDailyLifestyleSnapshots maps sleep-detail health columns onto the sna
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].deepSleepMinutes, 90);
   assert.equal(snapshots[0].sleepAvgHrv, 52);
+});
+
+test('buildDailyLifestyleSnapshots derives enhanced-tag correlation features from oura_tags rows', () => {
+  const snapshots = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-01',
+    endDate: '2026-07-01',
+    ouraTags: [
+      { local_date: '2026-07-01', tag_type: 'tag_generic_caffeine' },
+      { local_date: '2026-07-01', tag_type: 'tag_generic_alcohol' },
+    ],
+  });
+
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].caffeineTagged, true);
+  assert.equal(snapshots[0].alcoholTagged, true);
+  assert.equal(snapshots[0].saunaTagged, false);
+  assert.equal(snapshots[0].ouraTagCount, 2);
 });

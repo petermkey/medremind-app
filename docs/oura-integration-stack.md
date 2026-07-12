@@ -66,7 +66,7 @@ cron-job.org (every 6h) ──▶ /api/cron/oura-sync   (Bearer CRON_SECRET)
 ### 4.2 New data: fill the NULLs, then widen (migration 020-series)
 Phase A (no schema change): fetch `daily_resilience`, `vO2_max`, `daily_cardiovascular_age` in the daily route; extend `ouraDailyMapper` inputs (columns already exist; add `cardiovascular_age numeric` — one new column).
 Phase B (sleep detail): new columns on the snapshot (`sleep_avg_hrv numeric, sleep_efficiency int, sleep_latency_seconds int, deep_sleep_minutes int, rem_sleep_minutes int, respiratory_rate numeric`) fed from `sleep` periods (pick the longest/main period per local date — Oura returns multiple docs/day for naps).
-Phase C (tags): `oura_tags` table `(user_id, local_date, tag_type, comment, ts)` from `enhanced_tag`; correlation featureBuilder exposes them as boolean day-features. Drop the deprecated `tag` scope on next OAuth consent refresh.
+Phase C (tags): `oura_tags` table `(user_id, local_date, tag_type, comment, ts)` from `enhanced_tag`; correlation featureBuilder exposes them as boolean day-features. The deprecated `/tag` endpoint is unused; the `tag` OAuth scope stays (it authorizes `enhanced_tag`).
 
 ### 4.3 Pipelines consuming it (wiring, not new engines)
 - **correlation featureBuilder**: add sleep-detail outcomes + tag features — mechanical extension of `BuildDailyLifestyleSnapshotsInput`.
@@ -87,7 +87,7 @@ Phase C (tags): `oura_tags` table `(user_id, local_date, tag_type, comment, ts)`
 | 1 | **Cron sync route** (G1) — the single highest-value fix; data resumes flowing | S | everything downstream |
 | 2 | Phase A endpoints (G2) — fill vo2/RHR/resilience (+CV-age column) | S | B2 trends |
 | 3 | Phase B sleep detail + featureBuilder wiring | M | B3 correlations, richer "what works" |
-| 4 | Phase C enhanced tags (+ retire `tag` scope, G3) | S–M | caffeine/alcohol correlations |
+| 4 | Phase C enhanced tags (`/tag` endpoint unused, G3) | S–M | caffeine/alcohol correlations |
 | 5 | Webhooks | M | scale-time freshness (defer) |
 
 Step 1 is effectively a bug fix (silent data starvation since Apr 26) and can ship independently today; steps 2–4 ride the wellbeing backlog waves.

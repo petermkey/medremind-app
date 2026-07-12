@@ -62,3 +62,30 @@ export async function upsertExternalHealthDailySnapshots(
 
   return snapshots.length;
 }
+
+export type OuraTagRow = {
+  userId: string;
+  ouraId: string;
+  localDate: string;
+  tagType: string | null;
+  comment: string | null;
+  startTime: string | null;
+};
+
+export async function upsertOuraTags(rows: OuraTagRow[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const supabase = createHealthServiceClient();
+  const { error } = await supabase.from('oura_tags').upsert(
+    rows.map((row) => ({
+      user_id: row.userId,
+      oura_id: row.ouraId,
+      local_date: row.localDate,
+      tag_type: row.tagType,
+      comment: row.comment,
+      start_time: row.startTime,
+    })),
+    { onConflict: 'user_id,oura_id' },
+  );
+  if (error) throw error;
+  return rows.length;
+}

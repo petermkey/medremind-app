@@ -283,12 +283,13 @@ export async function buildAndPersistDailyLifestyleSnapshots(
 
   // V2 cut-over (Phase 1, step 2): read from planned_occurrences + execution_events.
   // doseRecords passed as [] — execution events are embedded in normalized occurrences.
-  const [foodEntries, waterEntries, scheduledDoses, healthSnapshots, medicationExposures] = await Promise.all([
+  const [foodEntries, waterEntries, scheduledDoses, healthSnapshots, medicationExposures, ouraTags] = await Promise.all([
     fetchSourceRows(supabase, 'food_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchSourceRows(supabase, 'water_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchOccurrenceRowsAsV1Compatible(supabase, userId, startDate, endDate),
     fetchSourceRows(supabase, 'external_health_daily_snapshots', userId, 'local_date', startDate, endDate),
     fetchSourceRows(supabase, 'daily_medication_exposures', userId, 'local_date', startDate, endDate),
+    fetchSourceRows(supabase, 'oura_tags', userId, 'local_date', startDate, endDate),
   ]);
 
   const snapshots = buildDailyLifestyleSnapshots({
@@ -301,6 +302,7 @@ export async function buildAndPersistDailyLifestyleSnapshots(
     doseRecords: [],
     healthSnapshots,
     medicationExposures,
+    ouraTags,
   });
 
   await upsertDailyLifestyleSnapshots(snapshots, supabase);

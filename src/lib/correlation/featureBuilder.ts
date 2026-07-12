@@ -12,6 +12,7 @@ export type BuildDailyLifestyleSnapshotsInput = {
   doseRecords?: Row[];
   healthSnapshots?: Row[];
   medicationExposures?: Row[];
+  ouraTags?: Row[];
 };
 
 function toNumber(value: unknown): number | null {
@@ -154,6 +155,7 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
   const recordsByDate = indexByDate(input.doseRecords, input.userId, 'recorded_at');
   const healthByDate = indexByDate(input.healthSnapshots, input.userId, 'local_date');
   const exposureByDate = indexByDate(input.medicationExposures, input.userId, 'local_date');
+  const tagsByDate = indexByDate(input.ouraTags, input.userId, 'local_date');
 
   return enumerateDates(input.startDate, input.endDate).map(localDate => {
     const foodRows = foodByDate.get(localDate) ?? [];
@@ -164,6 +166,9 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
     const exposureRows = exposureByDate.get(localDate) ?? [];
     const exposure = exposureRows[0] ?? {};
     const doseCounts = canonicalDoseCounts(doseRows, recordRows);
+    const tagRows = tagsByDate.get(localDate) ?? [];
+    const hasTagType = (needle: string) =>
+      tagRows.some(row => String(row.tag_type ?? '').includes(needle));
 
     return {
       userId: input.userId,
@@ -202,6 +207,10 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
       missedMedicationCount: toNumber(exposure.missed_medication_count) ?? 0,
       medicationClassExposureScore: toNumber(exposure.medication_class_exposure_score) ?? 0,
       medicationReviewSignalCount: toNumber(exposure.medication_review_signal_count) ?? 0,
+      caffeineTagged: hasTagType('caffeine'),
+      alcoholTagged: hasTagType('alcohol'),
+      saunaTagged: hasTagType('sauna'),
+      ouraTagCount: tagRows.length,
       sourcePayload: {
         foodEntryCount: foodRows.length,
         waterEntryCount: waterRows.length,
