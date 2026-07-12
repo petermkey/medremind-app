@@ -24,21 +24,20 @@ Two confirmed user-facing production breakages, both currently silent:
 All six items shipped 2026-07-09/10. Remaining follow-up: create the external cron-job.org job for P-5 (see README "CI/CD and Runtime Pipelines").
 
 ### 1.1 Oura sync overhaul ⭐ next up
-**Spec:** [`docs/superpowers/plans/2026-07-05-oura-sync-overhaul.md`](superpowers/plans/2026-07-05-oura-sync-overhaul.md) (full TDD plan, 4 sequential tasks, ready for `subagent-driven-development`)
+**Spec:** [`docs/superpowers/plans/2026-07-10-oura-sync-overhaul.md`](superpowers/plans/2026-07-10-oura-sync-overhaul.md) (full TDD plan, 5 sequential tasks, ready for `subagent-driven-development`) — supersedes the 2026-07-05 version of this plan.
 **Root doc:** [`docs/oura-integration-stack.md`](oura-integration-stack.md) (live audit + target architecture)
 
-Oura sync has been **manual-only and stalled since 2026-04-26** — only 15 snapshot days exist, starving every downstream correlation feature. Task 1 (cron-driven sync) is effectively a bug fix and should merge first; the data gap keeps growing until it does.
-
-**⚠️ Verified 2026-07-10: `supabase/008_oura_analytics.sql` has never been applied to production.** The plan's T1 step (line 128 of the plan doc) references that migration's `sync_type` check constraint as if it's live — it isn't. `external_health_sync_runs`, `oura_sync_endpoint_coverage`, `oura_raw_documents`, and `daily_health_features` all don't exist yet (confirmed via `information_schema.tables`); `019` is the last migration actually run. Whoever starts T1 must apply `008_oura_analytics.sql` first (or redesign it) before writing any code against those tables.
+Oura sync has been **stalled since 2026-04-26** — only 15 snapshot days exist, starving every downstream correlation feature. It is not just "manual-only, nobody clicked the button": the currently-deployed manual "Sync now" route (`src/app/api/integrations/health/sync/route.ts`) unconditionally writes to `external_health_sync_runs` before any Oura fetch happens, and that table doesn't exist in production — so every sync attempt since ~2026-04-29 has failed outright with a silent 502. Task 1 of the new plan (pure ops, no code) fixes this first and should restore the existing button immediately; Tasks 2–5 then add cron-driven sync and widen the data pulled.
 
 | Task | What | Migration |
 |---|---|---|
-| T1 | Extract sync engine → `/api/cron/oura-sync` (cron-job.org, 6h), fix `markHealthConnectionSyncSuccess` status-reset bug | none |
-| T2 | Phase A: real `vO2_max` / `daily_resilience` / `daily_cardiovascular_age` endpoints (replaces the non-existent `heart_health` call that always 404s) | `020_oura_heart_fields.sql` |
-| T3 | Phase B: sleep-detail fetch (HRV, efficiency, latency, deep/REM minutes, respiratory rate) → featureBuilder | `021_oura_sleep_detail.sql` |
-| T4 | Phase C: `enhanced_tag` → `oura_tags` table + boolean correlation features | `022_oura_tags.sql` |
+| T1 | Apply `supabase/008_oura_analytics.sql` to production (written, never run) — unblocks the already-deployed manual sync | none (applies existing 008) |
+| T2 | Extract sync engine → `/api/cron/oura-sync` (cron-job.org, 6h), fix `markHealthConnectionSyncSuccess` status-reset bug, reuse existing `'daily'` sync type | none |
+| T3 | Phase A: real `vO2_max` / `daily_resilience` / `daily_cardiovascular_age` endpoints (replaces the non-existent `heart_health` call that always 404s) | `020_oura_heart_fields.sql` |
+| T4 | Phase B: sleep-detail fetch (HRV, efficiency, latency, deep/REM minutes, respiratory rate) → featureBuilder | `021_oura_sleep_detail.sql` |
+| T5 | Phase C: `enhanced_tag` → `oura_tags` table + boolean correlation features | `022_oura_tags.sql` |
 
-Branches: `codex/oura-cron-sync` → `codex/oura-heart-endpoints` → `codex/oura-sleep-detail` → `codex/oura-tags` (sequential — all touch the same engine). Orchestrator applies migrations after each merge.
+Branches: `codex/oura-cron-sync` → `codex/oura-heart-endpoints` → `codex/oura-sleep-detail` → `codex/oura-tags` (T1 is ops-only, no branch; T2–T5 sequential — all touch the same engine). Orchestrator applies migrations after each merge.
 
 **⚠️ Migration number collision:** this plan claims `020–022`. [§1.2](#12-wellbeing--nutrition-feature-backlog) claims the *same* numbers for its own migrations. **Whichever of the two starts implementation first keeps 020–022; the other must renumber its migrations to the next free slot at that time.** Neither has been applied yet (`019` is the last migration actually run against prod), so no data conflict exists yet — this is purely a paperwork collision to resolve at kickoff.
 
