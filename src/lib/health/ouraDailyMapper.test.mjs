@@ -30,3 +30,14 @@ test('mapOuraDailyPayloadToHealthSnapshot maps daily sleep/readiness/activity/st
   assert.equal(snapshot.restingHeartRate, 54);
   assert.equal(snapshot.hrvBalance, 'fair');
 });
+
+test('maps merged heart endpoints including cardiovascular age', () => {
+  const snapshot = mapOuraDailyPayloadToHealthSnapshot({
+    userId: 'u1',
+    localDate: '2026-07-01',
+    heartHealth: { vo2_max: 41.2, resilience_level: 'solid', cardiovascular_age: 33 },
+  });
+  assert.equal(snapshot.vo2Max, 41.2);
+  assert.equal(snapshot.resilienceLevel, 'solid');
+  assert.equal(snapshot.cardiovascularAge, 33);
+});
