@@ -35,3 +35,30 @@ export function getOuraDailySyncWindow(now?: Date): OuraSyncWindow {
 export function getOuraManualRefreshWindow(now?: Date): OuraSyncWindow {
   return getWindowEndingOn(MANUAL_REFRESH_DAYS, now);
 }
+
+// Cron sync window: at minimum the trailing 7 days (daily_activity/stress
+// keep updating through the day; readiness finalizes next morning), extended
+// back to lastSync - 2d when the connection stalled, floored at 30 days back
+// so a very stale connection doesn't trigger a huge re-fetch on first cron run.
+export function computeOuraCronSyncRange(
+  now: Date,
+  lastSyncAt: string | null,
+): { start_date: string; end_date: string } {
+  const dayString = (d: Date) => d.toISOString().slice(0, 10);
+  const shift = (d: Date, days: number) => {
+    const next = new Date(d);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
+  };
+  let start = shift(now, -7);
+  if (lastSyncAt) {
+    const parsed = new Date(lastSyncAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      const overlap = shift(parsed, -2);
+      if (overlap < start) start = overlap;
+    }
+  }
+  const floor = shift(now, -30);
+  if (start < floor) start = floor;
+  return { start_date: dayString(start), end_date: dayString(now) };
+}

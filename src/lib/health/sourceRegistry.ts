@@ -67,6 +67,7 @@ export async function markHealthConnectionSyncSuccess(
   const { error } = await supabase
     .from('external_health_connections')
     .update({
+      status: 'connected',
       last_sync_at: new Date().toISOString(),
       last_error: null,
       updated_at: new Date().toISOString(),
@@ -77,6 +78,22 @@ export async function markHealthConnectionSyncSuccess(
   if (error) {
     throw error;
   }
+}
+
+export async function listConnectedOuraUserIds(): Promise<Array<{ userId: string; lastSyncAt: string | null }>> {
+  const supabase = createHealthServiceClient();
+  const { data, error } = await supabase
+    .from('external_health_connections')
+    .select('user_id, last_sync_at, status')
+    .eq('source', 'oura')
+    .in('status', ['connected', 'error']); // include 'error' so transient failures self-heal
+
+  if (error) throw error;
+
+  return ((data ?? []) as Array<{ user_id: string; last_sync_at: string | null }>).map((row) => ({
+    userId: row.user_id,
+    lastSyncAt: row.last_sync_at,
+  }));
 }
 
 export async function markHealthConnectionSyncError(
