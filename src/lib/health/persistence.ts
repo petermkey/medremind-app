@@ -33,6 +33,7 @@ function toSnapshotRow(snapshot: ExternalHealthDailySnapshot) {
     resting_heart_rate: snapshot.restingHeartRate,
     hrv_balance: snapshot.hrvBalance,
     resilience_level: snapshot.resilienceLevel,
+    cardiovascular_age: snapshot.cardiovascularAge,
     workout_count: snapshot.workoutCount,
     raw_payload: snapshot.rawPayload,
     updated_at: new Date().toISOString(),

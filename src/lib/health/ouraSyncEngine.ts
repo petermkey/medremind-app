@@ -226,20 +226,41 @@ async function fetchOptionalOuraCollection(
   }
 }
 
+// A day's heart-health picture is now assembled from three separate
+// collections instead of the non-existent /heart_health endpoint.
+function mergeHeartHealth(
+  vo2: OuraCollectionResponse,
+  resilience: OuraCollectionResponse,
+  cardioAge: OuraCollectionResponse,
+): Map<string, Record<string, unknown>> {
+  const merged = new Map<string, Record<string, unknown>>();
+  const upsert = (date: string, patch: Record<string, unknown>) => {
+    merged.set(date, { ...(merged.get(date) ?? {}), ...patch });
+  };
+  for (const [date, doc] of groupDailyData(vo2)) upsert(date, { vo2_max: doc.vo2_max });
+  for (const [date, doc] of groupDailyData(resilience)) upsert(date, { resilience_level: doc.level });
+  for (const [date, doc] of groupDailyData(cardioAge)) upsert(date, { cardiovascular_age: doc.vascular_age });
+  return merged;
+}
+
 async function fetchOuraDailyCollections(
   apiBaseUrl: string,
   accessToken: string,
   range: { start_date: string; end_date: string },
 ): Promise<OuraDailyCollections> {
-  const [dailySleep, readiness, activity, spo2, stress, heartHealth, workouts] = await Promise.all([
+  const [dailySleep, readiness, activity, spo2, stress, vo2MaxRes, resilienceRes, cardioAgeRes, workouts] = await Promise.all([
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_sleep', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_readiness', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_spo2', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_stress', range),
-    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/heart_health', range),
+    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/vO2_max', range),
+    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_resilience', range),
+    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_cardiovascular_age', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
   ]);
+
+  const heartHealth = mergeHeartHealth(vo2MaxRes, resilienceRes, cardioAgeRes);
 
   return {
     dailySleep: groupDailyData(dailySleep),
@@ -247,7 +268,7 @@ async function fetchOuraDailyCollections(
     dailyActivity: groupDailyData(activity),
     dailySpO2: groupDailyData(spo2),
     dailyStress: groupDailyData(stress),
-    heartHealth: groupDailyData(heartHealth),
+    heartHealth,
     workouts: groupWorkoutData(workouts),
     analyticsCollections: {
       daily_sleep: { required: true, data: collectionData(dailySleep) },
@@ -256,7 +277,9 @@ async function fetchOuraDailyCollections(
       daily_spo2: { required: true, data: collectionData(spo2) },
       daily_stress: { required: true, data: collectionData(stress) },
       workout: { required: true, data: collectionData(workouts) },
-      heart_health: { required: false, data: collectionData(heartHealth) },
+      vO2_max: { required: false, data: collectionData(vo2MaxRes) },
+      daily_resilience: { required: false, data: collectionData(resilienceRes) },
+      daily_cardiovascular_age: { required: false, data: collectionData(cardioAgeRes) },
     },
   };
 }

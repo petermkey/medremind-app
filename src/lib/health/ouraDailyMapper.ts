@@ -22,6 +22,7 @@ type OuraDailyPayload = {
     resting_heart_rate?: number | null;
     hrv_balance?: string | null;
     resilience_level?: string | null;
+    cardiovascular_age?: number | null;
   } | null;
   workouts?: unknown[] | null;
 };
@@ -56,6 +57,7 @@ export function mapOuraDailyPayloadToHealthSnapshot(
     restingHeartRate: numberOrNull(input.heartHealth?.resting_heart_rate),
     hrvBalance: stringOrNull(input.heartHealth?.hrv_balance),
     resilienceLevel: stringOrNull(input.heartHealth?.resilience_level),
+    cardiovascularAge: numberOrNull(input.heartHealth?.cardiovascular_age),
     workoutCount: Array.isArray(input.workouts) ? input.workouts.length : 0,
     rawPayload: input as unknown as Record<string, unknown>,
   };
