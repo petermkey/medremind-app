@@ -82,6 +82,12 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     recoveryHighSeconds: 300,
     steps: 8400,
     averageSpo2: 97.5,
+    sleepAvgHrv: null,
+    sleepEfficiency: null,
+    deepSleepMinutes: null,
+    remSleepMinutes: null,
+    respiratoryRate: null,
+    restingHeartRate: null,
     hasGlp1Active: true,
     daysSinceGlp1Start: null,
     glp1DoseEscalationPhase: false,
@@ -158,4 +164,19 @@ test('buildDailyLifestyleSnapshots does not double count taken dose records for 
   assert.equal(snapshots.length, 1);
   assert.equal(snapshots[0].takenCount, 1);
   assert.equal(snapshots[0].adherencePct, 100);
+});
+
+test('buildDailyLifestyleSnapshots maps sleep-detail health columns onto the snapshot', () => {
+  const snapshots = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-01',
+    endDate: '2026-07-01',
+    healthSnapshots: [
+      { user_id: 'user-1', local_date: '2026-07-01', deep_sleep_minutes: 90, sleep_avg_hrv: 52 },
+    ],
+  });
+
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].deepSleepMinutes, 90);
+  assert.equal(snapshots[0].sleepAvgHrv, 52);
 });
