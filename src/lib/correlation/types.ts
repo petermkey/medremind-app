@@ -27,6 +27,12 @@ export type DailyLifestyleSnapshot = {
   recoveryHighSeconds?: number | null;
   steps?: number | null;
   averageSpo2?: number | null;
+  sleepAvgHrv?: number | null;
+  sleepEfficiency?: number | null;
+  deepSleepMinutes?: number | null;
+  remSleepMinutes?: number | null;
+  respiratoryRate?: number | null;
+  restingHeartRate?: number | null;
   hasGlp1Active?: boolean;
   daysSinceGlp1Start?: number | null;
   glp1DoseEscalationPhase?: boolean;

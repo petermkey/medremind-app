@@ -20,6 +20,12 @@ export type ExternalHealthDailySnapshot = {
   hrvBalance: string | null;
   resilienceLevel: string | null;
   cardiovascularAge: number | null;
+  sleepAvgHrv: number | null;
+  sleepEfficiency: number | null;
+  sleepLatencySeconds: number | null;
+  deepSleepMinutes: number | null;
+  remSleepMinutes: number | null;
+  respiratoryRate: number | null;
   workoutCount: number;
   rawPayload: Record<string, unknown>;
 };

@@ -40,6 +40,7 @@ type OuraDailyCollections = {
   dailySpO2: Map<string, Record<string, unknown>>;
   dailyStress: Map<string, Record<string, unknown>>;
   heartHealth: Map<string, Record<string, unknown>>;
+  sleepPeriods: Map<string, Record<string, unknown>>;
   workouts: Map<string, unknown[]>;
   analyticsCollections: Record<string, OuraAnalyticsCollection>;
 };
@@ -109,6 +110,26 @@ function getContinuationToken(response: OuraCollectionResponse): string | null {
   return null;
 }
 
+// A day can carry several sleep documents (naps). Prefer the long_sleep
+// period; fall back to the longest total_sleep_duration.
+function pickMainSleepByDate(response: OuraCollectionResponse): Map<string, Record<string, unknown>> {
+  const byDate = new Map<string, Record<string, unknown>>();
+  for (const item of response.data ?? []) {
+    const record = asRecord(item);
+    const date = getLocalDate(item);
+    if (!record || !date) continue;
+    const current = byDate.get(date);
+    const duration = (r: Record<string, unknown>) =>
+      typeof r.total_sleep_duration === 'number' ? r.total_sleep_duration : 0;
+    const isLong = (r: Record<string, unknown>) => r.type === 'long_sleep';
+    if (!current || (isLong(record) && !isLong(current)) ||
+        (isLong(record) === isLong(current) && duration(record) > duration(current))) {
+      byDate.set(date, record);
+    }
+  }
+  return byDate;
+}
+
 function getSnapshotDates(collections: OuraDailyCollections): string[] {
   const dates = new Set<string>();
 
@@ -119,6 +140,7 @@ function getSnapshotDates(collections: OuraDailyCollections): string[] {
     collections.dailySpO2,
     collections.dailyStress,
     collections.heartHealth,
+    collections.sleepPeriods,
     collections.workouts,
   ]) {
     for (const date of collection.keys()) {
@@ -248,7 +270,7 @@ async function fetchOuraDailyCollections(
   accessToken: string,
   range: { start_date: string; end_date: string },
 ): Promise<OuraDailyCollections> {
-  const [dailySleep, readiness, activity, spo2, stress, vo2MaxRes, resilienceRes, cardioAgeRes, workouts] = await Promise.all([
+  const [dailySleep, readiness, activity, spo2, stress, vo2MaxRes, resilienceRes, cardioAgeRes, sleepRes, workouts] = await Promise.all([
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_sleep', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_readiness', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_activity', range),
@@ -257,6 +279,7 @@ async function fetchOuraDailyCollections(
     fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/vO2_max', range),
     fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_resilience', range),
     fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/daily_cardiovascular_age', range),
+    fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/sleep', range),
     fetchPaginatedOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/workout', range),
   ]);
 
@@ -269,6 +292,7 @@ async function fetchOuraDailyCollections(
     dailySpO2: groupDailyData(spo2),
     dailyStress: groupDailyData(stress),
     heartHealth,
+    sleepPeriods: pickMainSleepByDate(sleepRes),
     workouts: groupWorkoutData(workouts),
     analyticsCollections: {
       daily_sleep: { required: true, data: collectionData(dailySleep) },
@@ -280,6 +304,7 @@ async function fetchOuraDailyCollections(
       vO2_max: { required: false, data: collectionData(vo2MaxRes) },
       daily_resilience: { required: false, data: collectionData(resilienceRes) },
       daily_cardiovascular_age: { required: false, data: collectionData(cardioAgeRes) },
+      sleep: { required: false, data: collectionData(sleepRes) },
     },
   };
 }
@@ -355,6 +380,7 @@ export async function syncOuraSnapshots(
         dailyStress: collections.dailyStress.get(localDate),
         dailySpO2: collections.dailySpO2.get(localDate),
         heartHealth: collections.heartHealth.get(localDate),
+        sleepDetail: collections.sleepPeriods.get(localDate),
         workouts: collections.workouts.get(localDate),
       }),
     );

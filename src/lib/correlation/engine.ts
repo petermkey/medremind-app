@@ -27,6 +27,12 @@ const OUTCOMES = [
   { key: 'readinessScore', label: 'readiness score' },
   { key: 'activityScore', label: 'activity score' },
   { key: 'stressHighSeconds', label: 'high-stress time' },
+  { key: 'deepSleepMinutes', label: 'deep sleep (min)' },
+  { key: 'remSleepMinutes', label: 'REM sleep (min)' },
+  { key: 'sleepAvgHrv', label: 'sleep HRV' },
+  { key: 'sleepEfficiency', label: 'sleep efficiency' },
+  { key: 'restingHeartRate', label: 'resting HR' },
+  { key: 'respiratoryRate', label: 'respiratory rate' },
 ] as const;
 
 type NumericSnapshotKey = Exclude<keyof DailyLifestyleSnapshot, 'userId' | 'localDate' | 'sourcePayload'>;

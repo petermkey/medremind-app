@@ -41,3 +41,26 @@ test('maps merged heart endpoints including cardiovascular age', () => {
   assert.equal(snapshot.resilienceLevel, 'solid');
   assert.equal(snapshot.cardiovascularAge, 33);
 });
+
+test('maps main sleep period detail and sources RHR from it', () => {
+  const snapshot = mapOuraDailyPayloadToHealthSnapshot({
+    userId: 'u1',
+    localDate: '2026-07-01',
+    sleepDetail: {
+      average_hrv: 52,
+      efficiency: 91,
+      latency: 540,
+      deep_sleep_duration: 5400,
+      rem_sleep_duration: 6600,
+      average_breath: 13.5,
+      lowest_heart_rate: 47,
+    },
+  });
+  assert.equal(snapshot.sleepAvgHrv, 52);
+  assert.equal(snapshot.sleepEfficiency, 91);
+  assert.equal(snapshot.sleepLatencySeconds, 540);
+  assert.equal(snapshot.deepSleepMinutes, 90);
+  assert.equal(snapshot.remSleepMinutes, 110);
+  assert.equal(snapshot.respiratoryRate, 13.5);
+  assert.equal(snapshot.restingHeartRate, 47);
+});
