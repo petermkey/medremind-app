@@ -71,6 +71,16 @@ function getLocalDate(value: unknown): string | null {
   return null;
 }
 
+// enhanced_tag documents carry their date under `start_day`, not any of the
+// keys getLocalDate checks — special-case it here rather than widening the
+// shared key list (which other collections rely on staying narrow).
+function tagLocalDate(doc: Record<string, unknown>): string | null {
+  const fromCommon = getLocalDate(doc);
+  if (fromCommon) return fromCommon;
+  const startDay = doc.start_day;
+  return typeof startDay === 'string' && DATE_RE.test(startDay) ? startDay : null;
+}
+
 function groupDailyData(response: OuraCollectionResponse): Map<string, Record<string, unknown>> {
   const grouped = new Map<string, Record<string, unknown>>();
 
@@ -397,7 +407,7 @@ export async function syncOuraSnapshots(
       .map((doc) => ({
         userId,
         ouraId: String(doc.id ?? ''),
-        localDate: getLocalDate(doc) ?? range.end_date,
+        localDate: tagLocalDate(doc) ?? range.end_date,
         tagType: typeof doc.tag_type_code === 'string' ? doc.tag_type_code : null,
         comment: typeof doc.comment === 'string' ? doc.comment : null,
         startTime: typeof doc.start_time === 'string' ? doc.start_time : null,
