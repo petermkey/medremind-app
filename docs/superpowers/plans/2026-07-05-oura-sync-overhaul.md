@@ -1,5 +1,7 @@
 # Oura Sync Overhaul Implementation Plan
 
+> **Superseded 2026-07-10** — use [`docs/superpowers/plans/2026-07-10-oura-sync-overhaul.md`](2026-07-10-oura-sync-overhaul.md) instead. This plan's Task 1 assumes `supabase/008_oura_analytics.sql` is already applied to production; it is not, and the currently-deployed manual sync route already calls into those missing tables unconditionally — meaning "Sync now" has been actively failing (502), not just unused. The 2026-07-10 plan opens with a migration-application task that fixes this before any of the code-extraction work below, and reuses the existing `'daily'` sync-type value instead of introducing a new `'scheduled'` one. Kept here for historical reference only — do not execute from this file.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Automate Oura data sync (stalled since 2026-04-26 because it is manual-only) and widen the pulled data per `docs/oura-integration-stack.md`: fix the never-populated heart-health fields, add sleep detail, add enhanced tags, and wire everything into the correlation feature builder.
