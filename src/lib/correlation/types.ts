@@ -46,6 +46,10 @@ export type DailyLifestyleSnapshot = {
   missedMedicationCount?: number | null;
   medicationClassExposureScore?: number | null;
   medicationReviewSignalCount?: number | null;
+  caffeineTagged?: boolean;
+  alcoholTagged?: boolean;
+  saunaTagged?: boolean;
+  ouraTagCount?: number | null;
   sourcePayload?: Record<string, number>;
 };
 

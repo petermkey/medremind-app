@@ -20,6 +20,10 @@ const FEATURES = [
   { key: 'lateMedicationCount', label: 'late medication pattern' },
   { key: 'missedMedicationCount', label: 'missed medication pattern' },
   { key: 'medicationClassExposureScore', label: 'medication exposure pattern' },
+  { key: 'caffeineTagged', label: 'caffeine (Oura tag)' },
+  { key: 'alcoholTagged', label: 'alcohol (Oura tag)' },
+  { key: 'saunaTagged', label: 'sauna (Oura tag)' },
+  { key: 'ouraTagCount', label: 'Oura tag count' },
 ] as const;
 
 const OUTCOMES = [
