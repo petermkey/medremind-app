@@ -23,36 +23,38 @@ Two confirmed user-facing production breakages, both currently silent:
 
 All six items shipped 2026-07-09/10. Remaining follow-up: create the external cron-job.org job for P-5 (see README "CI/CD and Runtime Pipelines").
 
-### 1.1 Oura sync overhaul ⭐ next up
-**Spec:** [`docs/superpowers/plans/2026-07-10-oura-sync-overhaul.md`](superpowers/plans/2026-07-10-oura-sync-overhaul.md) (full TDD plan, 5 sequential tasks, ready for `subagent-driven-development`) — supersedes the 2026-07-05 version of this plan.
-**Root doc:** [`docs/oura-integration-stack.md`](oura-integration-stack.md) (live audit + target architecture)
+### 1.1 Oura sync overhaul ✅ shipped 2026-07-12/13
+**Spec:** [`docs/superpowers/plans/2026-07-10-oura-sync-overhaul.md`](superpowers/plans/2026-07-10-oura-sync-overhaul.md) (full TDD plan, 5 sequential tasks) — supersedes the 2026-07-05 version.
+**Root doc:** [`docs/oura-integration-stack.md`](oura-integration-stack.md) (live audit + target architecture; still worth reading for the endpoint/data catalog, though the gap list there now reflects the pre-fix state)
 
-Oura sync has been **stalled since 2026-04-26** — only 15 snapshot days exist, starving every downstream correlation feature. It is not just "manual-only, nobody clicked the button": the currently-deployed manual "Sync now" route (`src/app/api/integrations/health/sync/route.ts`) unconditionally writes to `external_health_sync_runs` before any Oura fetch happens, and that table doesn't exist in production — so every sync attempt since ~2026-04-29 has failed outright with a silent 502. Task 1 of the new plan (pure ops, no code) fixes this first and should restore the existing button immediately; Tasks 2–5 then add cron-driven sync and widen the data pulled.
+Oura sync was **stalled since 2026-04-26** — the currently-deployed manual "Sync now" route wrote unconditionally to `external_health_sync_runs` before any Oura fetch happened, and that table didn't exist in production (`008_oura_analytics.sql` was written but never applied), so every sync attempt since ~2026-04-29 failed outright with a silent 502. All 5 tasks shipped, merged to `main`, and deployed to production; migrations `008` + `020`–`022` applied.
 
-| Task | What | Migration |
-|---|---|---|
-| T1 | Apply `supabase/008_oura_analytics.sql` to production (written, never run) — unblocks the already-deployed manual sync | none (applies existing 008) |
-| T2 | Extract sync engine → `/api/cron/oura-sync` (cron-job.org, 6h), fix `markHealthConnectionSyncSuccess` status-reset bug, reuse existing `'daily'` sync type | none |
-| T3 | Phase A: real `vO2_max` / `daily_resilience` / `daily_cardiovascular_age` endpoints (replaces the non-existent `heart_health` call that always 404s) | `020_oura_heart_fields.sql` |
-| T4 | Phase B: sleep-detail fetch (HRV, efficiency, latency, deep/REM minutes, respiratory rate) → featureBuilder | `021_oura_sleep_detail.sql` |
-| T5 | Phase C: `enhanced_tag` → `oura_tags` table + boolean correlation features | `022_oura_tags.sql` |
+| Task | What | Migration | PR |
+|---|---|---|---|
+| T1 | Applied `supabase/008_oura_analytics.sql` to production (written, never run) | `008` (applied) | ops-only, no PR |
+| T2 | Extracted sync engine → `/api/cron/oura-sync`, fixed `markHealthConnectionSyncSuccess` status-reset bug, reused existing `'daily'` sync type | none | [#76](https://github.com/petermkey/medremind-app/pull/76) |
+| T3 | Phase A: real `vO2_max` / `daily_resilience` / `daily_cardiovascular_age` endpoints (replaces the non-existent `heart_health` call that always 404s) | `020_oura_heart_fields.sql` (applied) | [#80](https://github.com/petermkey/medremind-app/pull/80) (supersedes closed #77) |
+| T4 | Phase B: sleep-detail fetch (HRV, efficiency, latency, deep/REM minutes, respiratory rate) → featureBuilder | `021_oura_sleep_detail.sql` (applied) | [#78](https://github.com/petermkey/medremind-app/pull/78) |
+| T5 | Phase C: `enhanced_tag` → `oura_tags` table + correlation features (`caffeineTagged`/`alcoholTagged`/`saunaTagged`/`ouraTagCount`, registered in `engine.ts` FEATURES) | `022_oura_tags.sql` (applied) | [#79](https://github.com/petermkey/medremind-app/pull/79) |
 
-Branches: `codex/oura-cron-sync` → `codex/oura-heart-endpoints` → `codex/oura-sleep-detail` → `codex/oura-tags` (T1 is ops-only, no branch; T2–T5 sequential — all touch the same engine). Orchestrator applies migrations after each merge.
+**⚠️ Still open — one manual owner action:** `/api/cron/oura-sync` is deployed and CRON_SECRET-gated but has **no external scheduler wired up yet** (same situation P-5's healthcheck route was in). Create a cron-job.org job — `GET https://medremind-app-two.vercel.app/api/cron/oura-sync`, header `Authorization: Bearer <CRON_SECRET>` (Vercel prod value, not `.env.local`'s — they differ by design), every 6h, same account as job #7402449 (`/api/cron/notify`). Trigger once manually after creating it, then verify `external_health_daily_snapshots` keeps growing past 2026-07-12.
 
-**⚠️ Migration number collision:** this plan claims `020–022`. [§1.2](#12-wellbeing--nutrition-feature-backlog) claims the *same* numbers for its own migrations. **Whichever of the two starts implementation first keeps 020–022; the other must renumber its migrations to the next free slot at that time.** Neither has been applied yet (`019` is the last migration actually run against prod), so no data conflict exists yet — this is purely a paperwork collision to resolve at kickoff.
+Two deferred Minor items from the final review (not blocking, low priority): `daily_lifestyle_snapshots`'s column whitelist (`src/lib/correlation/persistence.ts`) doesn't yet persist the new sleep/heart/tag fields — harmless today since correlation cards build from the in-memory snapshot, but note if that table is ever made authoritative; tag-type substring matching (`includes('caffeine')` etc. in `featureBuilder.ts`) is unverified against a live Oura `enhanced_tag` payload — check once real tag data exists.
+
+**Migration numbers `020`–`022` are now taken by this work.** [§1.2](#12-wellbeing--nutrition-feature-backlog) below claims the same numbers for its own (unstarted) migrations — renumber those to `023`–`025` when that backlog starts.
 
 ### 1.2 Wellbeing & nutrition feature backlog
 **Spec:** [`docs/backlog-wellbeing-features.md`](backlog-wellbeing-features.md) (5 features, full architecture per feature)
 
 | Wave | Feature | Migration | Effort |
 |---|---|---|---|
-| 1 | B4 Wellbeing check-ins («Дневник самочувствия в 1 тап») | `022_wellbeing_checkins.sql`† | S–M |
+| 1 | B4 Wellbeing check-ins («Дневник самочувствия в 1 тап») | `024_wellbeing_checkins.sql`† | S–M |
 | 1 | B3 Eating window («Пищевое окно и циркадное питание») | none | S |
-| 2 | B1 Nutrient balance («Дефициты и дубли: питание ↔ стек») ⭐ flagship | `020_supplement_nutrient_facts.sql`† | M–L |
+| 2 | B1 Nutrient balance («Дефициты и дубли: питание ↔ стек») ⭐ flagship | `023_supplement_nutrient_facts.sql`† | M–L |
 | 3 | B5 Close the gap («Чем закрыть день») | none | S–M |
-| 4 | B2 AI weekly review («AI-нутрициолог: недельный разбор») | `021_weekly_reviews.sql`† | M |
+| 4 | B2 AI weekly review («AI-нутрициолог: недельный разбор») | `025_weekly_reviews.sql`† | M |
 
-† Numbers as originally written in the spec — subject to the renumbering note in §1.1 depending on which backlog starts first.
+† Renumbered from the spec's original `020`–`022` — those are now taken by the shipped Oura sync overhaul (§1.1). Confirm `019`+Oura's `020`–`022` are still the last applied migrations before starting.
 
 Refill forecasting and the doctor-facing PDF report were considered and **explicitly dropped by the owner** — do not resurrect them.
 
