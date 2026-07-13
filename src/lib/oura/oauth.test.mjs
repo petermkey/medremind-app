@@ -37,10 +37,10 @@ test('buildOuraAuthorizationUrl creates the Oura authorization-code URL', () => 
   assert.equal(url.searchParams.get('state'), 'state-123');
 });
 
-test('supportedOuraScopes removes unsupported Oura scopes', () => {
+test('supportedOuraScopes keeps heart_health/stress but drops unsupported scopes', () => {
   assert.deepEqual(
     supportedOuraScopes('email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health'),
-    ['email', 'personal', 'daily', 'heartrate', 'tag', 'workout', 'session', 'spo2'],
+    ['email', 'personal', 'daily', 'heartrate', 'tag', 'workout', 'session', 'spo2', 'stress', 'heart_health'],
   );
 });
 

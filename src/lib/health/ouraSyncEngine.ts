@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/nextjs';
+
 import { mapOuraDailyPayloadToHealthSnapshot } from '@/lib/health/ouraDailyMapper';
 import { upsertExternalHealthDailySnapshots, upsertOuraTags } from '@/lib/health/persistence';
 import { markHealthConnectionSyncSuccess } from '@/lib/health/sourceRegistry';
@@ -14,8 +16,9 @@ import {
   buildOuraAnalyticsSyncPayloads,
   type OuraAnalyticsCollection,
 } from '@/lib/oura/analyticsSync';
-import { fetchOuraJson, OuraApiError, refreshOuraAccessToken } from '@/lib/oura/client';
+import { fetchOuraJson, refreshOuraAccessToken } from '@/lib/oura/client';
 import { getOuraServerConfig } from '@/lib/oura/config';
+import { classifyOptionalOuraError, type OuraOptionalFetchAuthError } from '@/lib/oura/optionalFetchError';
 import {
   getStoredOuraTokens,
   markOuraSyncSuccess,
@@ -247,15 +250,11 @@ async function fetchOptionalOuraCollection(
   accessToken: string,
   path: string,
   range: { start_date: string; end_date: string },
-): Promise<OuraCollectionResponse> {
+): Promise<OuraCollectionResponse & { authError?: OuraOptionalFetchAuthError }> {
   try {
     return await fetchPaginatedOuraCollection(apiBaseUrl, accessToken, path, range);
   } catch (err) {
-    if (err instanceof OuraApiError && [401, 403, 404].includes(err.status)) {
-      return { data: [] };
-    }
-
-    throw err;
+    return classifyOptionalOuraError(err, path);
   }
 }
 
@@ -297,6 +296,29 @@ async function fetchOuraDailyCollections(
 
   const heartHealth = mergeHeartHealth(vo2MaxRes, resilienceRes, cardioAgeRes);
 
+  const optionalCollections = {
+    vO2_max: vo2MaxRes,
+    daily_resilience: resilienceRes,
+    daily_cardiovascular_age: cardioAgeRes,
+    sleep: sleepRes,
+    enhanced_tag: enhancedTagsRes,
+  };
+  const authErrors = Object.values(optionalCollections)
+    .map((collection) => collection.authError)
+    .filter((authError): authError is OuraOptionalFetchAuthError => authError !== undefined);
+  if (authErrors.length > 0) {
+    // A 401 on an "optional" endpoint means the token is missing a scope we
+    // asked for — that's a real, actionable misconfiguration (this fixed a
+    // heart_health/stress scope gap that silently zeroed out data for
+    // months). Surface it instead of letting fetchOptionalOuraCollection's
+    // tolerance for 403/404 mask it too.
+    Sentry.captureMessage('[ouraSyncEngine] optional Oura endpoint(s) rejected for missing scope', {
+      level: 'warning',
+      tags: { route: 'ouraSyncEngine' },
+      extra: { authErrors },
+    });
+  }
+
   return {
     dailySleep: groupDailyData(dailySleep),
     dailyReadiness: groupDailyData(readiness),
@@ -314,11 +336,11 @@ async function fetchOuraDailyCollections(
       daily_spo2: { required: true, data: collectionData(spo2) },
       daily_stress: { required: true, data: collectionData(stress) },
       workout: { required: true, data: collectionData(workouts) },
-      vO2_max: { required: false, data: collectionData(vo2MaxRes) },
-      daily_resilience: { required: false, data: collectionData(resilienceRes) },
-      daily_cardiovascular_age: { required: false, data: collectionData(cardioAgeRes) },
-      sleep: { required: false, data: collectionData(sleepRes) },
-      enhanced_tag: { required: false, data: collectionData(enhancedTagsRes) },
+      vO2_max: { required: false, data: collectionData(vo2MaxRes), error: vo2MaxRes.authError },
+      daily_resilience: { required: false, data: collectionData(resilienceRes), error: resilienceRes.authError },
+      daily_cardiovascular_age: { required: false, data: collectionData(cardioAgeRes), error: cardioAgeRes.authError },
+      sleep: { required: false, data: collectionData(sleepRes), error: sleepRes.authError },
+      enhanced_tag: { required: false, data: collectionData(enhancedTagsRes), error: enhancedTagsRes.authError },
     },
   };
 }
