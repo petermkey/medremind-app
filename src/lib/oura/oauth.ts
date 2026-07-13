@@ -22,7 +22,7 @@ export type OuraOAuthStateValidationInput = {
 };
 
 const OURA_OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
-const SUPPORTED_OURA_SCOPES = new Set(['email', 'personal', 'daily', 'heartrate', 'tag', 'workout', 'session', 'spo2']);
+const SUPPORTED_OURA_SCOPES = new Set(['email', 'personal', 'daily', 'heartrate', 'tag', 'workout', 'session', 'spo2', 'heart_health', 'stress']);
 
 function toBase64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
