@@ -8,7 +8,7 @@
 ## 1. Current state (audited live, 2026-07-05)
 
 ### What is built
-- **OAuth2** flow (`src/lib/oura/oauth.ts`, `client.ts`): scopes `email personal daily heartrate tag workout session spo2`; tokens encrypted at rest (`tokenCrypto.ts`, `OURA_TOKEN_ENCRYPTION_KEY`), refresh-token exchange implemented.
+- **OAuth2** flow (`src/lib/oura/oauth.ts`, `client.ts`): scopes `email personal daily heartrate tag workout session spo2 heart_health stress` (widened 2026-07-13 — see §2 correction below); tokens encrypted at rest (`tokenCrypto.ts`, `OURA_TOKEN_ENCRYPTION_KEY`), refresh-token exchange implemented.
 - **Fetch layer** `/api/integrations/oura/daily`: pulls `daily_sleep`, `daily_readiness`, `daily_activity`, `daily_spo2`, `daily_stress` (+ `workout` via analyticsSync) with `syncWindows.ts` range logic.
 - **Mapping** `src/lib/health/ouraDailyMapper.ts` → `external_health_daily_snapshots` (008): scores, stress/recovery seconds, steps, calories, SpO2, breathing disturbance, workout_count, `raw_payload` jsonb — **plus vo2_max / resting_heart_rate / hrv_balance / resilience_level columns**.
 - **Consumption**: correlation featureBuilder (`daily_lifestyle_snapshots` ← Oura features), Insights.
@@ -27,6 +27,8 @@
 - **Webhooks are the recommended freshness mechanism**: subscription API (create/list/renew/delete) authenticated with `x-client-id`/`x-client-secret`; events fire ~30s after mobile-app sync. Daily Activity / Stress / Heart Rate update **periodically through the day**, so single morning polls miss updates.
 - **Endpoint catalog (v2, `api.ouraring.com/v2/usercollection/*`)** — beyond what we pull today:
   `daily_resilience`, `daily_cardiovascular_age`, `vO2_max`, `sleep` (detailed periods: HRV, efficiency, latency, stages, respiratory rate), `sleep_time` (recommended bedtime windows), `rest_mode_period`, `enhanced_tag` (replaces tag), `session` (meditation/breathing), `heartrate` (5-min granularity), `ring_configuration`, `personal_info`.
+
+**⚠️ Correction (2026-07-13, verified via a live 401 probe against the real API with a real token):** this catalog did not originally note per-endpoint OAuth scope requirements, and the code built against it (2026-07-10 sync overhaul) shipped without them — `vO2_max` and `daily_cardiovascular_age` require the **`heart_health`** scope, `daily_resilience` requires the **`stress`** scope. Neither scope was requested, so those three endpoints 401 on every call; `fetchOptionalOuraCollection`'s error-tolerance silently turned that into "0 documents," indistinguishable from "user has no data" until endpoint coverage was explicitly widened to record auth errors (see `src/lib/oura/optionalFetchError.ts`). `sleep` and `enhanced_tag` need no additional scope beyond what was already granted. **Any future endpoint added from this catalog must have its scope requirement verified with a live authenticated call before shipping — the catalog/docs are not a reliable source for this.**
 
 Sources: [cloud.ouraring.com/v2/docs](https://cloud.ouraring.com/v2/docs), [Oura Member Care — The Oura API](https://support.ouraring.com/hc/en-us/articles/4415266939155-The-Oura-API), [Pinta365/oura_api endpoint coverage](https://github.com/Pinta365/oura_api).
 
