@@ -88,6 +88,11 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     remSleepMinutes: null,
     respiratoryRate: null,
     restingHeartRate: null,
+    temperatureDeviation: null,
+    nonWearMinutes: null,
+    deepSleepFirstThirdMinutes: null,
+    minutesToFirstDeepSleep: null,
+    hrvRecoveryDelta: null,
     hasGlp1Active: true,
     daysSinceGlp1Start: null,
     glp1DoseEscalationPhase: false,
@@ -201,4 +206,54 @@ test('buildDailyLifestyleSnapshots derives enhanced-tag correlation features fro
   assert.equal(snapshots[0].alcoholTagged, true);
   assert.equal(snapshots[0].saunaTagged, false);
   assert.equal(snapshots[0].ouraTagCount, 2);
+});
+
+test('exposes temperature and night-detail outcomes from health snapshots', () => {
+  const [snapshot] = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-13',
+    endDate: '2026-07-13',
+    healthSnapshots: [{
+      user_id: 'user-1',
+      local_date: '2026-07-13',
+      temperature_deviation: 0.4,
+      non_wear_minutes: 30,
+      deep_sleep_first_third_minutes: 22,
+      minutes_to_first_deep_sleep: 14,
+      hrv_recovery_delta: 8,
+      activity_score: 75,
+      steps: 9000,
+    }],
+  });
+  assert.equal(snapshot.temperatureDeviation, 0.4);
+  assert.equal(snapshot.nonWearMinutes, 30);
+  assert.equal(snapshot.deepSleepFirstThirdMinutes, 22);
+  assert.equal(snapshot.minutesToFirstDeepSleep, 14);
+  assert.equal(snapshot.hrvRecoveryDelta, 8);
+  assert.equal(snapshot.activityScore, 75);
+});
+
+test('low-wear days null out activity-derived outcomes but keep sleep outcomes', () => {
+  const [snapshot] = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-13',
+    endDate: '2026-07-13',
+    healthSnapshots: [{
+      user_id: 'user-1',
+      local_date: '2026-07-13',
+      non_wear_minutes: 500,
+      activity_score: 75,
+      steps: 9000,
+      stress_high_seconds: 1200,
+      recovery_high_seconds: 600,
+      sleep_score: 82,
+      deep_sleep_minutes: 90,
+    }],
+  });
+  assert.equal(snapshot.activityScore, null);
+  assert.equal(snapshot.steps, null);
+  assert.equal(snapshot.stressHighSeconds, null);
+  assert.equal(snapshot.recoveryHighSeconds, null);
+  assert.equal(snapshot.sleepScore, 82);
+  assert.equal(snapshot.deepSleepMinutes, 90);
 });

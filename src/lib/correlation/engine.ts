@@ -37,6 +37,10 @@ const OUTCOMES = [
   { key: 'sleepEfficiency', label: 'sleep efficiency' },
   { key: 'restingHeartRate', label: 'resting HR' },
   { key: 'respiratoryRate', label: 'respiratory rate' },
+  { key: 'temperatureDeviation', label: 'skin temperature deviation' },
+  { key: 'deepSleepFirstThirdMinutes', label: 'deep sleep in first third (min)' },
+  { key: 'minutesToFirstDeepSleep', label: 'time to first deep sleep (min)' },
+  { key: 'hrvRecoveryDelta', label: 'overnight HRV recovery' },
 ] as const;
 
 type NumericSnapshotKey = Exclude<keyof DailyLifestyleSnapshot, 'userId' | 'localDate' | 'sourcePayload'>;
