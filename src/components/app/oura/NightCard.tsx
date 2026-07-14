@@ -8,6 +8,13 @@ function fmt(value: number | null | undefined, suffix = ''): string {
   return `${rounded}${suffix}`;
 }
 
+function fmtSignedDecimal(value: number | null | undefined, suffix = ''): string {
+  if (value === null || value === undefined) return '—';
+  const fixed = (Math.round(value * 10) / 10).toFixed(1);
+  const signed = value > 0 ? `+${fixed}` : fixed;
+  return `${signed}${suffix}`;
+}
+
 function dateLabel(localDate: string): string {
   const date = new Date(`${localDate}T00:00:00.000Z`);
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date);
@@ -40,6 +47,7 @@ function HeroTile({
   metric,
   day,
   index,
+  formatter = fmt,
 }: {
   label: string;
   value: number | null | undefined;
@@ -47,12 +55,13 @@ function HeroTile({
   metric: OuraMetricKey;
   day: OuraStatsDay;
   index: number;
+  formatter?: (value: number | null | undefined, suffix?: string) => string;
 }) {
   const delta = classifyDelta(metric, typeof value === 'number' ? value : null, medianOfPreviousDays((day as OuraStatsDay & { __allDays?: OuraStatsDay[] }).__allDays ?? [], index, metric));
   return (
     <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0D1117] p-3">
       <div className="text-[10px] font-bold uppercase tracking-widest text-[#8B949E]">{label}</div>
-      <div className="mt-2 text-2xl font-extrabold text-[#F0F6FC]">{fmt(value, suffix)}</div>
+      <div className="mt-2 text-2xl font-extrabold text-[#F0F6FC]">{formatter(value, suffix)}</div>
       {delta.delta !== null && (
         <div className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${toneClass(delta.tone)}`}>
           {delta.delta > 0 ? '+' : ''}{fmt(delta.delta)} vs norm
@@ -109,7 +118,7 @@ export function NightCard({ days }: { days: OuraStatsDay[] }) {
         <HeroTile label="Sleep" value={day.sleepScore} metric="sleepScore" day={day} index={display.index} />
         <HeroTile label="Readiness" value={day.readinessScore} metric="readinessScore" day={day} index={display.index} />
         <HeroTile label="Night HRV" value={day.sleepAvgHrv} suffix=" ms" metric="sleepAvgHrv" day={day} index={display.index} />
-        <HeroTile label="Temperature" value={day.temperatureDeviation} suffix=" °C" metric="temperatureDeviation" day={day} index={display.index} />
+        <HeroTile label="Temperature" value={day.temperatureDeviation} suffix=" °C" metric="temperatureDeviation" day={day} index={display.index} formatter={fmtSignedDecimal} />
       </div>
 
       <div className="mt-4 rounded-xl bg-[#0D1117] px-3">

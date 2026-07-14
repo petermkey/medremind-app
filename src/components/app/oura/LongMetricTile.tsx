@@ -50,19 +50,28 @@ export function LongMetricTile({
   const prior = comparison(days, metric, period);
   if (latest === null) return null;
   const buckets = weeklyBuckets(days.slice(-period), metric).slice(-13);
-  const max = Math.max(...buckets.map(bucket => bucket.average ?? 0), 1);
+  const finiteAverages = buckets.map(bucket => bucket.average).filter((value): value is number => value !== null);
+  const domainMin = finiteAverages.length ? Math.min(...finiteAverages) : 0;
+  const domainMax = finiteAverages.length ? Math.max(...finiteAverages) : 1;
+  const span = domainMax - domainMin || 1;
 
   return (
     <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0D1117] p-3">
       <div className="text-[10px] font-bold uppercase tracking-widest text-[#8B949E]">{title}</div>
       <div className="mt-2 text-2xl font-extrabold text-[#F0F6FC]">{fmt(latest, suffix)}</div>
       {prior !== null && <div className="mt-1 text-xs text-[#8B949E]">was {fmt(prior, suffix)} in the prior {period}d</div>}
+      {finiteAverages.length > 1 && (
+        <div className="mt-1 text-[10px] text-[#8B949E]">weekly range {fmt(domainMin, suffix)}–{fmt(domainMax, suffix)}</div>
+      )}
       <div className="mt-3 flex h-9 items-end gap-1">
         {buckets.map(bucket => (
           <div
             key={bucket.startDate}
             className="flex-1 rounded-sm bg-[#3B82F6]"
-            style={{ height: `${Math.max(12, ((bucket.average ?? 0) / max) * 36)}px`, opacity: 0.75 }}
+            style={{
+              height: bucket.average === null ? '4px' : `${8 + ((bucket.average - domainMin) / span) * 28}px`,
+              opacity: bucket.average === null ? 0.15 : 0.8,
+            }}
             title={`${bucket.startDate}: ${fmt(bucket.average, suffix)}`}
           />
         ))}
