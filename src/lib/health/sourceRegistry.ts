@@ -80,6 +80,35 @@ export async function markHealthConnectionSyncSuccess(
   }
 }
 
+export async function updateOuraDeviceStatus(
+  userId: string,
+  patch: {
+    sleepWindow?: Record<string, unknown> | null;
+    sleepWindowDate?: string | null;
+    batteryLevel?: number | null;
+    batteryCharging?: boolean | null;
+    batteryAt?: string | null;
+  },
+) {
+  const supabase = createHealthServiceClient();
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if ('sleepWindow' in patch) row.sleep_window = patch.sleepWindow;
+  if ('sleepWindowDate' in patch) row.sleep_window_date = patch.sleepWindowDate;
+  if ('batteryLevel' in patch) row.battery_level = patch.batteryLevel;
+  if ('batteryCharging' in patch) row.battery_charging = patch.batteryCharging;
+  if ('batteryAt' in patch) row.battery_at = patch.batteryAt;
+
+  const { error } = await supabase
+    .from('external_health_connections')
+    .update(row)
+    .eq('user_id', userId)
+    .eq('source', 'oura');
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function listConnectedOuraUserIds(): Promise<Array<{ userId: string; lastSyncAt: string | null }>> {
   const supabase = createHealthServiceClient();
   const { data, error } = await supabase
