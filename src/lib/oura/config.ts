@@ -4,7 +4,7 @@ import { assertValidOuraTokenEncryptionKey } from './tokenCrypto';
 const DEFAULT_AUTHORIZATION_URL = 'https://cloud.ouraring.com/oauth/authorize';
 const DEFAULT_TOKEN_URL = 'https://api.ouraring.com/oauth/token';
 const DEFAULT_API_BASE_URL = 'https://api.ouraring.com';
-const DEFAULT_SCOPES = 'email personal daily heartrate tag workout session spo2 heart_health stress';
+const DEFAULT_SCOPES = 'email personal daily heartrate tag workout session spo2 heart_health stress ring_configuration';
 
 export type OuraServerConfig = {
   authorizationUrl: string;
