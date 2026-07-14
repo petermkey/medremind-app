@@ -27,6 +27,26 @@ function medianLine(values: Array<number | null>, fixedDomain?: [number, number]
   return 1 - Math.max(0, Math.min(1, (median - domain[0]) / span));
 }
 
+function rangeLabel(values: Array<number | null>, suffix: string): string | null {
+  const finite = values.filter((value): value is number => value !== null && Number.isFinite(value));
+  if (finite.length === 0) return null;
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  if (min === max) return `${fmt(min, suffix)}`;
+  return `${fmt(min, suffix)}–${fmt(max, suffix)}`;
+}
+
+const LEGENDS: Record<string, Array<{ color: string; label: string }>> = {
+  diverging: [
+    { color: '#F97316', label: 'Warmer' },
+    { color: '#38BDF8', label: 'Cooler' },
+  ],
+  paired: [
+    { color: '#F97316', label: 'Stress' },
+    { color: '#10B981', label: 'Recovery' },
+  ],
+};
+
 export function TrendChart({
   title,
   dates,
@@ -65,16 +85,30 @@ export function TrendChart({
   const slot = plotWidth / Math.max(values.length, 1);
   const barWidth = Math.max(2, Math.min(8, slot * 0.62));
   const zeroY = padY + plotHeight / 2;
+  const legend = LEGENDS[mode];
+  const range = rangeLabel(mode === 'paired' ? [...values, ...(secondaryValues ?? [])] : values, valueSuffix);
 
   return (
     <div className="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0D1117] p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="mb-1 flex items-center justify-between gap-3">
         <div className="text-xs font-bold text-[#F0F6FC]">{title}</div>
-        {tooltip && <div className="text-[10px] text-[#8B949E]">{tooltip.label} · {tooltip.value}</div>}
+        <div className="text-[10px] font-semibold text-[#8B949E]">
+          {tooltip ? `${tooltip.label} · ${tooltip.value}` : range}
+        </div>
       </div>
+      {legend && (
+        <div className="mb-2 flex items-center gap-3">
+          {legend.map(item => (
+            <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[#8B949E]">
+              <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      )}
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-28 w-full"
+        className="h-28 w-full touch-none"
         role="img"
         aria-label={`${title} trend`}
         onClick={(event) => {
@@ -92,9 +126,24 @@ export function TrendChart({
             strokeDasharray="4 4"
           />
         )}
-        {mode === 'diverging' && (
-          <line x1={padX} x2={width - padX} y1={zeroY} y2={zeroY} stroke="rgba(255,255,255,0.28)" strokeDasharray="4 4" />
-        )}
+        {bars.map((bar, index) => {
+          const x = padX + index * slot;
+          const label = dates[index] ?? '';
+          const tooltipValue = mode === 'paired'
+            ? `${fmt(bar.value, valueSuffix)} stress · ${fmt(secondaryBars[index]?.value ?? null, valueSuffix)} recovery`
+            : fmt(bar.value, valueSuffix);
+          return (
+            <rect
+              key={`hit-${label || index}`}
+              x={x}
+              y={padY}
+              width={Math.max(slot, 1)}
+              height={plotHeight}
+              fill="transparent"
+              onClick={() => setTooltip({ index, label, value: tooltipValue })}
+            />
+          );
+        })}
         {bars.map((bar, index) => {
           if (bar.value === null) return null;
           const x = padX + index * slot + (slot - barWidth) / 2;
@@ -155,6 +204,12 @@ export function TrendChart({
             />
           );
         })}
+        {mode === 'diverging' && (
+          <g>
+            <line x1={padX} x2={width - padX} y1={zeroY} y2={zeroY} stroke="rgba(255,255,255,0.6)" strokeWidth="1" pointerEvents="none" />
+            <text x={padX} y={zeroY - 3} fontSize="8" fill="rgba(255,255,255,0.6)" pointerEvents="none">0{valueSuffix}</text>
+          </g>
+        )}
       </svg>
       <div className="mt-1 flex justify-between text-[10px] text-[#8B949E]">
         <span>{dates[0] ?? ''}</span>
