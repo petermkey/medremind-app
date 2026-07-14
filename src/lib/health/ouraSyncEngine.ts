@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 
 import { mapOuraDailyPayloadToHealthSnapshot } from '@/lib/health/ouraDailyMapper';
+import { hrvRecoveryDelta, parseSleepPhaseFeatures } from '@/lib/health/nightDetail';
 import { upsertExternalHealthDailySnapshots, upsertOuraTags } from '@/lib/health/persistence';
 import { markHealthConnectionSyncSuccess } from '@/lib/health/sourceRegistry';
 import {
@@ -142,6 +143,15 @@ function pickMainSleepByDate(response: OuraCollectionResponse): Map<string, Reco
     }
   }
   return byDate;
+}
+
+function computeNightDetail(sleepDoc: Record<string, unknown> | undefined) {
+  const phases = parseSleepPhaseFeatures(sleepDoc?.sleep_phase_30_sec);
+  return {
+    deep_sleep_first_third_minutes: phases.deepSleepFirstThirdMinutes,
+    minutes_to_first_deep_sleep: phases.minutesToFirstDeepSleep,
+    hrv_recovery_delta: hrvRecoveryDelta(sleepDoc?.hrv),
+  };
 }
 
 function getSnapshotDates(collections: OuraDailyCollections): string[] {
@@ -417,6 +427,7 @@ export async function syncOuraSnapshots(
         dailySpO2: collections.dailySpO2.get(localDate),
         heartHealth: collections.heartHealth.get(localDate),
         sleepDetail: collections.sleepPeriods.get(localDate),
+        nightDetail: computeNightDetail(collections.sleepPeriods.get(localDate)),
         workouts: collections.workouts.get(localDate),
       }),
     );
