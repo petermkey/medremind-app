@@ -93,6 +93,8 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     deepSleepFirstThirdMinutes: null,
     minutesToFirstDeepSleep: null,
     hrvRecoveryDelta: null,
+    postDoseHrDeltaBpm: null,
+    daytimeAvgHr: null,
     hasGlp1Active: true,
     daysSinceGlp1Start: null,
     glp1DoseEscalationPhase: false,
@@ -256,4 +258,20 @@ test('low-wear days null out activity-derived outcomes but keep sleep outcomes',
   assert.equal(snapshot.recoveryHighSeconds, null);
   assert.equal(snapshot.sleepScore, 82);
   assert.equal(snapshot.deepSleepMinutes, 90);
+});
+
+test('exposes precomputed dose-response HR outcomes', () => {
+  const [snapshot] = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-13',
+    endDate: '2026-07-13',
+    doseResponseRows: [{
+      user_id: 'user-1',
+      local_date: '2026-07-13',
+      post_dose_hr_delta_bpm: -8,
+      daytime_avg_hr: 65.5,
+    }],
+  });
+  assert.equal(snapshot.postDoseHrDeltaBpm, -8);
+  assert.equal(snapshot.daytimeAvgHr, 65.5);
 });

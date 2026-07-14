@@ -40,6 +40,8 @@ type OuraStatus = {
   connected: boolean;
   status: string | null;
   lastSyncAt: string | null;
+  battery?: { level: number; charging: boolean; at: string | null } | null;
+  sleepWindowDate?: string | null;
 };
 
 export default function SettingsPage() {
@@ -70,6 +72,7 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [zeroPushSubscriptions, setZeroPushSubscriptions] = useState(false);
   const installState = useInstallState();
+  const ringBatteryLow = ouraStatus?.battery ? ouraStatus.battery.level <= 5 : false;
 
   // Push can be "enabled" in settings with nothing actually registered on
   // this account (failed re-subscribe, VAPID rotation) — the cron used to
@@ -364,6 +367,8 @@ export default function SettingsPage() {
         connected: false,
         status: data.status ?? 'revoked',
         lastSyncAt: null,
+        battery: null,
+        sleepWindowDate: null,
       });
       setHealthSyncStatus('Oura disconnected in MedRemind.');
     } finally {
@@ -439,6 +444,9 @@ export default function SettingsPage() {
                 <div className="mt-1 text-xs text-[#8B949E]">
                   {ouraStatus?.connected ? 'Connected' : 'Not connected'}
                   {ouraStatus?.lastSyncAt ? ` · Last sync: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : ''}
+                  {ouraStatus?.battery
+                    ? ` · Battery: ${ouraStatus.battery.level}%${ouraStatus.battery.charging ? ' (charging)' : ''}`
+                    : ''}
                 </div>
               </div>
               <div className="flex flex-shrink-0 gap-2">
@@ -465,6 +473,7 @@ export default function SettingsPage() {
                 <div className="text-sm font-semibold text-[#F0F6FC]">Health sync</div>
                 <div className="mt-1 text-xs text-[#8B949E]">
                   {healthSyncStatus || (ouraStatus?.lastSyncAt ? `Last run: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : 'No health sync run shown yet.')}
+                  {ringBatteryLow ? ' · Ring battery is low — data may stop arriving.' : ''}
                 </div>
               </div>
               <Button variant="secondary" size="sm" onClick={handleHealthSync} loading={healthSyncing}>

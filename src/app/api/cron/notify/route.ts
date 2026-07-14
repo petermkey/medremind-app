@@ -17,6 +17,7 @@ import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { isInQuietHours } from '@/lib/push/quietHours';
 import { isVapidConfigured, sendPushToUser } from '@/lib/push/sendToUser';
 import { computeWindowSegments, segmentsToOrFilter } from '@/lib/push/scheduleWindow';
 
@@ -112,6 +113,14 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
       const tz = profileRow?.timezone ?? 'UTC';
+      const { data: connRow } = await supabase
+        .from('external_health_connections')
+        .select('sleep_window')
+        .eq('user_id', userId)
+        .eq('source', 'oura')
+        .maybeSingle();
+      const optimalBedtime = (connRow?.sleep_window as { optimal_bedtime?: unknown } | null)?.optimal_bedtime;
+      const quietNow = isInQuietHours(now, tz, optimalBedtime);
 
       // ── Stale-claim recovery ─────────────────────────────────────────────
       // Pass A writes an in-flight claim (notification_count=0) before sending
@@ -294,6 +303,12 @@ export async function GET(request: NextRequest) {
           });
 
           if (remindable.length === 0) return;
+          if (quietNow) {
+            for (const occ of remindable) {
+              results.push({ userId, doseId: occ.id, status: 'quiet-hours', pass: 'B' });
+            }
+            return;
+          }
 
           const itemIds = [...new Set(remindable.map(o => o.protocol_item_id))];
           const { data: items } = await supabase

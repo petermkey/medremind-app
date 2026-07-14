@@ -41,6 +41,8 @@ const OUTCOMES = [
   { key: 'deepSleepFirstThirdMinutes', label: 'deep sleep in first third (min)' },
   { key: 'minutesToFirstDeepSleep', label: 'time to first deep sleep (min)' },
   { key: 'hrvRecoveryDelta', label: 'overnight HRV recovery' },
+  { key: 'postDoseHrDeltaBpm', label: 'post-dose HR change (bpm)' },
+  { key: 'daytimeAvgHr', label: 'daytime avg HR' },
 ] as const;
 
 type NumericSnapshotKey = Exclude<keyof DailyLifestyleSnapshot, 'userId' | 'localDate' | 'sourcePayload'>;

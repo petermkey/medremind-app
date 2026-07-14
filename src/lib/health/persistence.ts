@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
+import { chunkRows, type OuraHeartrateSampleRow } from '@/lib/oura/heartrateSamples';
+
 import type { ExternalHealthDailySnapshot } from './types';
+
+const HEARTRATE_UPSERT_CHUNK = 500;
 
 export function createHealthServiceClient() {
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -93,5 +97,21 @@ export async function upsertOuraTags(rows: OuraTagRow[]): Promise<number> {
     { onConflict: 'user_id,oura_id' },
   );
   if (error) throw error;
+  return rows.length;
+}
+
+export async function upsertOuraHeartrateSamples(
+  userId: string,
+  rows: OuraHeartrateSampleRow[],
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const supabase = createHealthServiceClient();
+  for (const chunk of chunkRows(rows, HEARTRATE_UPSERT_CHUNK)) {
+    const { error } = await supabase.from('oura_heartrate_samples').upsert(
+      chunk.map((row) => ({ user_id: userId, ts: row.ts, bpm: row.bpm, source: row.source })),
+      { onConflict: 'user_id,ts' },
+    );
+    if (error) throw error;
+  }
   return rows.length;
 }
