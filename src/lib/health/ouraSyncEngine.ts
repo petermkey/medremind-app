@@ -1,7 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
 
 import { mapOuraDailyPayloadToHealthSnapshot } from '@/lib/health/ouraDailyMapper';
-import { upsertExternalHealthDailySnapshots, upsertOuraTags } from '@/lib/health/persistence';
+import {
+  upsertExternalHealthDailySnapshots,
+  upsertOuraHeartrateSamples,
+  upsertOuraTags,
+} from '@/lib/health/persistence';
 import { markHealthConnectionSyncSuccess } from '@/lib/health/sourceRegistry';
 import {
   finishOuraSyncRun,
@@ -18,7 +22,9 @@ import {
 } from '@/lib/oura/analyticsSync';
 import { fetchOuraJson, refreshOuraAccessToken } from '@/lib/oura/client';
 import { getOuraServerConfig } from '@/lib/oura/config';
+import { parseHeartrateRows } from '@/lib/oura/heartrateSamples';
 import { classifyOptionalOuraError, type OuraOptionalFetchAuthError } from '@/lib/oura/optionalFetchError';
+import { heartrateDatetimeRange } from '@/lib/oura/syncWindows';
 import {
   getStoredOuraTokens,
   markOuraSyncSuccess,
@@ -258,6 +264,60 @@ async function fetchOptionalOuraCollection(
   }
 }
 
+// Heartrate is additive telemetry: a failure records coverage and moves on,
+// never failing the run. Uses datetime params because heartrate has no date params.
+async function syncHeartrateSamples(input: {
+  userId: string;
+  syncRunId: string;
+  apiBaseUrl: string;
+  accessToken: string;
+  range: { start_date: string; end_date: string };
+}): Promise<number> {
+  const dtRange = heartrateDatetimeRange(input.range);
+  const data: unknown[] = [];
+  let nextToken: string | null = null;
+  try {
+    for (let page = 0; page < OURA_MAX_PAGES_PER_COLLECTION; page += 1) {
+      const response = await fetchOuraJson<OuraCollectionResponse>(
+        input.apiBaseUrl,
+        input.accessToken,
+        '/v2/usercollection/heartrate',
+        nextToken ? { ...dtRange, next_token: nextToken } : dtRange,
+      );
+      if (Array.isArray(response.data)) data.push(...response.data);
+      nextToken = getContinuationToken(response);
+      if (!nextToken) break;
+    }
+    const rows = parseHeartrateRows(data);
+    const count = await upsertOuraHeartrateSamples(input.userId, rows);
+    await recordOuraEndpointCoverage({
+      syncRunId: input.syncRunId,
+      userId: input.userId,
+      endpoint: 'heartrate',
+      status: 'success',
+      required: false,
+      rangeStart: input.range.start_date,
+      rangeEnd: input.range.end_date,
+      documentCount: count,
+    });
+    return count;
+  } catch (err) {
+    await recordOuraEndpointCoverage({
+      syncRunId: input.syncRunId,
+      userId: input.userId,
+      endpoint: 'heartrate',
+      status: 'failed',
+      required: false,
+      rangeStart: input.range.start_date,
+      rangeEnd: input.range.end_date,
+      documentCount: 0,
+      error: { message: err instanceof Error ? err.message : 'heartrate fetch failed' },
+    }).catch(() => undefined);
+    Sentry.captureException(err, { tags: { route: 'ouraSyncEngine', endpoint: 'heartrate' } });
+    return 0;
+  }
+}
+
 // A day's heart-health picture is now assembled from three separate
 // collections instead of the non-existent /heart_health endpoint.
 function mergeHeartHealth(
@@ -436,6 +496,13 @@ export async function syncOuraSnapshots(
       }))
       .filter((row) => row.ouraId.length > 0);
     await upsertOuraTags(tagRows);
+    const heartrateCount = await syncHeartrateSamples({
+      userId,
+      syncRunId: syncRun.id,
+      apiBaseUrl: auth.config.apiBaseUrl,
+      accessToken: auth.tokens.accessToken,
+      range,
+    });
 
     await markOuraSyncSuccess(userId);
     await markHealthConnectionSyncSuccess(userId, 'oura');
@@ -447,6 +514,7 @@ export async function syncOuraSnapshots(
         rawDocuments: analyticsPayloads.rawDocuments.length,
         dailyHealthFeatures: analyticsPayloads.dailyHealthFeatures.length,
         externalHealthSnapshots: count,
+        heartrateSamples: heartrateCount,
       },
     });
     await pruneOuraRawDocuments({ userId });
