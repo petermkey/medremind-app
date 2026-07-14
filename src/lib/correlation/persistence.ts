@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
+import { dailyDoseResponseRows, type HrSample } from '@/lib/health/doseResponse';
+
 import { buildDailyLifestyleSnapshots } from './featureBuilder';
 import { generateCorrelationInsightCards } from './engine';
 import { assertSafeCorrelationInsightCardText } from './medicationSafety';
@@ -283,14 +285,43 @@ export async function buildAndPersistDailyLifestyleSnapshots(
 
   // V2 cut-over (Phase 1, step 2): read from planned_occurrences + execution_events.
   // doseRecords passed as [] — execution events are embedded in normalized occurrences.
-  const [foodEntries, waterEntries, scheduledDoses, healthSnapshots, medicationExposures, ouraTags] = await Promise.all([
+  const [
+    foodEntries,
+    waterEntries,
+    scheduledDoses,
+    healthSnapshots,
+    medicationExposures,
+    ouraTags,
+    heartrateRows,
+    takenEventRows,
+  ] = await Promise.all([
     fetchSourceRows(supabase, 'food_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchSourceRows(supabase, 'water_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchOccurrenceRowsAsV1Compatible(supabase, userId, startDate, endDate),
     fetchSourceRows(supabase, 'external_health_daily_snapshots', userId, 'local_date', startDate, endDate),
     fetchSourceRows(supabase, 'daily_medication_exposures', userId, 'local_date', startDate, endDate),
     fetchSourceRows(supabase, 'oura_tags', userId, 'local_date', startDate, endDate),
+    fetchSourceRows(supabase, 'oura_heartrate_samples', userId, 'ts', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`, 'ts, bpm, source'),
+    (async () => {
+      const { data, error } = await supabase
+        .from('execution_events')
+        .select('event_at, event_type')
+        .eq('user_id', userId)
+        .eq('event_type', 'taken')
+        .gte('event_at', `${widenedStartDate}T00:00:00.000Z`)
+        .lte('event_at', `${widenedEndDate}T23:59:59.999Z`);
+      if (error) throw error;
+      return (data as unknown as Row[] | null) ?? [];
+    })(),
   ]);
+  const hrSamples: HrSample[] = heartrateRows
+    .filter((row) => typeof row.ts === 'string' && typeof row.bpm === 'number' && typeof row.source === 'string')
+    .map((row) => ({ ts: row.ts as string, bpm: row.bpm as number, source: row.source as string }));
+  const takenTimes = takenEventRows
+    .map((row) => row.event_at)
+    .filter((value): value is string => typeof value === 'string');
+  const doseResponseRows = dailyDoseResponseRows(hrSamples, takenTimes, startDate, endDate, 'UTC')
+    .map((row) => ({ ...row, user_id: userId }));
 
   const snapshots = buildDailyLifestyleSnapshots({
     userId,
@@ -303,6 +334,7 @@ export async function buildAndPersistDailyLifestyleSnapshots(
     healthSnapshots,
     medicationExposures,
     ouraTags,
+    doseResponseRows,
   });
 
   await upsertDailyLifestyleSnapshots(snapshots, supabase);
