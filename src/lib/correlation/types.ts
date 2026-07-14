@@ -33,6 +33,8 @@ export type DailyLifestyleSnapshot = {
   remSleepMinutes?: number | null;
   respiratoryRate?: number | null;
   restingHeartRate?: number | null;
+  postDoseHrDeltaBpm?: number | null;
+  daytimeAvgHr?: number | null;
   hasGlp1Active?: boolean;
   daysSinceGlp1Start?: number | null;
   glp1DoseEscalationPhase?: boolean;

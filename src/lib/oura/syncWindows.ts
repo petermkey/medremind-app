@@ -62,3 +62,13 @@ export function computeOuraCronSyncRange(
   if (start < floor) start = floor;
   return { start_date: dayString(start), end_date: dayString(now) };
 }
+
+// heartrate + ring_battery_level use datetime params, not date params.
+export function heartrateDatetimeRange(
+  range: { start_date: string; end_date: string },
+): { start_datetime: string; end_datetime: string } {
+  return {
+    start_datetime: `${range.start_date}T00:00:00Z`,
+    end_datetime: `${range.end_date}T23:59:59Z`,
+  };
+}

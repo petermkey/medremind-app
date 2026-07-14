@@ -5,6 +5,7 @@ import {
   getOuraBackfillWindow,
   getOuraDailySyncWindow,
   getOuraManualRefreshWindow,
+  heartrateDatetimeRange,
 } from '../../src/lib/oura/syncWindows';
 
 {
@@ -59,4 +60,11 @@ import {
     start_date: '2026-06-10',
     end_date: '2026-07-10',
   });
+}
+
+{
+  assert.deepEqual(
+    heartrateDatetimeRange({ start_date: '2026-07-07', end_date: '2026-07-14' }),
+    { start_datetime: '2026-07-07T00:00:00Z', end_datetime: '2026-07-14T23:59:59Z' },
+  );
 }

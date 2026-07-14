@@ -88,6 +88,8 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     remSleepMinutes: null,
     respiratoryRate: null,
     restingHeartRate: null,
+    postDoseHrDeltaBpm: null,
+    daytimeAvgHr: null,
     hasGlp1Active: true,
     daysSinceGlp1Start: null,
     glp1DoseEscalationPhase: false,
@@ -201,4 +203,20 @@ test('buildDailyLifestyleSnapshots derives enhanced-tag correlation features fro
   assert.equal(snapshots[0].alcoholTagged, true);
   assert.equal(snapshots[0].saunaTagged, false);
   assert.equal(snapshots[0].ouraTagCount, 2);
+});
+
+test('exposes precomputed dose-response HR outcomes', () => {
+  const [snapshot] = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-13',
+    endDate: '2026-07-13',
+    doseResponseRows: [{
+      user_id: 'user-1',
+      local_date: '2026-07-13',
+      post_dose_hr_delta_bpm: -8,
+      daytime_avg_hr: 65.5,
+    }],
+  });
+  assert.equal(snapshot.postDoseHrDeltaBpm, -8);
+  assert.equal(snapshot.daytimeAvgHr, 65.5);
 });

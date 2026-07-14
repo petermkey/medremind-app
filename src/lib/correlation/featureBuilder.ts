@@ -13,6 +13,7 @@ export type BuildDailyLifestyleSnapshotsInput = {
   healthSnapshots?: Row[];
   medicationExposures?: Row[];
   ouraTags?: Row[];
+  doseResponseRows?: Row[];
 };
 
 function toNumber(value: unknown): number | null {
@@ -156,6 +157,7 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
   const healthByDate = indexByDate(input.healthSnapshots, input.userId, 'local_date');
   const exposureByDate = indexByDate(input.medicationExposures, input.userId, 'local_date');
   const tagsByDate = indexByDate(input.ouraTags, input.userId, 'local_date');
+  const doseHrByDate = indexByDate(input.doseResponseRows, input.userId, 'local_date');
 
   return enumerateDates(input.startDate, input.endDate).map(localDate => {
     const foodRows = foodByDate.get(localDate) ?? [];
@@ -194,6 +196,8 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
       remSleepMinutes: firstNumber(healthRows, 'rem_sleep_minutes'),
       respiratoryRate: firstNumber(healthRows, 'respiratory_rate'),
       restingHeartRate: firstNumber(healthRows, 'resting_heart_rate'),
+      postDoseHrDeltaBpm: firstNumber(doseHrByDate.get(localDate) ?? [], 'post_dose_hr_delta_bpm'),
+      daytimeAvgHr: firstNumber(doseHrByDate.get(localDate) ?? [], 'daytime_avg_hr'),
       hasGlp1Active: toBoolean(exposure.has_glp1_active),
       daysSinceGlp1Start: toNumber(exposure.days_since_glp1_start),
       glp1DoseEscalationPhase: toBoolean(exposure.glp1_dose_escalation_phase),
