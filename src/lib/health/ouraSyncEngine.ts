@@ -6,7 +6,7 @@ import {
   upsertOuraHeartrateSamples,
   upsertOuraTags,
 } from '@/lib/health/persistence';
-import { markHealthConnectionSyncSuccess } from '@/lib/health/sourceRegistry';
+import { markHealthConnectionSyncSuccess, updateOuraDeviceStatus } from '@/lib/health/sourceRegistry';
 import {
   finishOuraSyncRun,
   type JsonObject,
@@ -318,6 +318,105 @@ async function syncHeartrateSamples(input: {
   }
 }
 
+// Additive device/user status: latest optimal-bedtime window + battery.
+// Failures record coverage and move on — never fail the run.
+async function syncOuraDeviceStatus(input: {
+  userId: string;
+  syncRunId: string;
+  apiBaseUrl: string;
+  accessToken: string;
+  range: { start_date: string; end_date: string };
+}): Promise<void> {
+  const dtRange = heartrateDatetimeRange(input.range);
+  try {
+    const sleepTimeRes = await fetchOptionalOuraCollection(
+      input.apiBaseUrl,
+      input.accessToken,
+      '/v2/usercollection/sleep_time',
+      input.range,
+    );
+    const docs = (sleepTimeRes.data ?? [])
+      .map(asRecord)
+      .filter((doc): doc is Record<string, unknown> => doc !== null && typeof doc.day === 'string')
+      .sort((a, b) => String(a.day).localeCompare(String(b.day)));
+    const latest = docs[docs.length - 1];
+    if (latest && latest.optimal_bedtime && typeof latest.optimal_bedtime === 'object') {
+      await updateOuraDeviceStatus(input.userId, {
+        sleepWindow: {
+          optimal_bedtime: latest.optimal_bedtime as Record<string, unknown>,
+          recommendation: latest.recommendation ?? null,
+          status: latest.status ?? null,
+        },
+        sleepWindowDate: String(latest.day),
+      });
+    }
+    await recordOuraEndpointCoverage({
+      syncRunId: input.syncRunId,
+      userId: input.userId,
+      endpoint: 'sleep_time',
+      status: sleepTimeRes.authError ? 'failed' : 'success',
+      required: false,
+      rangeStart: input.range.start_date,
+      rangeEnd: input.range.end_date,
+      documentCount: docs.length,
+      error: sleepTimeRes.authError,
+    });
+  } catch (err) {
+    await recordOuraEndpointCoverage({
+      syncRunId: input.syncRunId,
+      userId: input.userId,
+      endpoint: 'sleep_time',
+      status: 'failed',
+      required: false,
+      rangeStart: input.range.start_date,
+      rangeEnd: input.range.end_date,
+      documentCount: 0,
+      error: { message: err instanceof Error ? err.message : 'sleep_time fetch failed' },
+    }).catch(() => undefined);
+    Sentry.captureException(err, { tags: { route: 'ouraSyncEngine', endpoint: 'sleep_time' } });
+  }
+
+  try {
+    const battery = await fetchOuraJson<OuraCollectionResponse>(
+      input.apiBaseUrl,
+      input.accessToken,
+      '/v2/usercollection/ring_battery_level',
+      { ...dtRange, latest: 'true' },
+    );
+    const row = asRecord((battery.data ?? [])[0]);
+    if (row && typeof row.level === 'number' && typeof row.timestamp === 'string') {
+      await updateOuraDeviceStatus(input.userId, {
+        batteryLevel: row.level,
+        batteryCharging: row.charging === true || row.in_charger === true,
+        batteryAt: row.timestamp,
+      });
+    }
+    await recordOuraEndpointCoverage({
+      syncRunId: input.syncRunId,
+      userId: input.userId,
+      endpoint: 'ring_battery_level',
+      status: 'success',
+      required: false,
+      rangeStart: input.range.start_date,
+      rangeEnd: input.range.end_date,
+      documentCount: row ? 1 : 0,
+    });
+  } catch (err) {
+    await recordOuraEndpointCoverage({
+      syncRunId: input.syncRunId,
+      userId: input.userId,
+      endpoint: 'ring_battery_level',
+      status: 'failed',
+      required: false,
+      rangeStart: input.range.start_date,
+      rangeEnd: input.range.end_date,
+      documentCount: 0,
+      error: { message: err instanceof Error ? err.message : 'battery fetch failed' },
+    }).catch(() => undefined);
+    Sentry.captureException(err, { tags: { route: 'ouraSyncEngine', endpoint: 'ring_battery_level' } });
+  }
+}
+
 // A day's heart-health picture is now assembled from three separate
 // collections instead of the non-existent /heart_health endpoint.
 function mergeHeartHealth(
@@ -497,6 +596,13 @@ export async function syncOuraSnapshots(
       .filter((row) => row.ouraId.length > 0);
     await upsertOuraTags(tagRows);
     const heartrateCount = await syncHeartrateSamples({
+      userId,
+      syncRunId: syncRun.id,
+      apiBaseUrl: auth.config.apiBaseUrl,
+      accessToken: auth.tokens.accessToken,
+      range,
+    });
+    await syncOuraDeviceStatus({
       userId,
       syncRunId: syncRun.id,
       apiBaseUrl: auth.config.apiBaseUrl,
