@@ -27,6 +27,8 @@ function toBoolean(value: unknown): boolean {
   return value === true;
 }
 
+const LOW_WEAR_MINUTES = 480;
+
 function addDays(localDate: string, days: number): string {
   const date = new Date(`${localDate}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -171,6 +173,8 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
     const tagRows = tagsByDate.get(localDate) ?? [];
     const hasTagType = (needle: string) =>
       tagRows.some(row => String(row.tag_type ?? '').includes(needle));
+    const nonWearMinutes = firstNumber(healthRows, 'non_wear_minutes');
+    const lowWearDay = nonWearMinutes !== null && nonWearMinutes > LOW_WEAR_MINUTES;
 
     return {
       userId: input.userId,
@@ -185,10 +189,10 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
       adherencePct: doseCounts.adherencePct,
       sleepScore: firstNumber(healthRows, 'sleep_score'),
       readinessScore: firstNumber(healthRows, 'readiness_score'),
-      activityScore: firstNumber(healthRows, 'activity_score'),
-      stressHighSeconds: firstNumber(healthRows, 'stress_high_seconds'),
-      recoveryHighSeconds: firstNumber(healthRows, 'recovery_high_seconds'),
-      steps: firstNumber(healthRows, 'steps'),
+      activityScore: lowWearDay ? null : firstNumber(healthRows, 'activity_score'),
+      stressHighSeconds: lowWearDay ? null : firstNumber(healthRows, 'stress_high_seconds'),
+      recoveryHighSeconds: lowWearDay ? null : firstNumber(healthRows, 'recovery_high_seconds'),
+      steps: lowWearDay ? null : firstNumber(healthRows, 'steps'),
       averageSpo2: firstNumber(healthRows, 'average_spo2'),
       sleepAvgHrv: firstNumber(healthRows, 'sleep_avg_hrv'),
       sleepEfficiency: firstNumber(healthRows, 'sleep_efficiency'),
@@ -196,6 +200,11 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
       remSleepMinutes: firstNumber(healthRows, 'rem_sleep_minutes'),
       respiratoryRate: firstNumber(healthRows, 'respiratory_rate'),
       restingHeartRate: firstNumber(healthRows, 'resting_heart_rate'),
+      temperatureDeviation: firstNumber(healthRows, 'temperature_deviation'),
+      nonWearMinutes,
+      deepSleepFirstThirdMinutes: firstNumber(healthRows, 'deep_sleep_first_third_minutes'),
+      minutesToFirstDeepSleep: firstNumber(healthRows, 'minutes_to_first_deep_sleep'),
+      hrvRecoveryDelta: firstNumber(healthRows, 'hrv_recovery_delta'),
       postDoseHrDeltaBpm: firstNumber(doseHrByDate.get(localDate) ?? [], 'post_dose_hr_delta_bpm'),
       daytimeAvgHr: firstNumber(doseHrByDate.get(localDate) ?? [], 'daytime_avg_hr'),
       hasGlp1Active: toBoolean(exposure.has_glp1_active),

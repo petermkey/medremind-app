@@ -33,6 +33,11 @@ export type DailyLifestyleSnapshot = {
   remSleepMinutes?: number | null;
   respiratoryRate?: number | null;
   restingHeartRate?: number | null;
+  temperatureDeviation?: number | null;
+  nonWearMinutes?: number | null;
+  deepSleepFirstThirdMinutes?: number | null;
+  minutesToFirstDeepSleep?: number | null;
+  hrvRecoveryDelta?: number | null;
   postDoseHrDeltaBpm?: number | null;
   daytimeAvgHr?: number | null;
   hasGlp1Active?: boolean;

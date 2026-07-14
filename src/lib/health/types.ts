@@ -26,6 +26,12 @@ export type ExternalHealthDailySnapshot = {
   deepSleepMinutes: number | null;
   remSleepMinutes: number | null;
   respiratoryRate: number | null;
+  temperatureDeviation: number | null;
+  temperatureTrendDeviation: number | null;
+  nonWearMinutes: number | null;
+  deepSleepFirstThirdMinutes: number | null;
+  minutesToFirstDeepSleep: number | null;
+  hrvRecoveryDelta: number | null;
   workoutCount: number;
   rawPayload: Record<string, unknown>;
 };

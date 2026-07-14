@@ -5,12 +5,17 @@ type OuraDailyPayload = {
   localDate: string;
   timezone?: string;
   dailySleep?: { score?: number | null } | null;
-  dailyReadiness?: { score?: number | null } | null;
+  dailyReadiness?: {
+    score?: number | null;
+    temperature_deviation?: number | null;
+    temperature_trend_deviation?: number | null;
+  } | null;
   dailyActivity?: {
     score?: number | null;
     steps?: number | null;
     active_calories?: number | null;
     total_calories?: number | null;
+    non_wear_time?: number | null;
   } | null;
   dailyStress?: { stress_high?: number | null; recovery_high?: number | null } | null;
   dailySpO2?: {
@@ -32,6 +37,13 @@ type OuraDailyPayload = {
     rem_sleep_duration?: number | null;
     average_breath?: number | null;
     lowest_heart_rate?: number | null;
+  } | null;
+  // Precomputed by ouraSyncEngine from the main sleep doc; this mapper stays
+  // value-import-free so its .test.mjs loads under --experimental-strip-types.
+  nightDetail?: {
+    deep_sleep_first_third_minutes?: number | null;
+    minutes_to_first_deep_sleep?: number | null;
+    hrv_recovery_delta?: number | null;
   } | null;
   workouts?: unknown[] | null;
 };
@@ -79,6 +91,12 @@ export function mapOuraDailyPayloadToHealthSnapshot(
     deepSleepMinutes: minutesOrNull(input.sleepDetail?.deep_sleep_duration),
     remSleepMinutes: minutesOrNull(input.sleepDetail?.rem_sleep_duration),
     respiratoryRate: numberOrNull(input.sleepDetail?.average_breath),
+    temperatureDeviation: numberOrNull(input.dailyReadiness?.temperature_deviation),
+    temperatureTrendDeviation: numberOrNull(input.dailyReadiness?.temperature_trend_deviation),
+    nonWearMinutes: minutesOrNull(input.dailyActivity?.non_wear_time),
+    deepSleepFirstThirdMinutes: numberOrNull(input.nightDetail?.deep_sleep_first_third_minutes),
+    minutesToFirstDeepSleep: numberOrNull(input.nightDetail?.minutes_to_first_deep_sleep),
+    hrvRecoveryDelta: numberOrNull(input.nightDetail?.hrv_recovery_delta),
     workoutCount: Array.isArray(input.workouts) ? input.workouts.length : 0,
     rawPayload: input as unknown as Record<string, unknown>,
   };

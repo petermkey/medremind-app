@@ -64,3 +64,32 @@ test('maps main sleep period detail and sources RHR from it', () => {
   assert.equal(snapshot.respiratoryRate, 13.5);
   assert.equal(snapshot.restingHeartRate, 47);
 });
+
+test('maps temperature deviation, non-wear minutes, and night detail', () => {
+  const snapshot = mapOuraDailyPayloadToHealthSnapshot({
+    userId: 'user-1',
+    localDate: '2026-07-13',
+    dailyReadiness: { score: 80, temperature_deviation: 0.35, temperature_trend_deviation: -0.1 },
+    dailyActivity: { score: 70, non_wear_time: 5400 },
+    nightDetail: {
+      deep_sleep_first_third_minutes: 1,
+      minutes_to_first_deep_sleep: 1,
+      hrv_recovery_delta: 30,
+    },
+  });
+  assert.equal(snapshot.temperatureDeviation, 0.35);
+  assert.equal(snapshot.temperatureTrendDeviation, -0.1);
+  assert.equal(snapshot.nonWearMinutes, 90);
+  assert.equal(snapshot.deepSleepFirstThirdMinutes, 1);
+  assert.equal(snapshot.minutesToFirstDeepSleep, 1);
+  assert.equal(snapshot.hrvRecoveryDelta, 30);
+});
+
+test('night detail fields are null when sleep detail is absent', () => {
+  const snapshot = mapOuraDailyPayloadToHealthSnapshot({ userId: 'user-1', localDate: '2026-07-13' });
+  assert.equal(snapshot.temperatureDeviation, null);
+  assert.equal(snapshot.nonWearMinutes, null);
+  assert.equal(snapshot.deepSleepFirstThirdMinutes, null);
+  assert.equal(snapshot.minutesToFirstDeepSleep, null);
+  assert.equal(snapshot.hrvRecoveryDelta, null);
+});
