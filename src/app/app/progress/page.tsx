@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, eachDayOfInterval, format, subDays } from 'date-fns';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { OuraTab } from '@/components/app/oura/OuraTab';
 import { Button } from '@/components/ui/Button';
 import { useStore } from '@/lib/store/store';
 
@@ -172,6 +174,8 @@ function heatmapCellBorder(pct: number, total: number, isFuture: boolean): strin
 }
 
 export default function ProgressPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     activeProtocols,
     getStreak,
@@ -188,9 +192,21 @@ export default function ProgressPage() {
   const [refreshingMedication, setRefreshingMedication] = useState(false);
   const [refreshingCorrelations, setRefreshingCorrelations] = useState(false);
   const [analyticsMessage, setAnalyticsMessage] = useState('');
+  const activeTab = searchParams.get('tab') === 'oura' ? 'oura' : 'correlations';
 
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
+
+  function setActiveTab(tab: 'correlations' | 'oura') {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'oura') {
+      params.set('tab', 'oura');
+    } else {
+      params.delete('tab');
+    }
+    const query = params.toString();
+    router.replace(query ? `/app/progress?${query}` : '/app/progress', { scroll: false });
+  }
 
   useEffect(() => {
     const update = () => setIsMobile(window.innerWidth < 640);
@@ -426,9 +442,29 @@ export default function ProgressPage() {
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
         <h1 className="text-xl font-extrabold text-[#F0F6FC]">Progress</h1>
+        <div className="mt-3 grid grid-cols-2 rounded-xl bg-[#0D1117] p-1">
+          {([
+            ['correlations', 'Correlations'],
+            ['oura', 'Oura'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setActiveTab(value)}
+              className={[
+                'rounded-lg px-3 py-2 text-sm font-bold transition-colors',
+                activeTab === value ? 'bg-[#3B82F6] text-white' : 'text-[#8B949E] hover:text-[#F0F6FC]',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
+        {activeTab === 'oura' ? <OuraTab /> : (
+        <>
 
         {/* ── 1. PRIMARY ADHERENCE STATUS + TREND ── */}
         <div
@@ -717,6 +753,8 @@ export default function ProgressPage() {
             <div className="text-sm font-bold text-[#F0F6FC] mb-1">No data yet</div>
             <div className="text-xs text-[#8B949E]">Activate a protocol to start tracking your adherence.</div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>
