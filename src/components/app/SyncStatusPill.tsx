@@ -9,6 +9,10 @@ import { getSyncStatusSnapshot, subscribeSyncStatus, type SyncStatus } from '@/l
 // followed by immediate outbox retry).
 const ERROR_DISPLAY_DELAY_MS = 4000;
 
+// How long the idle "Synced" pill stays visible before fading out — it floats over
+// page content, so it shouldn't linger indefinitely once there's nothing to report.
+const IDLE_HIDE_DELAY_MS = 3000;
+
 function tone(status: SyncStatus) {
   if (status.lastError) return 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.12)] text-[#FCA5A5]';
   if (status.pending > 0 || status.running) return 'border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.12)] text-[#FCD34D]';
@@ -27,6 +31,8 @@ export function SyncStatusPill() {
   // of continuous failure. Cleared immediately on success.
   const [displayedError, setDisplayedError] = useState<string | null>(getSyncStatusSnapshot().lastError);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [idle, setIdle] = useState(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return subscribeSyncStatus((next) => {
@@ -51,13 +57,30 @@ export function SyncStatusPill() {
   }, []);
 
   const visibleStatus: SyncStatus = { ...status, lastError: displayedError };
+  const isActive = Boolean(visibleStatus.lastError) || visibleStatus.pending > 0 || visibleStatus.running;
+
+  useEffect(() => {
+    if (isActive) {
+      setIdle(false);
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      return;
+    }
+    idleTimerRef.current = setTimeout(() => setIdle(true), IDLE_HIDE_DELAY_MS);
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [isActive]);
 
   return (
     <Link
       href="/app/settings"
       className={[
-        'pointer-events-auto inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md transition-colors',
+        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md transition-opacity duration-500',
         tone(visibleStatus),
+        idle ? 'pointer-events-none opacity-0' : 'pointer-events-auto opacity-100',
       ].join(' ')}
       title="Open settings for sync details"
     >

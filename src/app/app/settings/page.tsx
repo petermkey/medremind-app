@@ -450,17 +450,20 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="flex flex-shrink-0 gap-2">
-                <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#3B82F6] hover:underline">
-                  Connect
-                </a>
-                <button
-                  type="button"
-                  onClick={handleOuraDisconnect}
-                  disabled={disconnectingOura}
-                  className="text-xs font-semibold text-[#FCA5A5] hover:underline disabled:opacity-50"
-                >
-                  Disconnect
-                </button>
+                {ouraStatus?.connected ? (
+                  <button
+                    type="button"
+                    onClick={handleOuraDisconnect}
+                    disabled={disconnectingOura}
+                    className="text-xs font-semibold text-[#FCA5A5] hover:underline disabled:opacity-50"
+                  >
+                    Disconnect
+                  </button>
+                ) : (
+                  <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+                    Connect
+                  </a>
+                )}
               </div>
             </div>
             <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#8B949E] hover:text-[#F0F6FC]">
@@ -552,7 +555,7 @@ export default function SettingsPage() {
           <p className="text-xs text-[#8B949E] leading-relaxed">
             Import old `medremind-store` snapshot into Supabase for the current signed-in account.
           </p>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button variant="secondary" size="sm" onClick={handleExportSnapshot}>
               Export snapshot
             </Button>
@@ -566,7 +569,7 @@ export default function SettingsPage() {
               Flush sync now
             </Button>
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button variant="secondary" size="sm" onClick={loadSnapshotFromCurrentBrowser}>
               Load from local storage
             </Button>

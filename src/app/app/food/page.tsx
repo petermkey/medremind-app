@@ -781,27 +781,27 @@ export default function FoodPage() {
               {targetProfile ? 'Targets' : 'Set targets'}
             </button>
           </div>
+        </div>
 
-          <div className="mt-2 flex gap-2">
-            <input
-              type="text"
-              value={mealText}
-              onChange={e => setMealText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') void analyzeText(); }}
-              placeholder="Describe your meal…"
-              aria-label="Describe your meal"
-              disabled={analyzing}
-              className="flex-1 rounded-xl bg-[#161B22] px-3 py-2 text-sm text-[#F0F6FC] placeholder-[#8B949E]"
-            />
-            <button
-              type="button"
-              onClick={() => void analyzeText()}
-              disabled={analyzing || mealText.trim().length < 3}
-              className="rounded-xl bg-[#238636] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-            >
-              Analyze
-            </button>
-          </div>
+        <div className="mb-4 flex gap-2">
+          <input
+            type="text"
+            value={mealText}
+            onChange={e => setMealText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void analyzeText(); }}
+            placeholder="Describe your meal…"
+            aria-label="Describe your meal"
+            disabled={analyzing}
+            className="flex-1 rounded-xl bg-[#161B22] px-3 py-2 text-sm text-[#F0F6FC] placeholder-[#8B949E]"
+          />
+          <button
+            type="button"
+            onClick={() => void analyzeText()}
+            disabled={analyzing || mealText.trim().length < 3}
+            className="rounded-xl bg-[#238636] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+          >
+            Analyze
+          </button>
         </div>
 
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1">

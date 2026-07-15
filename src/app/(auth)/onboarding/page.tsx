@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/store';
 import { saveProfile } from '@/lib/supabase/auth';
@@ -27,7 +27,8 @@ export default function OnboardingPage() {
   // Step 1 state
   const [name, setName] = useState(profile?.name ?? '');
   const [timezone, setTimezone] = useState('UTC');
-  const [ageRange, setAgeRange] = useState<AgeRange>('31-50');
+  const [ageRange, setAgeRange] = useState<AgeRange>(profile?.ageRange ?? '31-50');
+  const profileSyncedRef = useRef(false);
 
   // Step 2 state
   const [selectedProtocolId, setSelectedProtocolId] = useState<string | null>(null);
@@ -43,6 +44,17 @@ export default function OnboardingPage() {
   useEffect(() => {
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
   }, []);
+
+  // The persisted store hydrates from localStorage after this component's
+  // first render, so the useState initializers above can miss an
+  // already-known profile. Backfill once hydration lands, without
+  // clobbering anything the user has already typed.
+  useEffect(() => {
+    if (profileSyncedRef.current || !profile) return;
+    profileSyncedRef.current = true;
+    if (profile.name) setName(prev => prev || profile.name);
+    if (profile.ageRange) setAgeRange(profile.ageRange);
+  }, [profile]);
 
   function handleStep1() {
     if (!name.trim()) return;
@@ -79,7 +91,7 @@ export default function OnboardingPage() {
     router.push('/app');
   }
 
-  const stepLabels = ['Profile', 'First Protocol', 'Reminders'];
+  const stepLabels = ['Profile', 'Protocol', 'Reminders'];
 
   return (
     <div className="min-h-screen bg-[#0D1117] flex items-center justify-center p-6">
@@ -100,7 +112,7 @@ export default function OnboardingPage() {
               ].join(' ')}>
                 {i + 1 < step ? '✓' : i + 1}
               </div>
-              <span className={`text-xs font-semibold ${i + 1 === step ? 'text-[#F0F6FC]' : 'text-[#8B949E]'}`}>{label}</span>
+              <span className={`text-xs font-semibold whitespace-nowrap ${i + 1 === step ? 'text-[#F0F6FC]' : 'text-[#8B949E]'}`}>{label}</span>
               {i < 2 && <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />}
             </div>
           ))}
