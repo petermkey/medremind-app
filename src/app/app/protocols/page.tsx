@@ -209,22 +209,22 @@ export default function ProtocolsPage() {
                   {CATEGORY_ICONS[p.category] ?? '💊'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-[#F0F6FC] truncate">{p.name}</span>
+                  <span className="block text-sm font-bold text-[#F0F6FC] truncate">{p.name}</span>
+                  <div className="mt-1 flex items-center gap-2">
                     {p.isArchived ? (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B949E]">
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B949E] flex-shrink-0">
                         archived
                       </span>
                     ) : instance ? (
                       <span
-                        className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                        className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: `${statusColor}20`, color: statusColor }}
                       >
                         {getStatusLabel(instance.status)}
                       </span>
                     ) : null}
                     {p.isTemplate && !instance && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B5CF6]">
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B5CF6] flex-shrink-0">
                         template
                       </span>
                     )}
