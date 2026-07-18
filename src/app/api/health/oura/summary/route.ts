@@ -53,6 +53,8 @@ function dayFromRow(row: Row) {
     vo2Max: numberOrNull(row.vo2_max),
     cardiovascularAge: numberOrNull(row.cardiovascular_age),
     resilienceLevel: stringOrNull(row.resilience_level),
+    hrvBalance: stringOrNull(row.hrv_balance),
+    workoutCount: numberOrNull(row.workout_count),
     nonWearMinutes: numberOrNull(row.non_wear_minutes),
   };
 }
@@ -125,6 +127,8 @@ export async function GET(request: NextRequest) {
       'vo2_max',
       'cardiovascular_age',
       'resilience_level',
+      'hrv_balance',
+      'workout_count',
       'non_wear_minutes',
     ].join(', '))
     .eq('source', 'oura')

@@ -19,7 +19,11 @@ export type OuraMetricKey =
   | 'minutesToFirstDeepSleep'
   | 'cardiovascularAge'
   | 'temperatureDeviation'
-  | 'temperatureTrendDeviation';
+  | 'temperatureTrendDeviation'
+  | 'deepSleepFirstThirdMinutes'
+  | 'activeCalories'
+  | 'totalCalories'
+  | 'workoutCount';
 
 export type OuraStatsDay = {
   localDate: string;
@@ -48,6 +52,8 @@ export type OuraStatsDay = {
   vo2Max?: number | null;
   cardiovascularAge?: number | null;
   resilienceLevel?: string | null;
+  hrvBalance?: string | null;
+  workoutCount?: number | null;
   nonWearMinutes?: number | null;
 };
 
@@ -59,6 +65,7 @@ const HIGHER_IS_BETTER = new Set<OuraMetricKey>([
   'activityScore',
   'sleepAvgHrv',
   'deepSleepMinutes',
+  'deepSleepFirstThirdMinutes',
   'remSleepMinutes',
   'sleepEfficiency',
   'hrvRecoveryDelta',
@@ -132,6 +139,11 @@ export function classifyDelta(metric: OuraMetricKey, value: number | null, norm:
   return { delta, tone: 'neutral' };
 }
 
+export function latencyMinutes(seconds: number | null | undefined): number | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null;
+  return Math.round((seconds / 60) * 10) / 10;
+}
+
 function hasSleepData(day: OuraStatsDay): boolean {
   return numeric(day.sleepScore) !== null || numeric(day.deepSleepMinutes) !== null;
 }
@@ -143,6 +155,27 @@ export function pickDisplayNight(days: OuraStatsDay[]): {
 } {
   for (let index = days.length - 1; index >= 0; index -= 1) {
     if (hasSleepData(days[index])) {
+      return { day: days[index], index, isFallback: index !== days.length - 1 };
+    }
+  }
+  return { day: null, index: -1, isFallback: false };
+}
+
+function hasDayData(day: OuraStatsDay): boolean {
+  return (
+    numeric(day.activityScore) !== null
+    || numeric(day.activeCalories) !== null
+    || numeric(day.steps) !== null
+  );
+}
+
+export function pickDisplayDay(days: OuraStatsDay[]): {
+  day: OuraStatsDay | null;
+  index: number;
+  isFallback: boolean;
+} {
+  for (let index = days.length - 1; index >= 0; index -= 1) {
+    if (hasDayData(days[index])) {
       return { day: days[index], index, isFallback: index !== days.length - 1 };
     }
   }
@@ -232,3 +265,17 @@ export function resilienceScore(value: string | null | undefined): number | null
   if (value === 'exceptional') return 5;
   return null;
 }
+
+// One-line plain-language explainers for the Sleep Lab surfaces. Keyed by
+// OuraMetricKey where one exists; hrvBalance is a text metric without a key.
+export const OURA_METRIC_EXPLAINERS: Record<string, string> = {
+  sleepEfficiency: 'Share of time in bed actually spent asleep — 85% or higher is a good night.',
+  sleepLatencySeconds: 'How long it took to fall asleep — 10–20 minutes is typical; under 5 can mean sleep debt.',
+  deepSleepFirstThirdMinutes: 'Deep sleep banked in the first third of the night, when restorative pressure should peak.',
+  temperatureTrendDeviation: 'Multi-day drift of night skin temperature vs your baseline — a sustained rise can flag strain or oncoming illness.',
+  activityScore: "Oura's 0–100 read on how well you balanced movement, exercise, and rest.",
+  activeCalories: 'Calories burned through movement, on top of what your body burns at rest.',
+  totalCalories: 'Everything burned across the day, including resting metabolism.',
+  hrvBalance: 'Whether your recent HRV trend is in line with your longer-term baseline.',
+  workoutCount: 'Workout sessions Oura detected or you logged for this day.',
+};

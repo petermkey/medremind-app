@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
-import { isLowWearDay, type OuraStatsDay } from '@/lib/health/ouraStats';
+import { isLowWearDay, latencyMinutes, type OuraStatsDay } from '@/lib/health/ouraStats';
+import { DayCard } from './DayCard';
 import { LongMetricTile, ResilienceTile } from './LongMetricTile';
 import { NightCard } from './NightCard';
 import { TrendChart } from './TrendChart';
@@ -94,9 +95,19 @@ export function OuraTab() {
   const stepsValues = metric(visibleDays, 'steps');
   const stressValues = metric(visibleDays, 'stressHighSeconds');
   const recoveryValues = metric(visibleDays, 'recoveryHighSeconds');
-  const showSleepGroup = hasAny(sleepScoreValues) || hasAny(deepSleepValues) || hasAny(hrvValues);
+  const efficiencyValues = metric(visibleDays, 'sleepEfficiency');
+  const latencyValues = useMemo(
+    () => visibleDays.map(day => latencyMinutes(day.sleepLatencySeconds)),
+    [visibleDays],
+  );
+  const deepFirstThirdValues = metric(visibleDays, 'deepSleepFirstThirdMinutes');
+  const activityScoreValues = metric(visibleDays, 'activityScore');
+  const activeCaloriesValues = metric(visibleDays, 'activeCalories');
+  const showSleepGroup = hasAny(sleepScoreValues) || hasAny(deepSleepValues) || hasAny(hrvValues)
+    || hasAny(efficiencyValues) || hasAny(latencyValues) || hasAny(deepFirstThirdValues);
   const showRecoveryGroup = hasAny(readinessValues) || hasAny(temperatureValues) || hasAny(restingHrValues);
-  const showActivityGroup = hasAny(stepsValues) || hasAny(stressValues) || hasAny(recoveryValues);
+  const showActivityGroup = hasAny(stepsValues) || hasAny(stressValues) || hasAny(recoveryValues)
+    || hasAny(activityScoreValues) || hasAny(activeCaloriesValues);
   const showLongGroup = summary?.days.some(day => day.vo2Max !== null || day.cardiovascularAge !== null || day.resilienceLevel) ?? false;
 
   if (loading && !summary) {
@@ -139,6 +150,7 @@ export function OuraTab() {
       </div>
 
       <NightCard days={summary.days} />
+      <DayCard days={summary.days} />
 
       <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -169,6 +181,9 @@ export function OuraTab() {
             <TrendChart title="Sleep score" dates={labels} values={sleepScoreValues} lowWearMask={lowWearMask} fixedDomain={[0, 100]} />
             <TrendChart title="Deep sleep minutes" dates={labels} values={deepSleepValues} lowWearMask={lowWearMask} valueSuffix=" min" />
             <TrendChart title="Night HRV" dates={labels} values={hrvValues} lowWearMask={lowWearMask} valueSuffix=" ms" />
+            <TrendChart title="Sleep efficiency" dates={labels} values={efficiencyValues} lowWearMask={lowWearMask} fixedDomain={[0, 100]} valueSuffix="%" />
+            <TrendChart title="Sleep latency" dates={labels} values={latencyValues} lowWearMask={lowWearMask} valueSuffix=" min" />
+            <TrendChart title="Deep sleep, first ⅓" dates={labels} values={deepFirstThirdValues} lowWearMask={lowWearMask} valueSuffix=" min" />
           </TrendGroup>
           )}
 
@@ -183,6 +198,8 @@ export function OuraTab() {
           {showActivityGroup && (
           <TrendGroup title="Activity">
             <TrendChart title="Steps" dates={labels} values={stepsValues} lowWearMask={lowWearMask} />
+            <TrendChart title="Activity score" dates={labels} values={activityScoreValues} lowWearMask={lowWearMask} fixedDomain={[0, 100]} />
+            <TrendChart title="Active calories" dates={labels} values={activeCaloriesValues} lowWearMask={lowWearMask} valueSuffix=" kcal" />
             <TrendChart
               title="High stress vs recovery"
               dates={labels}
