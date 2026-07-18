@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store/store';
 import { WeekStrip } from '@/components/app/WeekStrip';
 import { MedCard } from '@/components/app/MedCard';
 import { AddDoseSheet } from '@/components/app/AddDoseSheet';
+import { MorningBriefingCard } from '@/components/app/MorningBriefingCard';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 import type { PlannedOccurrence } from '@/types';
@@ -56,6 +57,7 @@ export default function SchedulePage() {
     endProtocolFromToday,
     scheduledDoses,
     doseRecords,
+    notificationSettings,
   } = useStore();
   const { show } = useToast();
 
@@ -238,6 +240,11 @@ export default function SchedulePage() {
               You can edit past doses only for active protocols. Resume paused protocols first.
             </div>
           </div>
+        )}
+
+        {/* Morning briefing (W3-B) — today only, opt-in via Settings */}
+        {selectedDate === todayStr && notificationSettings.morningBriefingEnabled && (
+          <MorningBriefingCard todayStr={todayStr} doseCount={total} />
         )}
 
         {/* Next dose banner */}
