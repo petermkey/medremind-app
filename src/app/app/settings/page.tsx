@@ -42,6 +42,7 @@ type OuraStatus = {
   lastSyncAt: string | null;
   battery?: { level: number; charging: boolean; at: string | null } | null;
   sleepWindowDate?: string | null;
+  missingScopes?: string[];
 };
 
 export default function SettingsPage() {
@@ -466,6 +467,17 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+            {ouraStatus?.connected && (ouraStatus.missingScopes?.length ?? 0) > 0 && (
+              <div className="mt-3 rounded-xl border border-[rgba(251,191,36,0.25)] bg-[rgba(251,191,36,0.08)] px-4 py-3 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-[#FBB924]">Missing permissions — reconnect Oura</p>
+                <p className="text-xs text-[#8B949E] leading-relaxed">
+                  Your Oura connection is missing: {ouraStatus.missingScopes!.join(', ')}. Some data won&apos;t sync until you reconnect.
+                </p>
+                <a href="/api/integrations/oura/connect" className="mt-1 text-xs font-semibold text-[#FBB924] hover:underline">
+                  Reconnect Oura →
+                </a>
+              </div>
+            )}
             <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#8B949E] hover:text-[#F0F6FC]">
               Manage Oura app access
             </a>

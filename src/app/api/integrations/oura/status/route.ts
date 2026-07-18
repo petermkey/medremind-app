@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { getOuraServerConfig } from '@/lib/oura/config';
+import { normalizeOuraScope } from '@/lib/oura/oauth';
 import { getOuraIntegrationStatus } from '@/lib/oura/tokenStore';
 import { createClient } from '@/lib/supabase/server';
 
@@ -22,8 +24,23 @@ export async function GET() {
       .eq('source', 'oura')
       .maybeSingle();
 
+    // Oura tokens don't retroactively gain scopes when the app's required set
+    // changes — surface a drift so the client can prompt a reconnect instead
+    // of silently 401ing on the endpoints that need the missing scope.
+    let missingScopes: string[] = [];
+    if (status.connected) {
+      try {
+        const requiredScopes = getOuraServerConfig().scopes;
+        const grantedScopes = new Set(status.scopes.map(normalizeOuraScope));
+        missingScopes = requiredScopes.filter((scope) => !grantedScopes.has(scope));
+      } catch (configErr) {
+        console.error('[oura/status] scope-drift check skipped', configErr);
+      }
+    }
+
     return NextResponse.json({
       ...status,
+      missingScopes,
       battery: connectionRow?.battery_level != null
         ? {
             level: connectionRow.battery_level,
