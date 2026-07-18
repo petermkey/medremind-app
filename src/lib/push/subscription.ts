@@ -190,6 +190,7 @@ export async function saveNotificationSettingsToSupabase(settings: {
   leadTimeMin: number;
   digestTime: string;
   morningBriefingEnabled: boolean;
+  smartFoodTiming: boolean;
 }): Promise<void> {
   const supabase = getSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -203,6 +204,7 @@ export async function saveNotificationSettingsToSupabase(settings: {
       lead_time_min: settings.leadTimeMin,
       digest_time: settings.digestTime,
       morning_briefing_enabled: settings.morningBriefingEnabled,
+      smart_food_timing: settings.smartFoodTiming,
     },
     { onConflict: 'user_id' },
   );
