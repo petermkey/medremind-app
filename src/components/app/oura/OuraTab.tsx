@@ -8,6 +8,7 @@ import { isLowWearDay, latencyMinutes, type OuraStatsDay } from '@/lib/health/ou
 import { DayCard } from './DayCard';
 import { LongMetricTile, ResilienceTile } from './LongMetricTile';
 import { NightCard } from './NightCard';
+import { PulseDayCard } from './PulseDayCard';
 import { TrendChart } from './TrendChart';
 
 type OuraSummary = {
@@ -151,6 +152,7 @@ export function OuraTab() {
 
       <NightCard days={summary.days} />
       <DayCard days={summary.days} />
+      <PulseDayCard />
 
       <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
