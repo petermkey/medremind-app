@@ -3,8 +3,11 @@ import test from 'node:test';
 
 import {
   classifyDelta,
+  latencyMinutes,
   medianOfPreviousDays,
   normalizeBars,
+  OURA_METRIC_EXPLAINERS,
+  pickDisplayDay,
   pickDisplayNight,
   weeklyBuckets,
 } from './ouraStats.ts';
@@ -68,4 +71,58 @@ test('normalizeBars preserves missing values, fixed domains, and low-wear opacit
     { value: 50, y: 0.5, height: 0.5, opacity: 0.3 },
     { value: 100, y: 0, height: 1, opacity: 1 },
   ]);
+});
+
+test('latencyMinutes converts stored seconds to one-decimal minutes and rejects junk', () => {
+  assert.equal(latencyMinutes(720), 12);
+  assert.equal(latencyMinutes(770), 12.8);
+  assert.equal(latencyMinutes(0), 0);
+  assert.equal(latencyMinutes(null), null);
+  assert.equal(latencyMinutes(undefined), null);
+  assert.equal(latencyMinutes(Number.NaN), null);
+});
+
+test('classifyDelta directions for the sleep-lab metrics', () => {
+  assert.equal(classifyDelta('deepSleepFirstThirdMinutes', 40, 30).tone, 'positive');
+  assert.equal(classifyDelta('deepSleepFirstThirdMinutes', 20, 30).tone, 'negative');
+  assert.equal(classifyDelta('activeCalories', 900, 500).tone, 'neutral');
+  assert.equal(classifyDelta('totalCalories', 2600, 2400).tone, 'neutral');
+  assert.equal(classifyDelta('workoutCount', 3, 1).tone, 'neutral');
+});
+
+test('pickDisplayDay falls back to the latest day with activity data', () => {
+  const result = pickDisplayDay([
+    { localDate: '2026-07-12', activityScore: 70 },
+    { localDate: '2026-07-13', activityScore: null },
+  ]);
+  assert.deepEqual(result, {
+    day: { localDate: '2026-07-12', activityScore: 70 },
+    index: 0,
+    isFallback: true,
+  });
+  assert.deepEqual(pickDisplayDay([{ localDate: '2026-07-13' }]), {
+    day: null,
+    index: -1,
+    isFallback: false,
+  });
+});
+
+test('every sleep-lab metric ships a single-line explainer', () => {
+  const keys = [
+    'sleepEfficiency',
+    'sleepLatencySeconds',
+    'deepSleepFirstThirdMinutes',
+    'temperatureTrendDeviation',
+    'activityScore',
+    'activeCalories',
+    'totalCalories',
+    'hrvBalance',
+    'workoutCount',
+  ];
+  for (const key of keys) {
+    const text = OURA_METRIC_EXPLAINERS[key];
+    assert.equal(typeof text, 'string', `missing explainer for ${key}`);
+    assert.ok(text.length > 20, `explainer too short for ${key}`);
+    assert.ok(!text.includes('\n'), `explainer must be one line for ${key}`);
+  }
 });
