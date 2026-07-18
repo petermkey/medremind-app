@@ -93,6 +93,9 @@ test('buildDailyLifestyleSnapshots aggregates food, water, health, and medicatio
     deepSleepFirstThirdMinutes: null,
     minutesToFirstDeepSleep: null,
     hrvRecoveryDelta: null,
+    eatingWindowHours: null,
+    lastMealHour: null,
+    lateMealFlag: false,
     postDoseHrDeltaBpm: null,
     daytimeAvgHr: null,
     hasGlp1Active: true,
@@ -258,6 +261,35 @@ test('low-wear days null out activity-derived outcomes but keep sleep outcomes',
   assert.equal(snapshot.recoveryHighSeconds, null);
   assert.equal(snapshot.sleepScore, 82);
   assert.equal(snapshot.deepSleepMinutes, 90);
+});
+
+test('maps eating-window rows into snapshot features', () => {
+  const [snapshot] = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-13',
+    endDate: '2026-07-13',
+    eatingWindowRows: [{
+      user_id: 'user-1',
+      local_date: '2026-07-13',
+      eating_window_hours: 8.5,
+      last_meal_hour: 21.25,
+      late_meal_flag: true,
+    }],
+  });
+  assert.equal(snapshot.eatingWindowHours, 8.5);
+  assert.equal(snapshot.lastMealHour, 21.25);
+  assert.equal(snapshot.lateMealFlag, true);
+});
+
+test('eating-window features default to null/false when no rows exist', () => {
+  const [snapshot] = buildDailyLifestyleSnapshots({
+    userId: 'user-1',
+    startDate: '2026-07-13',
+    endDate: '2026-07-13',
+  });
+  assert.equal(snapshot.eatingWindowHours, null);
+  assert.equal(snapshot.lastMealHour, null);
+  assert.equal(snapshot.lateMealFlag, false);
 });
 
 test('exposes precomputed dose-response HR outcomes', () => {
