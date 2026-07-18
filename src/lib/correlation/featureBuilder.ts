@@ -14,6 +14,7 @@ export type BuildDailyLifestyleSnapshotsInput = {
   medicationExposures?: Row[];
   ouraTags?: Row[];
   doseResponseRows?: Row[];
+  eatingWindowRows?: Row[];
 };
 
 function toNumber(value: unknown): number | null {
@@ -160,6 +161,7 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
   const exposureByDate = indexByDate(input.medicationExposures, input.userId, 'local_date');
   const tagsByDate = indexByDate(input.ouraTags, input.userId, 'local_date');
   const doseHrByDate = indexByDate(input.doseResponseRows, input.userId, 'local_date');
+  const windowByDate = indexByDate(input.eatingWindowRows, input.userId, 'local_date');
 
   return enumerateDates(input.startDate, input.endDate).map(localDate => {
     const foodRows = foodByDate.get(localDate) ?? [];
@@ -171,6 +173,7 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
     const exposure = exposureRows[0] ?? {};
     const doseCounts = canonicalDoseCounts(doseRows, recordRows);
     const tagRows = tagsByDate.get(localDate) ?? [];
+    const windowRows = windowByDate.get(localDate) ?? [];
     const hasTagType = (needle: string) =>
       tagRows.some(row => String(row.tag_type ?? '').includes(needle));
     const nonWearMinutes = firstNumber(healthRows, 'non_wear_minutes');
@@ -205,6 +208,9 @@ export function buildDailyLifestyleSnapshots(input: BuildDailyLifestyleSnapshots
       deepSleepFirstThirdMinutes: firstNumber(healthRows, 'deep_sleep_first_third_minutes'),
       minutesToFirstDeepSleep: firstNumber(healthRows, 'minutes_to_first_deep_sleep'),
       hrvRecoveryDelta: firstNumber(healthRows, 'hrv_recovery_delta'),
+      eatingWindowHours: firstNumber(windowRows, 'eating_window_hours'),
+      lastMealHour: firstNumber(windowRows, 'last_meal_hour'),
+      lateMealFlag: toBoolean(windowRows[0]?.late_meal_flag),
       postDoseHrDeltaBpm: firstNumber(doseHrByDate.get(localDate) ?? [], 'post_dose_hr_delta_bpm'),
       daytimeAvgHr: firstNumber(doseHrByDate.get(localDate) ?? [], 'daytime_avg_hr'),
       hasGlp1Active: toBoolean(exposure.has_glp1_active),

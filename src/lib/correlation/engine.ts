@@ -24,6 +24,9 @@ const FEATURES = [
   { key: 'alcoholTagged', label: 'alcohol (Oura tag)' },
   { key: 'saunaTagged', label: 'sauna (Oura tag)' },
   { key: 'ouraTagCount', label: 'Oura tag count' },
+  { key: 'eatingWindowHours', label: 'eating window (h)' },
+  { key: 'lastMealHour', label: 'last meal time' },
+  { key: 'lateMealFlag', label: 'late meal (after 21:00)' },
 ] as const;
 
 const OUTCOMES = [

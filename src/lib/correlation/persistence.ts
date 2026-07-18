@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { dailyDoseResponseRows, type HrSample } from '@/lib/health/doseResponse';
+import { computeEatingWindow } from '@/lib/nutrition/eatingWindow';
 
 import { buildDailyLifestyleSnapshots } from './featureBuilder';
 import { generateCorrelationInsightCards } from './engine';
@@ -322,6 +323,24 @@ export async function buildAndPersistDailyLifestyleSnapshots(
     .filter((value): value is string => typeof value === 'string');
   const doseResponseRows = dailyDoseResponseRows(hrSamples, takenTimes, startDate, endDate, 'UTC')
     .map((row) => ({ ...row, user_id: userId }));
+  const windowEntries = foodEntries
+    .filter((row) => typeof row.consumed_at === 'string')
+    .map((row) => ({
+      consumedAt: row.consumed_at as string,
+      timezone: typeof row.timezone === 'string' ? row.timezone : undefined,
+    }));
+  const eatingWindowRows: Row[] = [];
+  for (let date = startDate; date <= endDate; date = addDays(date, 1)) {
+    const window = computeEatingWindow(windowEntries, date, 'UTC');
+    if (window.mealCount === 0) continue;
+    eatingWindowRows.push({
+      user_id: userId,
+      local_date: date,
+      eating_window_hours: window.windowHours,
+      last_meal_hour: window.lastMealHour,
+      late_meal_flag: window.lateFlag,
+    });
+  }
 
   const snapshots = buildDailyLifestyleSnapshots({
     userId,
@@ -335,6 +354,7 @@ export async function buildAndPersistDailyLifestyleSnapshots(
     medicationExposures,
     ouraTags,
     doseResponseRows,
+    eatingWindowRows,
   });
 
   await upsertDailyLifestyleSnapshots(snapshots, supabase);
