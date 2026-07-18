@@ -143,6 +143,7 @@ export interface NotificationSettings {
   emailEnabled: boolean;
   leadTimeMin: number;       // notify N min before dose
   digestTime: string;        // HH:MM
+  morningBriefingEnabled: boolean; // W3-B daily readiness briefing push (default off)
 }
 
 // ─── Occurrence model (F3) ─────────────────────────────────────────────

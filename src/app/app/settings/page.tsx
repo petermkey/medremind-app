@@ -57,6 +57,7 @@ export default function SettingsPage() {
   const [emailEnabled, setEmailEnabled] = useState(notificationSettings.emailEnabled);
   const [leadTime, setLeadTime] = useState(String(notificationSettings.leadTimeMin));
   const [digestTime, setDigestTime] = useState(notificationSettings.digestTime);
+  const [morningBriefingEnabled, setMorningBriefingEnabled] = useState(notificationSettings.morningBriefingEnabled);
   const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
   const [importPayload, setImportPayload] = useState('');
   const [importStatus, setImportStatus] = useState('');
@@ -114,6 +115,7 @@ export default function SettingsPage() {
     setEmailEnabled(notificationSettings.emailEnabled);
     setLeadTime(String(notificationSettings.leadTimeMin));
     setDigestTime(notificationSettings.digestTime);
+    setMorningBriefingEnabled(notificationSettings.morningBriefingEnabled);
   }, [notificationSettings]);
 
   async function handleSaveProfile() {
@@ -126,7 +128,7 @@ export default function SettingsPage() {
 
   async function saveNotifications() {
     try {
-      updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime });
+      updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime, morningBriefingEnabled });
     } catch (err) {
       console.error('[settings] store write error', err);
       show(`Store error: ${String(err)}`, 'warning');
@@ -139,6 +141,7 @@ export default function SettingsPage() {
       emailEnabled,
       leadTimeMin: parseInt(leadTime),
       digestTime,
+      morningBriefingEnabled,
     }).catch(err => console.error('[settings] notification_settings sync failed', err));
 
     if (!pushEnabled) {
@@ -416,6 +419,7 @@ export default function SettingsPage() {
             </div>
           )}
           <Toggle label="Push notifications" sub="Dose reminders delivered to your device" checked={pushEnabled} onChange={setPushEnabled} />
+          <Toggle label="Утренний брифинг" sub="Ежедневная сводка готовности, сна и приёмов (~06:30)" checked={morningBriefingEnabled} onChange={setMorningBriefingEnabled} />
           <Toggle label="Email digest" sub="Daily summary at set time" checked={emailEnabled} onChange={setEmailEnabled} />
           <Select label="Reminder lead time" value={leadTime} onChange={e => setLeadTime(e.target.value)}
             options={[

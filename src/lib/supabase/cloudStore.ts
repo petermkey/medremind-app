@@ -96,6 +96,7 @@ function defaultNotificationSettings(): NotificationSettings {
     emailEnabled: false,
     leadTimeMin: 0,
     digestTime: '07:00',
+    morningBriefingEnabled: false,
   };
 }
 
@@ -604,6 +605,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         emailEnabled: Boolean(nRow.email_enabled),
         leadTimeMin: Number(nRow.lead_time_min ?? 0),
         digestTime: String(nRow.digest_time ?? '07:00').slice(0, 5),
+        morningBriefingEnabled: Boolean(nRow.morning_briefing_enabled),
       }
     : defaultNotificationSettings();
 
