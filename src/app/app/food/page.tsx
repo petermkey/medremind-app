@@ -22,7 +22,15 @@ import {
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { compressImageForAnalysis } from '@/lib/food/imageCompression';
 import { scaleNutrients } from '@/lib/food/scaleNutrients';
+import {
+  computeNutrientGaps,
+  gapsBucket,
+  hasMeaningfulGaps,
+  localHourForTimestamp,
+  SUGGEST_FROM_HOUR,
+} from '@/lib/food/suggest/gaps';
 import type { FoodAnalysisDraft, FoodEntry, FoodNutrients } from '@/types/food';
+import type { FoodSuggestion } from '@/lib/food/suggest/suggestSchema';
 import type {
   GeneratedNutritionTargets,
   NutritionActivityLevel,
@@ -371,6 +379,11 @@ export default function FoodPage() {
   const [savingTargets, setSavingTargets] = useState(false);
   const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(() => new Set());
   const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<FoodEntry | null>(null);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
+  const suggestCache = useRef(new Map<string, FoodSuggestion[]>());
 
   const timezone = useMemo(() => getResolvedTimezone(profile?.timezone), [profile?.timezone]);
   const today = useMemo(() => currentDateForTimezone(timezone), [timezone]);
@@ -380,6 +393,28 @@ export default function FoodPage() {
   const waterTotal = waterTotalForDate(activeDate, timezone);
   const stripDates = useMemo(() => dateStripDates(activeDate, today), [activeDate, today]);
   const shouldShowSetup = !loadingProfile && !targetProfile && !nutritionError;
+  const gaps = useMemo(
+    () =>
+      targetProfile
+        ? computeNutrientGaps(totals, waterTotal, {
+            caloriesKcal: targetProfile.caloriesKcal,
+            proteinG: targetProfile.proteinG,
+            fatG: targetProfile.fatG,
+            carbsG: targetProfile.carbsG,
+            fiberG: targetProfile.fiberG,
+            waterMl: targetProfile.waterMl,
+          })
+        : null,
+    [targetProfile, totals, waterTotal],
+  );
+  const localHour = localHourForTimestamp(new Date().toISOString(), timezone);
+  const showSuggestButton = Boolean(
+    gaps &&
+      hasMeaningfulGaps(gaps) &&
+      activeDate === today &&
+      localHour !== null &&
+      localHour >= SUGGEST_FROM_HOUR,
+  );
   const eatingWindow = useMemo(
     () =>
       computeEatingWindow(
@@ -495,6 +530,52 @@ export default function FoodPage() {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  async function openSuggestions() {
+    if (!gaps || suggestLoading) return;
+    const cacheKey = `${activeDate}:${gapsBucket(gaps)}`;
+    const cached = suggestCache.current.get(cacheKey);
+    if (cached) {
+      setSuggestions(cached);
+      setSuggestError(null);
+      setSuggestOpen(true);
+      return;
+    }
+
+    setSuggestLoading(true);
+    setSuggestError(null);
+    setSuggestions([]);
+    setSuggestOpen(true);
+    try {
+      const response = await fetch('/api/food/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: activeDate }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload || typeof payload !== 'object' || !Array.isArray(payload.suggestions)) {
+        const reason =
+          payload && typeof payload === 'object' && 'reason' in payload
+            ? String(payload.reason)
+            : null;
+        setSuggestError(foodAnalysisErrorMessage(reason, 'text'));
+        return;
+      }
+
+      const nextSuggestions = payload.suggestions as FoodSuggestion[];
+      suggestCache.current.set(cacheKey, nextSuggestions);
+      setSuggestions(nextSuggestions);
+    } catch {
+      setSuggestError(foodAnalysisErrorMessage(null, 'text'));
+    } finally {
+      setSuggestLoading(false);
+    }
+  }
+
+  function applySuggestion(suggestion: FoodSuggestion) {
+    setMealText(`${suggestion.title}. ${suggestion.description}`);
+    setSuggestOpen(false);
   }
 
   function handleSaveDraft() {
@@ -891,6 +972,16 @@ export default function FoodPage() {
                 quickAddWater({ userId: profile.id, timezone, selectedDate: activeDate, amountMl });
               }}
             />
+            {showSuggestButton && (
+              <button
+                type="button"
+                onClick={() => void openSuggestions()}
+                disabled={suggestLoading}
+                className="mt-2 w-full rounded-xl border border-[rgba(16,185,129,0.28)] bg-[rgba(16,185,129,0.08)] px-3 py-2.5 text-sm font-bold text-[#34D399] disabled:opacity-60"
+              >
+                {suggestLoading ? 'Подбираем...' : 'Чем закрыть день?'}
+              </button>
+            )}
           </>
         )}
         {eatingWindow.mealCount > 0 && (
@@ -1010,6 +1101,64 @@ export default function FoodPage() {
           </div>
         )}
       </div>
+
+      {suggestOpen && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 px-5 pb-5">
+          <div className="w-full max-w-[390px] rounded-2xl border border-[rgba(16,185,129,0.28)] bg-[#161B22] p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-base font-bold text-[#F0F6FC]">Чем закрыть день?</h2>
+              <button
+                type="button"
+                onClick={() => setSuggestOpen(false)}
+                className="rounded-xl bg-[#30363D] px-3 py-1.5 text-xs font-bold text-[#F0F6FC]"
+              >
+                Close
+              </button>
+            </div>
+            {suggestLoading && (
+              <div className="flex items-center gap-2 py-4 text-xs font-medium text-[#8B949E]">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#10B981] border-t-transparent" />
+                Подбираем варианты...
+              </div>
+            )}
+            {suggestError && (
+              <div className="rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+                {suggestError}
+              </div>
+            )}
+            {!suggestLoading && !suggestError && suggestions.length === 0 && (
+              <div className="py-4 text-xs text-[#8B949E]">Сегодня все цели уже закрыты.</div>
+            )}
+            <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={`${suggestion.title}-${index}`}
+                  type="button"
+                  onClick={() => applySuggestion(suggestion)}
+                  className="w-full rounded-xl bg-[#0D1117] px-3 py-2.5 text-left"
+                >
+                  <div className="text-sm font-bold text-[#F0F6FC]">{suggestion.title}</div>
+                  <div className="mt-0.5 text-xs text-[#C9D1D9]">{suggestion.description}</div>
+                  <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold text-[#8B949E]">
+                    {typeof suggestion.approxNutrients.caloriesKcal === 'number' && (
+                      <span>{Math.round(suggestion.approxNutrients.caloriesKcal)} kcal</span>
+                    )}
+                    {typeof suggestion.approxNutrients.proteinG === 'number' && (
+                      <span>{Math.round(suggestion.approxNutrients.proteinG)} g protein</span>
+                    )}
+                    {typeof suggestion.approxNutrients.fiberG === 'number' && (
+                      <span>{Math.round(suggestion.approxNutrients.fiberG)} g fiber</span>
+                    )}
+                  </div>
+                  {suggestion.rationale && (
+                    <div className="mt-1 text-[10px] text-[#8B949E]">{suggestion.rationale}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmDeleteEntry && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 px-5 pb-5">
