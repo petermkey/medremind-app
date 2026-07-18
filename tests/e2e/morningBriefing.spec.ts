@@ -7,6 +7,17 @@ const hasAuthCreds = Boolean(e2eEmail && e2ePassword);
 
 test.skip(!hasAuthCreds, 'E2E credentials not configured');
 
+declare global {
+  interface Window {
+    __medremindStore?: {
+      getState: () => {
+        profile?: { onboarded?: boolean; timezone?: string } | null;
+        updateNotificationSettings: (patch: { morningBriefingEnabled: boolean }) => void;
+      };
+    };
+  }
+}
+
 async function login(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(e2eEmail!);
@@ -38,31 +49,39 @@ function summaryStub(todayStr: string) {
   return { connected: true, lastSyncAt: new Date().toISOString(), battery: null, days };
 }
 
-async function setBriefingToggle(page: Page, enabled: boolean) {
-  await page.goto('/app/settings');
-  const toggleRow = page
-    .getByText('Утренний брифинг', { exact: true })
-    .locator('xpath=ancestor::div[contains(@class, "flex")][1]');
-  const toggle = toggleRow.locator('button').first();
-  const isOn = (await toggle.getAttribute('class'))?.includes('bg-[#3B82F6]') ?? false;
-  if (isOn !== enabled) await toggle.click();
-  await page.getByRole('button', { name: 'Save Notifications' }).click();
+async function setBriefingStoreFlag(page: Page, enabled: boolean) {
+  await page.waitForFunction(() => Boolean(window.__medremindStore?.getState().profile?.onboarded));
+  await page.evaluate((nextEnabled) => {
+    window.__medremindStore?.getState().updateNotificationSettings({
+      morningBriefingEnabled: nextEnabled,
+    });
+  }, enabled);
 }
 
 test('morning briefing card renders from stubbed summary and dismisses for the day', async ({ page }) => {
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
   await page.addInitScript(() => {
     localStorage.removeItem('medremind-briefing-dismissed-v1');
+  });
+
+  await login(page);
+  await page.goto('/app');
+  await expect(page.getByText("Today's progress")).toBeVisible();
+  const todayStr = await page.evaluate(() => {
+    const timeZone = window.__medremindStore?.getState().profile?.timezone ?? 'UTC';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const map = new Map(parts.map((part) => [part.type, part.value]));
+    return `${map.get('year')}-${map.get('month')}-${map.get('day')}`;
   });
   await page.route('**/api/health/oura/summary*', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(summaryStub(todayStr)) }),
   );
-
-  await login(page);
-  await setBriefingToggle(page, true);
+  await setBriefingStoreFlag(page, true);
   try {
-    await page.goto('/app');
-
     const card = page.getByTestId('morning-briefing-card');
     await expect(card).toBeVisible({ timeout: 15_000 });
     await expect(card).toContainText('Утренний брифинг: отличная готовность');
@@ -75,6 +94,6 @@ test('morning briefing card renders from stubbed summary and dismisses for the d
     await page.reload();
     await expect(page.getByTestId('morning-briefing-card')).toBeHidden();
   } finally {
-    await setBriefingToggle(page, false);
+    await setBriefingStoreFlag(page, false);
   }
 });
