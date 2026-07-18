@@ -19,10 +19,20 @@ export async function GET(request: NextRequest) {
 
   // Heartbeat: lets Sentry alert if this route stops being invoked by the
   // external cron-job.org scheduler, independent of any in-request error.
-  const checkInId = Sentry.captureCheckIn({
-    monitorSlug: 'cron-oura-sync',
-    status: 'in_progress',
-  });
+  // monitorConfig upserts the expected schedule so it stays in lockstep with
+  // the cron-job.org job (#8090621, hourly) without touching the Sentry UI.
+  const checkInId = Sentry.captureCheckIn(
+    {
+      monitorSlug: 'cron-oura-sync',
+      status: 'in_progress',
+    },
+    {
+      schedule: { type: 'crontab', value: '0 * * * *' },
+      checkinMargin: 10,
+      maxRuntime: 10,
+      timezone: 'Europe/London',
+    },
+  );
 
   const results: Array<{ userId: string; status: string; snapshots?: number }> = [];
 
