@@ -20,7 +20,7 @@ type Report = {
 };
 
 const DISCLAIMER =
-  'Это не медицинская рекомендация. Stack Guard сравнивает ваш стек со справочными правилами (NIH ODS и др.) и только подсказывает — расписание он никогда не меняет. Перед изменением схемы приёма проконсультируйтесь с врачом.';
+  'This is not medical advice. Stack Guard compares your stack against reference rules (NIH ODS and others) and only flags possible issues; it never changes your schedule. Consult a clinician before changing your regimen.';
 
 export function StackGuardCard() {
   const [report, setReport] = useState<Report | null>(null);
@@ -61,7 +61,7 @@ export function StackGuardCard() {
 
       {report.pendingFactsUsed && (
         <div className="text-[10px] font-semibold text-[#FBB924] mb-2">
-          Часть данных о составах ещё не подтверждена — выводы могут уточниться.
+          Some composition data is still unconfirmed, so findings may change.
         </div>
       )}
 
@@ -84,9 +84,9 @@ export function StackGuardCard() {
                 <div className="text-xs text-[#8B949E] leading-relaxed">{finding.explanation}</div>
                 <div className="text-xs text-[#F0F6FC] leading-relaxed">💡 {finding.suggestion}</div>
                 <div className="text-[10px] text-[#8B949E]">
-                  Затронуто: {finding.itemsInvolved.map((item) => item.name).join(' · ')}
+                  Affected: {finding.itemsInvolved.map((item) => item.name).join(' · ')}
                 </div>
-                <div className="text-[10px] text-[#8B949E] break-words">Источник: {finding.source}</div>
+                <div className="text-[10px] text-[#8B949E] break-words">Source: {finding.source}</div>
               </div>
             )}
           </div>

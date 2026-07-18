@@ -84,11 +84,11 @@ test('morning briefing card renders from stubbed summary and dismisses for the d
   try {
     const card = page.getByTestId('morning-briefing-card');
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card).toContainText('Утренний брифинг: отличная готовность');
-    await expect(card).toContainText('Готовность 88 · сон 82.');
-    await expect(card).toContainText('HRV 66 мс — +10% к 30-дневной норме.');
+    await expect(card).toContainText('Morning briefing: strong readiness');
+    await expect(card).toContainText('Readiness 88 · sleep 82.');
+    await expect(card).toContainText('HRV 66 ms — +10% vs your 30-day baseline.');
 
-    await card.getByRole('button', { name: 'Скрыть брифинг' }).click();
+    await card.getByRole('button', { name: 'Dismiss briefing' }).click();
     await expect(card).toBeHidden();
 
     await page.reload();

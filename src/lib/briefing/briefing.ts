@@ -53,23 +53,19 @@ const READINESS_GOOD = 85;
 const READINESS_LOW = 60;
 
 const TITLES: Record<BriefingSeverity, string> = {
-  good: 'Утренний брифинг: отличная готовность',
-  info: 'Утренний брифинг',
-  caution: 'Утренний брифинг: день восстановления',
-  warning: 'Утренний брифинг: поберегите себя',
+  good: 'Morning briefing: strong readiness',
+  info: 'Morning briefing',
+  caution: 'Morning briefing: recovery day',
+  warning: 'Morning briefing: take it easy',
 };
 
-export function ruPlural(count: number, one: string, few: string, many: string): string {
-  const mod10 = Math.abs(count) % 10;
-  const mod100 = Math.abs(count) % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
+export function doseLabel(count: number): string {
+  return count === 1 ? 'dose' : 'doses';
 }
 
 function doseLine(doseCount: number): string {
-  if (doseCount <= 0) return 'На сегодня приёмов не запланировано.';
-  return `Сегодня по расписанию: ${doseCount} ${ruPlural(doseCount, 'приём', 'приёма', 'приёмов')}.`;
+  if (doseCount <= 0) return 'No doses are scheduled for today.';
+  return `Scheduled today: ${doseCount} ${doseLabel(doseCount)}.`;
 }
 
 export function buildBriefing(
@@ -83,21 +79,21 @@ export function buildBriefing(
   if (!hasScores) {
     return {
       title: TITLES.info,
-      body: `Данных Oura за эту ночь пока нет. ${doseLine(doseCount)}`,
+      body: `No Oura data is available for last night yet. ${doseLine(doseCount)}`,
       severity: 'info',
     };
   }
 
   const lines: string[] = [];
   const scoreParts: string[] = [];
-  if (snapshot.readinessScore !== null) scoreParts.push(`Готовность ${snapshot.readinessScore}`);
-  if (snapshot.sleepScore !== null) scoreParts.push(`сон ${snapshot.sleepScore}`);
+  if (snapshot.readinessScore !== null) scoreParts.push(`Readiness ${snapshot.readinessScore}`);
+  if (snapshot.sleepScore !== null) scoreParts.push(`sleep ${snapshot.sleepScore}`);
   if (scoreParts.length > 0) lines.push(`${scoreParts.join(' · ')}.`);
 
   const hrvDelta = pctDelta(snapshot.sleepAvgHrv, baseline.hrvAvg30);
   if (snapshot.sleepAvgHrv !== null && hrvDelta !== null) {
     const sign = hrvDelta > 0 ? '+' : '';
-    lines.push(`HRV ${snapshot.sleepAvgHrv} мс — ${sign}${hrvDelta}% к 30-дневной норме.`);
+    lines.push(`HRV ${snapshot.sleepAvgHrv} ms — ${sign}${hrvDelta}% vs your 30-day baseline.`);
   }
 
   const temperatureHigh =
@@ -105,7 +101,7 @@ export function buildBriefing(
     snapshot.temperatureDeviation >= TEMPERATURE_WARNING_DEVIATION;
   if (temperatureHigh && snapshot.temperatureDeviation !== null) {
     lines.push(
-      `Температура тела выше обычной на ${snapshot.temperatureDeviation.toFixed(1)} °C — прислушайтесь к самочувствию.`,
+      `Body temperature is ${snapshot.temperatureDeviation.toFixed(1)} °C above usual — pay attention to how you feel.`,
     );
   }
 

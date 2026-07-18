@@ -132,7 +132,7 @@ test.describe('Pulse Day (requires E2E_EMAIL and E2E_PASSWORD)', () => {
     await login(page);
     await page.goto('/app/progress?tab=oura');
 
-    await expect(page.getByRole('heading', { name: 'Пульс дня' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pulse day' })).toBeVisible();
     await expect(page.getByTestId('pulse-day-chart')).toBeVisible();
 
     const markers = page.getByTestId('pulse-marker');

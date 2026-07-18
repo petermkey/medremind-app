@@ -140,14 +140,17 @@ test.describe('smart food-timed reminders (requires E2E_EMAIL and E2E_PASSWORD)'
     // 1. Turn the toggle on via Settings UI and save.
     await page.goto('/app/settings');
     await cleanupSeed(page);
-    const toggle = page.getByRole('button', { name: 'Умный тайминг напоминаний' });
+    const toggle = page.getByRole('button', { name: 'Smart reminder timing' });
+    if (await toggle.getAttribute('aria-pressed') === 'true') {
+      await toggle.click();
+      await page.getByRole('button', { name: 'Save Notifications' }).click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    }
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Save Notifications' }).click();
-    // Migration 030 is owner-applied before merge. Until the column is live,
-    // cloud round-trip cannot return smartFoodTiming; keep this pre-merge E2E
-    // focused on the UI toggle + Schedule hint behavior.
+    // Keep the local test state deterministic while the cloud save settles.
     await setTestProfileTimezone(page, 'UTC');
     await setSmartTimingStoreFlag(page, true);
 
@@ -209,7 +212,7 @@ test.describe('smart food-timed reminders (requires E2E_EMAIL and E2E_PASSWORD)'
     await setSmartTimingStoreFlag(page, true);
 
     // 3. Schedule page: 09:30 empty-stomach dose inside the 09:00–20:00 eating
-    // window → hint «⏱ 8:30 AM · смещено» (median first meal 09:00 − 30 min − no
+    // window → hint "⏱ 8:30 AM · adjusted" (median first meal 09:00 - 30 min - no
     // cap issues). The dose row itself still shows the ORIGINAL 09:30 slot —
     // planned occurrences are never modified.
     await page.waitForFunction((expectedName) => {
@@ -239,7 +242,7 @@ test.describe('smart food-timed reminders (requires E2E_EMAIL and E2E_PASSWORD)'
 
     const doseCard = page.locator('[data-dose-id]', { hasText: seedName }).first();
     await expect(doseCard).toBeVisible({ timeout: 30_000 });
-    await expect(doseCard.getByText(/· смещено/)).toBeVisible();
+    await expect(doseCard.getByText(/· adjusted/)).toBeVisible();
     await expect(doseCard.getByText(/9:30 AM/)).toBeVisible();
     await waitForSyncFlushed(page);
   });

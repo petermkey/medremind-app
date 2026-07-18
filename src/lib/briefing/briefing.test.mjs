@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { baselineAverage, buildBriefing, pctDelta, ruPlural } from './briefing.ts';
+import { baselineAverage, buildBriefing, doseLabel, pctDelta } from './briefing.ts';
 
 test('baselineAverage is the mean of finite samples, 1-decimal rounded', () => {
   assert.equal(baselineAverage([50, 60, 70, 55, 65, 60, 60]), 60);
@@ -30,12 +30,10 @@ test('pctDelta is null on missing current or missing/zero baseline', () => {
   assert.equal(pctDelta(Number.NaN, 60), null);
 });
 
-test('ruPlural picks the correct Russian plural form', () => {
-  assert.equal(ruPlural(1, 'приём', 'приёма', 'приёмов'), 'приём');
-  assert.equal(ruPlural(2, 'приём', 'приёма', 'приёмов'), 'приёма');
-  assert.equal(ruPlural(5, 'приём', 'приёма', 'приёмов'), 'приёмов');
-  assert.equal(ruPlural(11, 'приём', 'приёма', 'приёмов'), 'приёмов');
-  assert.equal(ruPlural(21, 'приём', 'приёма', 'приёмов'), 'приём');
+test('doseLabel picks the singular/plural English label', () => {
+  assert.equal(doseLabel(1), 'dose');
+  assert.equal(doseLabel(2), 'doses');
+  assert.equal(doseLabel(0), 'doses');
 });
 
 const BASELINE = { readinessAvg30: 75, hrvAvg30: 60 };
@@ -47,10 +45,10 @@ test('good day: readiness >= 85 -> severity good with full copy', () => {
     3,
   );
   assert.equal(briefing.severity, 'good');
-  assert.equal(briefing.title, 'Утренний брифинг: отличная готовность');
+  assert.equal(briefing.title, 'Morning briefing: strong readiness');
   assert.equal(
     briefing.body,
-    'Готовность 88 · сон 82. HRV 66 мс — +10% к 30-дневной норме. Сегодня по расписанию: 3 приёма.',
+    'Readiness 88 · sleep 82. HRV 66 ms — +10% vs your 30-day baseline. Scheduled today: 3 doses.',
   );
 });
 
@@ -61,10 +59,10 @@ test('HRV >= 15% below baseline -> severity caution', () => {
     1,
   );
   assert.equal(briefing.severity, 'caution');
-  assert.equal(briefing.title, 'Утренний брифинг: день восстановления');
+  assert.equal(briefing.title, 'Morning briefing: recovery day');
   assert.equal(
     briefing.body,
-    'Готовность 78 · сон 70. HRV 51 мс — -15% к 30-дневной норме. Сегодня по расписанию: 1 приём.',
+    'Readiness 78 · sleep 70. HRV 51 ms — -15% vs your 30-day baseline. Scheduled today: 1 dose.',
   );
 });
 
@@ -77,7 +75,7 @@ test('low readiness < 60 -> severity caution even with normal HRV', () => {
   assert.equal(briefing.severity, 'caution');
   assert.equal(
     briefing.body,
-    'Готовность 55 · сон 60. HRV 60 мс — 0% к 30-дневной норме. На сегодня приёмов не запланировано.',
+    'Readiness 55 · sleep 60. HRV 60 ms — 0% vs your 30-day baseline. No doses are scheduled for today.',
   );
 });
 
@@ -88,10 +86,10 @@ test('temperature deviation >= +0.5 C -> severity warning and wins over good rea
     2,
   );
   assert.equal(briefing.severity, 'warning');
-  assert.equal(briefing.title, 'Утренний брифинг: поберегите себя');
+  assert.equal(briefing.title, 'Morning briefing: take it easy');
   assert.equal(
     briefing.body,
-    'Готовность 90 · сон 85. HRV 70 мс — +17% к 30-дневной норме. Температура тела выше обычной на 0.6 °C — прислушайтесь к самочувствию. Сегодня по расписанию: 2 приёма.',
+    'Readiness 90 · sleep 85. HRV 70 ms — +17% vs your 30-day baseline. Body temperature is 0.6 °C above usual — pay attention to how you feel. Scheduled today: 2 doses.',
   );
 });
 
@@ -102,20 +100,20 @@ test('middling day -> severity info', () => {
     4,
   );
   assert.equal(briefing.severity, 'info');
-  assert.equal(briefing.title, 'Утренний брифинг');
+  assert.equal(briefing.title, 'Morning briefing');
   assert.equal(
     briefing.body,
-    'Готовность 72 · сон 68. HRV 58 мс — -3% к 30-дневной норме. Сегодня по расписанию: 4 приёма.',
+    'Readiness 72 · sleep 68. HRV 58 ms — -3% vs your 30-day baseline. Scheduled today: 4 doses.',
   );
 });
 
 test('no snapshot -> info briefing that still reports the dose count', () => {
   const briefing = buildBriefing(null, { readinessAvg30: null, hrvAvg30: null }, 5);
   assert.equal(briefing.severity, 'info');
-  assert.equal(briefing.title, 'Утренний брифинг');
+  assert.equal(briefing.title, 'Morning briefing');
   assert.equal(
     briefing.body,
-    'Данных Oura за эту ночь пока нет. Сегодня по расписанию: 5 приёмов.',
+    'No Oura data is available for last night yet. Scheduled today: 5 doses.',
   );
 });
 
@@ -126,5 +124,5 @@ test('missing HRV baseline omits the HRV line; missing sleep omits the sleep hal
     1,
   );
   assert.equal(briefing.severity, 'info');
-  assert.equal(briefing.body, 'Готовность 80. Сегодня по расписанию: 1 приём.');
+  assert.equal(briefing.body, 'Readiness 80. Scheduled today: 1 dose.');
 });

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   NUTRIENT_ALIASES,
-  NUTRIENT_LABELS_RU,
+  NUTRIENT_LABELS,
   STACK_GUARD_RULES,
   STACK_GUARD_RULESET_VERSION,
 } from '../../src/lib/stackGuard/rules';
@@ -17,7 +17,7 @@ test('there are 13 curated rules with unique ids', () => {
   assert.equal(ids.size, 13);
 });
 
-test('every rule carries a real citation and non-empty Russian copy', () => {
+test('every rule carries a real citation and non-empty English copy', () => {
   for (const rule of STACK_GUARD_RULES) {
     assert.ok(/https?:\/\/|\d{4};/.test(rule.source), `rule ${rule.id} needs a URL or journal citation`);
     assert.ok(
@@ -36,8 +36,8 @@ test('pair rules have non-overlapping non-empty alias groups', () => {
   }
 });
 
-test('every duplication token has a Russian label', () => {
+test('every duplication token has an English label', () => {
   for (const token of Object.keys(NUTRIENT_ALIASES)) {
-    assert.ok(NUTRIENT_LABELS_RU[token], `token ${token} lacks RU label`);
+    assert.ok(NUTRIENT_LABELS[token], `token ${token} lacks label`);
   }
 });

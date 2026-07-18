@@ -67,7 +67,7 @@ export function PulseDayCard() {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-xs font-bold uppercase tracking-widest text-[#8B949E]">Intraday heart rate</div>
-          <h2 className="mt-1 text-lg font-extrabold text-[#F0F6FC]">Пульс дня</h2>
+          <h2 className="mt-1 text-lg font-extrabold text-[#F0F6FC]">Pulse day</h2>
         </div>
         <div className="flex items-center gap-1">
           <button
