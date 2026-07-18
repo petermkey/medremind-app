@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
+import { StackGuardCard } from '@/components/app/StackGuardCard';
 import { useStore } from '@/lib/store/store';
 
 export default function MedsPage() {
@@ -52,6 +53,7 @@ export default function MedsPage() {
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {tab === 'mine' && (
           <>
+            <StackGuardCard />
             {myMeds.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-4xl mb-3">💊</div>
