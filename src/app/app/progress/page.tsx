@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { addDays, eachDayOfInterval, format, subDays } from 'date-fns';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OuraTab } from '@/components/app/oura/OuraTab';
+import { NutrientBalanceCard } from '@/components/app/nutrientBalance/NutrientBalanceCard';
 import { Button } from '@/components/ui/Button';
 import { useStore } from '@/lib/store/store';
 
@@ -625,6 +626,8 @@ export default function ProgressPage() {
             </div>
           )}
         </div>
+
+        <NutrientBalanceCard />
 
         {/* ── 5. LAST 7 DAYS (weekly rings — unchanged) ── */}
         <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
