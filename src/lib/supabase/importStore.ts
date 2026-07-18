@@ -114,10 +114,9 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
     const { error } = await supabase.from('notification_settings').upsert({
       user_id: userId,
       push_enabled: Boolean(notifPatch.pushEnabled),
-      email_enabled: Boolean(notifPatch.emailEnabled),
       lead_time_min: Number.isFinite(notifPatch.leadTimeMin) ? notifPatch.leadTimeMin : 0,
-      digest_time: notifPatch.digestTime || '07:00',
       morning_briefing_enabled: Boolean(notifPatch.morningBriefingEnabled),
+      weekly_review_enabled: Boolean(notifPatch.weeklyReviewEnabled),
     });
     if (error) throw new Error(`Notification settings import failed: ${error.message}`);
   }

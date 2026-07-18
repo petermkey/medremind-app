@@ -93,10 +93,9 @@ export async function backupCurrentStoreToSupabase(): Promise<ImportSummary> {
 function defaultNotificationSettings(): NotificationSettings {
   return {
     pushEnabled: false,
-    emailEnabled: false,
     leadTimeMin: 0,
-    digestTime: '07:00',
     morningBriefingEnabled: false,
+    weeklyReviewEnabled: false,
   };
 }
 
@@ -602,10 +601,9 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   const notificationSettings: NotificationSettings = nRow
     ? {
         pushEnabled: Boolean(nRow.push_enabled),
-        emailEnabled: Boolean(nRow.email_enabled),
         leadTimeMin: Number(nRow.lead_time_min ?? 0),
-        digestTime: String(nRow.digest_time ?? '07:00').slice(0, 5),
         morningBriefingEnabled: Boolean(nRow.morning_briefing_enabled),
+        weeklyReviewEnabled: Boolean(nRow.weekly_review_enabled),
       }
     : defaultNotificationSettings();
 
