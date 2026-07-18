@@ -38,6 +38,9 @@ export type DailyLifestyleSnapshot = {
   deepSleepFirstThirdMinutes?: number | null;
   minutesToFirstDeepSleep?: number | null;
   hrvRecoveryDelta?: number | null;
+  eatingWindowHours?: number | null;
+  lastMealHour?: number | null;
+  lateMealFlag?: boolean;
   postDoseHrDeltaBpm?: number | null;
   daytimeAvgHr?: number | null;
   hasGlp1Active?: boolean;
