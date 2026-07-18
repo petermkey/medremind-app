@@ -1,6 +1,14 @@
 'use client';
 
-import { classifyDelta, medianOfPreviousDays, pickDisplayNight, type OuraMetricKey, type OuraStatsDay } from '@/lib/health/ouraStats';
+import {
+  classifyDelta,
+  latencyMinutes,
+  medianOfPreviousDays,
+  OURA_METRIC_EXPLAINERS,
+  pickDisplayNight,
+  type OuraMetricKey,
+  type OuraStatsDay,
+} from '@/lib/health/ouraStats';
 
 function fmt(value: number | null | undefined, suffix = ''): string {
   if (value === null || value === undefined) return '—';
@@ -27,9 +35,18 @@ function toneClass(tone: string): string {
   return 'text-[#8B949E] bg-[#1C2333]';
 }
 
-function DeltaChip({ day, index, metric }: { day: OuraStatsDay; index: number; metric: OuraMetricKey }) {
-  const norm = medianOfPreviousDays((day as OuraStatsDay & { __allDays?: OuraStatsDay[] }).__allDays ?? [], index, metric);
-  const value = typeof day[metric] === 'number' ? day[metric] : null;
+function DeltaChip({ day, index, metric, transform }: {
+  day: OuraStatsDay;
+  index: number;
+  metric: OuraMetricKey;
+  // Applied to BOTH the value and the norm before the delta is classified;
+  // used to show sleep-latency delta in minutes while stored in seconds.
+  transform?: (value: number | null | undefined) => number | null;
+}) {
+  const rawNorm = medianOfPreviousDays((day as OuraStatsDay & { __allDays?: OuraStatsDay[] }).__allDays ?? [], index, metric);
+  const rawValue = typeof day[metric] === 'number' ? (day[metric] as number) : null;
+  const norm = transform ? transform(rawNorm) : rawNorm;
+  const value = transform ? transform(rawValue) : rawValue;
   const delta = classifyDelta(metric, value, norm);
   if (delta.delta === null) return null;
   const sign = delta.delta > 0 ? '+' : '';
@@ -71,19 +88,25 @@ function HeroTile({
   );
 }
 
-function DetailRow({ label, value, suffix, metric, day, index }: {
+function DetailRow({ label, value, suffix, metric, day, index, hint, formatter = fmt, transform }: {
   label: string;
   value: number | null | undefined;
   suffix?: string;
   metric: OuraMetricKey;
   day: OuraStatsDay;
   index: number;
+  hint?: string;
+  formatter?: (value: number | null | undefined, suffix?: string) => string;
+  transform?: (value: number | null | undefined) => number | null;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[rgba(255,255,255,0.06)] py-2 last:border-b-0">
-      <span className="text-sm text-[#C9D1D9]">{label}</span>
-      <span className="ml-auto text-sm font-bold text-[#F0F6FC]">{fmt(value, suffix)}</span>
-      <DeltaChip day={day} index={index} metric={metric} />
+    <div className="border-b border-[rgba(255,255,255,0.06)] py-2 last:border-b-0">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-[#C9D1D9]">{label}</span>
+        <span className="ml-auto text-sm font-bold text-[#F0F6FC]">{formatter(value, suffix)}</span>
+        <DeltaChip day={day} index={index} metric={metric} transform={transform} />
+      </div>
+      {hint && <p className="mt-0.5 text-[11px] leading-snug text-[#8B949E]">{hint}</p>}
     </div>
   );
 }
@@ -124,8 +147,46 @@ export function NightCard({ days }: { days: OuraStatsDay[] }) {
       <div className="mt-4 rounded-xl bg-[#0D1117] px-3">
         <DetailRow label="Deep sleep" value={day.deepSleepMinutes} suffix=" min" metric="deepSleepMinutes" day={day} index={display.index} />
         <DetailRow label="REM" value={day.remSleepMinutes} suffix=" min" metric="remSleepMinutes" day={day} index={display.index} />
+        <DetailRow
+          label="Sleep efficiency"
+          value={day.sleepEfficiency}
+          suffix="%"
+          metric="sleepEfficiency"
+          day={day}
+          index={display.index}
+          hint={OURA_METRIC_EXPLAINERS.sleepEfficiency}
+        />
+        <DetailRow
+          label="Sleep latency"
+          value={latencyMinutes(day.sleepLatencySeconds)}
+          suffix=" min"
+          metric="sleepLatencySeconds"
+          day={day}
+          index={display.index}
+          hint={OURA_METRIC_EXPLAINERS.sleepLatencySeconds}
+          transform={latencyMinutes}
+        />
+        <DetailRow
+          label="Deep sleep, first ⅓"
+          value={day.deepSleepFirstThirdMinutes}
+          suffix=" min"
+          metric="deepSleepFirstThirdMinutes"
+          day={day}
+          index={display.index}
+          hint={OURA_METRIC_EXPLAINERS.deepSleepFirstThirdMinutes}
+        />
         <DetailRow label="Time to first deep" value={day.minutesToFirstDeepSleep} suffix=" min" metric="minutesToFirstDeepSleep" day={day} index={display.index} />
         <DetailRow label="Overnight HRV recovery" value={day.hrvRecoveryDelta} metric="hrvRecoveryDelta" day={day} index={display.index} />
+        <DetailRow
+          label="Temperature trend"
+          value={day.temperatureTrendDeviation}
+          suffix=" °C"
+          metric="temperatureTrendDeviation"
+          day={day}
+          index={display.index}
+          hint={OURA_METRIC_EXPLAINERS.temperatureTrendDeviation}
+          formatter={fmtSignedDecimal}
+        />
         <DetailRow label="Resting HR" value={day.restingHeartRate} suffix=" bpm" metric="restingHeartRate" day={day} index={display.index} />
         <DetailRow label="Respiratory rate" value={day.respiratoryRate} metric="respiratoryRate" day={day} index={display.index} />
         <DetailRow label="SpO₂" value={day.averageSpo2} suffix="%" metric="averageSpo2" day={day} index={display.index} />
