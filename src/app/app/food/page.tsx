@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
+import Link from 'next/link';
 import { useStore } from '@/lib/store/store';
 import { useFoodStore, type FoodStoreState } from '@/lib/store/foodStore';
 import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
@@ -12,6 +13,12 @@ import {
   validateNutritionTargetProfileTargets,
 } from '@/lib/food/targetAlgorithm';
 import { consumedAtForSelectedDateInTimezone } from '@/lib/nutrition/waterEntryTime';
+import {
+  computeEatingWindow,
+  computeEatingWindowStreak,
+  formatWindowDuration,
+  STREAK_MAX_WINDOW_HOURS,
+} from '@/lib/nutrition/eatingWindow';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { compressImageForAnalysis } from '@/lib/food/imageCompression';
 import { scaleNutrients } from '@/lib/food/scaleNutrients';
@@ -373,6 +380,26 @@ export default function FoodPage() {
   const waterTotal = waterTotalForDate(activeDate, timezone);
   const stripDates = useMemo(() => dateStripDates(activeDate, today), [activeDate, today]);
   const shouldShowSetup = !loadingProfile && !targetProfile && !nutritionError;
+  const eatingWindow = useMemo(
+    () =>
+      computeEatingWindow(
+        entries.map(entry => ({ consumedAt: entry.consumedAt, timezone: entry.timezone })),
+        activeDate,
+        timezone,
+      ),
+    [entries, activeDate, timezone],
+  );
+  const storeEntries = foodStore.entries;
+  const eatingStreak = useMemo(
+    () =>
+      computeEatingWindowStreak(
+        storeEntries.map(entry => ({ consumedAt: entry.consumedAt, timezone: entry.timezone })),
+        activeDate,
+        timezone,
+        7,
+      ),
+    [storeEntries, activeDate, timezone],
+  );
 
   useEffect(() => {
     setSelectedDate(current => current ?? today);
@@ -866,6 +893,9 @@ export default function FoodPage() {
             />
           </>
         )}
+        {eatingWindow.mealCount > 0 && (
+          <EatingWindowCard window={eatingWindow} streak={eatingStreak} />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-5">
@@ -1160,6 +1190,46 @@ function WaterTracker({
             +500 ml
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EatingWindowCard({
+  window,
+  streak,
+}: {
+  window: ReturnType<typeof computeEatingWindow>;
+  streak: number;
+}) {
+  return (
+    <div className="mt-2 rounded-xl border border-[rgba(168,85,247,0.24)] bg-[rgba(168,85,247,0.08)] p-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="text-[13px] font-bold text-[#F0F6FC]">Eating window</div>
+            {window.lateFlag && (
+              <span className="rounded-full bg-[rgba(251,191,36,0.16)] px-2 py-0.5 text-[10px] font-bold text-[#FBBF24]">
+                late
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 text-[11px] font-semibold text-[#C9D1D9]">
+            {window.firstMeal} → {window.lastMeal}
+            {window.windowHours !== null && window.windowHours > 0 && (
+              <> · {formatWindowDuration(window.windowHours)}</>
+            )}
+          </div>
+          <div className="mt-0.5 text-[10px] font-semibold text-[#8B949E]">
+            ≤{STREAK_MAX_WINDOW_HOURS}h streak: {streak} day{streak === 1 ? '' : 's'}
+          </div>
+        </div>
+        <Link
+          href="/app/insights"
+          className="flex-shrink-0 text-[11px] font-bold text-[#A855F7] hover:underline"
+        >
+          7-day averages →
+        </Link>
       </div>
     </div>
   );
