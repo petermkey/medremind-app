@@ -53,9 +53,12 @@ const FOOD_LOOKBACK_DAYS = 14;
 
 function localDateFor(iso: string, timeZone: string): string {
   try {
-    return new Intl.DateTimeFormat('en-CA', {
+    const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date(iso));
+    }).formatToParts(new Date(iso));
+    const map = new Map(parts.map(part => [part.type, part.value]));
+    const date = `${map.get('year')}-${map.get('month')}-${map.get('day')}`;
+    return date.length === 10 ? date : iso.slice(0, 10);
   } catch {
     return iso.slice(0, 10);
   }
