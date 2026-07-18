@@ -203,11 +203,11 @@ test.describe('close the gap', () => {
       await page.goto('/app/food', { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { name: 'Food' })).toBeVisible({ timeout: 30_000 });
 
-      const suggestButton = page.getByRole('button', { name: 'Чем закрыть день?' });
+      const suggestButton = page.getByRole('button', { name: 'Close today’s gaps' });
       await expect(suggestButton).toBeVisible();
       await suggestButton.click();
 
-      await expect(page.getByRole('heading', { name: 'Чем закрыть день?' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Close today’s gaps' })).toBeVisible();
       await page.getByRole('button', { name: new RegExp(SUGGESTION_TITLE) }).click();
 
       await expect(page.getByLabel('Describe your meal')).toHaveValue(

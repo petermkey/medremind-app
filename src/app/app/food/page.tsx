@@ -979,7 +979,7 @@ export default function FoodPage() {
                 disabled={suggestLoading}
                 className="mt-2 w-full rounded-xl border border-[rgba(16,185,129,0.28)] bg-[rgba(16,185,129,0.08)] px-3 py-2.5 text-sm font-bold text-[#34D399] disabled:opacity-60"
               >
-                {suggestLoading ? 'Подбираем...' : 'Чем закрыть день?'}
+                {suggestLoading ? 'Finding options...' : 'Close today’s gaps'}
               </button>
             )}
           </>
@@ -1106,7 +1106,7 @@ export default function FoodPage() {
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 px-5 pb-5">
           <div className="w-full max-w-[390px] rounded-2xl border border-[rgba(16,185,129,0.28)] bg-[#161B22] p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-base font-bold text-[#F0F6FC]">Чем закрыть день?</h2>
+              <h2 className="text-base font-bold text-[#F0F6FC]">Close today’s gaps</h2>
               <button
                 type="button"
                 onClick={() => setSuggestOpen(false)}
@@ -1118,7 +1118,7 @@ export default function FoodPage() {
             {suggestLoading && (
               <div className="flex items-center gap-2 py-4 text-xs font-medium text-[#8B949E]">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#10B981] border-t-transparent" />
-                Подбираем варианты...
+                Finding options...
               </div>
             )}
             {suggestError && (
@@ -1127,7 +1127,7 @@ export default function FoodPage() {
               </div>
             )}
             {!suggestLoading && !suggestError && suggestions.length === 0 && (
-              <div className="py-4 text-xs text-[#8B949E]">Сегодня все цели уже закрыты.</div>
+              <div className="py-4 text-xs text-[#8B949E]">All targets are already covered today.</div>
             )}
             <div className="max-h-[50vh] space-y-2 overflow-y-auto">
               {suggestions.map((suggestion, index) => (

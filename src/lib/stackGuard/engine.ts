@@ -4,7 +4,7 @@
 // SUGGESTIONS: nothing in this module (or its consumers) mutates schedules.
 import {
   NUTRIENT_ALIASES,
-  NUTRIENT_LABELS_RU,
+  NUTRIENT_LABELS,
   STACK_GUARD_RULESET_VERSION,
   type PairRule,
   type SingleDoseLimitRule,
@@ -222,16 +222,16 @@ export function evaluateStack(
   }
   for (const [token, dupItems] of [...itemsByToken.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     if (dupItems.length < 2) continue;
-    const label = NUTRIENT_LABELS_RU[token] ?? token;
+    const label = NUTRIENT_LABELS[token] ?? token;
     findings.push({
       ruleId: `duplicate_nutrient:${token}`,
       severity: 'info',
       itemsInvolved: dupItems
         .map((item) => ({ protocolItemId: item.protocolItemId, name: item.name }))
         .sort((a, b) => a.protocolItemId.localeCompare(b.protocolItemId)),
-      title: `Дублирование нутриента: ${label}`,
-      explanation: `«${label}» встречается сразу в нескольких позициях стека — суммарная дневная доза может оказаться выше, чем вы планировали.`,
-      suggestion: 'Проверьте составы позиций и суммарную дневную дозу; при необходимости обсудите с врачом, нужен ли дубль.',
+      title: `Duplicate nutrient: ${label}`,
+      explanation: `${label} appears in multiple stack items, so the total daily amount may be higher than intended.`,
+      suggestion: 'Review ingredient lists and total daily dose; if needed, ask a clinician whether the duplicate is appropriate.',
       source: 'NIH Office of Dietary Supplements — fact sheets: https://ods.od.nih.gov/factsheets/',
     });
   }

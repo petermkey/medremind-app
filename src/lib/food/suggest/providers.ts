@@ -13,11 +13,11 @@ import {
 const PROVIDER_TIMEOUT_MS = 30_000;
 
 const SUGGEST_PROMPT = [
-  'Ты - помощник по питанию. Пользователю осталось добрать до дневных целей',
-  'нутриенты, перечисленные в JSON ниже (нулевые значения означают, что цель',
-  'уже закрыта). Предложи 2-3 конкретных блюда или перекуса, реально',
-  'закрывающих самые большие пробелы. Обычные продукты, без экзотики.',
-  'Отвечай на русском. Верни только JSON по схеме. Никаких медицинских советов.',
+  'You are a nutrition assistant. The user still needs the nutrients listed',
+  'in the JSON below to reach today’s targets (zero values mean the target is',
+  'already covered). Suggest 2-3 concrete meals or snacks that realistically',
+  'cover the biggest gaps. Use ordinary foods, no exotic ingredients.',
+  'Answer in English. Return only JSON matching the schema. No medical advice.',
 ].join(' ');
 
 export type FoodSuggestResult = { suggestions: FoodSuggestion[]; model: string };
@@ -75,15 +75,15 @@ function mockSuggestions(gaps: NutrientGaps): FoodSuggestResult {
   const suggestions = validateFoodSuggestions({
     suggestions: [
       {
-        title: 'Творог с ягодами',
-        description: '200 г творога 5% с горстью черники.',
-        rationale: `Закрывает около 34 г из ${gaps.proteinG} г недостающего белка.`,
+        title: 'Cottage cheese with berries',
+        description: '200 g cottage cheese with a handful of blueberries.',
+        rationale: `Covers about 34 g of the remaining ${gaps.proteinG} g protein gap.`,
         approxNutrients: { caloriesKcal: 280, proteinG: 34, totalFatG: 10, carbsG: 14, fiberG: 2 },
       },
       {
-        title: 'Чечевичный суп',
-        description: 'Тарелка чечевичного супа с цельнозерновым хлебом.',
-        rationale: `Дает около 12 г клетчатки из недостающих ${gaps.fiberG} г.`,
+        title: 'Lentil soup',
+        description: 'A bowl of lentil soup with whole-grain bread.',
+        rationale: `Adds about 12 g of the remaining ${gaps.fiberG} g fiber gap.`,
         approxNutrients: { caloriesKcal: 350, proteinG: 18, totalFatG: 6, carbsG: 52, fiberG: 12 },
       },
     ],

@@ -324,8 +324,8 @@ export async function GET(request: NextRequest) {
               const smartNote = adjustedMinutes === null
                 ? ''
                 : itemWithFoodMap.get(occ.protocol_item_id) === 'no'
-                  ? ' · ⏱ сдвинуто до вашего обычного первого приёма пищи'
-                  : ' · ⏱ сдвинуто к вашему обычному приёму пищи';
+                  ? ' · ⏱ adjusted before your usual first meal'
+                  : ' · ⏱ adjusted toward your usual meal time';
 
               const title = `MedRemind — ${displayTime}`;
               const body = `${itemName} (${protocolName})${smartNote}`;

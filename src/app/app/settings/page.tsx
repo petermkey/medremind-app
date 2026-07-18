@@ -422,8 +422,8 @@ export default function SettingsPage() {
             </div>
           )}
           <Toggle label="Push notifications" sub="Dose reminders delivered to your device" checked={pushEnabled} onChange={setPushEnabled} />
-          <Toggle label="Утренний брифинг" sub="Ежедневная сводка готовности, сна и приёмов (~06:30)" checked={morningBriefingEnabled} onChange={setMorningBriefingEnabled} />
-          <Toggle label="Умный тайминг напоминаний" sub="Сдвигает пуш-напоминание с учётом вашего обычного времени еды (не более ±90 мин)" checked={smartFoodTiming} onChange={setSmartFoodTiming} />
+          <Toggle label="Morning briefing" sub="Daily readiness, sleep, and dose summary (~06:30)" checked={morningBriefingEnabled} onChange={setMorningBriefingEnabled} />
+          <Toggle label="Smart reminder timing" sub="Adjusts push reminders around your usual meal times (up to ±90 min)" checked={smartFoodTiming} onChange={setSmartFoodTiming} />
           <Toggle label="Email digest" sub="Daily summary at set time" checked={emailEnabled} onChange={setEmailEnabled} />
           <Select label="Reminder lead time" value={leadTime} onChange={e => setLeadTime(e.target.value)}
             options={[
