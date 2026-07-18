@@ -383,7 +383,7 @@ export default function FoodPage() {
   const eatingWindow = useMemo(
     () =>
       computeEatingWindow(
-        entries.map(entry => ({ consumedAt: entry.consumedAt, timezone: entry.timezone })),
+        entries.map(entry => ({ consumedAt: entry.consumedAt })),
         activeDate,
         timezone,
       ),
@@ -393,7 +393,7 @@ export default function FoodPage() {
   const eatingStreak = useMemo(
     () =>
       computeEatingWindowStreak(
-        storeEntries.map(entry => ({ consumedAt: entry.consumedAt, timezone: entry.timezone })),
+        storeEntries.map(entry => ({ consumedAt: entry.consumedAt })),
         activeDate,
         timezone,
         7,
