@@ -63,11 +63,11 @@ export function WeeklyReviewSection() {
       className="rounded-2xl border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.06)] p-4 mt-3 mb-3"
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-bold text-[#F0F6FC]">🧠 Недельный разбор</div>
+        <div className="text-sm font-bold text-[#F0F6FC]">🧠 Weekly review</div>
         <div className="text-[11px] text-[#8B949E]">{formatWeek(selected.weekStart)}</div>
       </div>
 
-      <Block title="Итоги недели">
+      <Block title="Week highlights">
         <ul className="flex flex-col gap-1">
           {payload.highlights.map((highlight) => (
             <li key={highlight} className="text-xs text-[#F0F6FC] leading-relaxed">• {highlight}</li>
@@ -75,7 +75,7 @@ export function WeeklyReviewSection() {
         </ul>
       </Block>
 
-      <Block title="Питание">
+      <Block title="Nutrition">
         {payload.eatingPatterns.map((pattern) => (
           <div key={pattern.title} className="mb-1.5">
             <span className="text-xs font-semibold text-[#F0F6FC]">{pattern.title}: </span>
@@ -84,12 +84,12 @@ export function WeeklyReviewSection() {
         ))}
       </Block>
 
-      <Block title="Приём стека">
+      <Block title="Stack adherence">
         <p className="text-xs text-[#8B949E] leading-relaxed">{payload.stackAdherence.summary}</p>
       </Block>
 
       {payload.ouraLinkage.length > 0 && (
-        <Block title="Сон и восстановление">
+        <Block title="Sleep & recovery">
           <ul className="flex flex-col gap-1">
             {payload.ouraLinkage.map((linkage) => (
               <li key={linkage} className="text-xs text-[#8B949E] leading-relaxed">• {linkage}</li>
@@ -98,7 +98,7 @@ export function WeeklyReviewSection() {
         </Block>
       )}
 
-      <Block title="На следующую неделю">
+      <Block title="For next week">
         {payload.actions.map((action) => (
           <div key={action.title} className="mb-1.5">
             <span className="text-xs font-semibold text-[#10B981]">{action.title}: </span>
@@ -128,8 +128,7 @@ export function WeeklyReviewSection() {
       )}
 
       <p className="mt-3 text-[10px] text-[#8B949E] leading-relaxed">
-        ⚠️ Это не медицинская рекомендация. Не меняйте приём препаратов и добавок без
-        консультации с врачом.
+        ⚠️ This is not medical advice. Do not change your medications or supplements without consulting your healthcare provider.
       </p>
     </div>
   );

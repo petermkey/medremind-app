@@ -45,7 +45,7 @@ test('stored weekly review renders section-by-section on Progress', async ({ pag
 
   const section = page.getByTestId('weekly-review-section');
   await expect(section).toBeVisible({ timeout: 15_000 });
-  await expect(section).toContainText('Недельный разбор');
+  await expect(section).toContainText('Weekly review');
   await expect(section).toContainText('Белок в среднем 92 г/день');
   await expect(section).toContainText('Поздние ужины');
   await expect(section).toContainText('Принято 36 из 42 доз (86%)');
@@ -56,7 +56,7 @@ test('stored weekly review renders section-by-section on Progress', async ({ pag
 test('settings: weekly-review toggle replaced the email-digest block', async ({ page }) => {
   await login(page);
   await page.goto('/app/settings');
-  await expect(page.getByText('Недельный AI-разбор')).toBeVisible();
+  await expect(page.getByText('Weekly AI review')).toBeVisible();
   await expect(page.getByText('Email digest')).toHaveCount(0);
   await expect(page.getByText('Daily digest time')).toHaveCount(0);
 });
