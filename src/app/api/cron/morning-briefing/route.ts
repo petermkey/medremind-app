@@ -4,7 +4,7 @@
 // deploy.
 import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 
 import {
   baselineAverage,
@@ -86,175 +86,197 @@ export async function GET(request: NextRequest) {
     },
   );
 
-  if (!isVapidConfigured()) {
-    Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
-    return NextResponse.json({ error: 'VAPID not configured' }, { status: 500 });
-  }
+  // Decouple trigger from work: the per-user push loop can exceed cron-job.org's
+  // fixed 30s client timeout, which would log a false "Timeout" even though the
+  // Vercel function (maxDuration 300) completes. after() runs the work once the
+  // 200 is sent; the Sentry check-in is the real success/failure monitor.
+  after(() => runBriefing(checkInId));
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
-    return NextResponse.json({ error: 'Supabase env not configured' }, { status: 500 });
-  }
+  return NextResponse.json({ triggered: true });
+}
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const now = new Date();
-  const results: Result[] = [];
+async function runBriefing(checkInId: string): Promise<void> {
+  try {
+    if (!isVapidConfigured()) {
+      Sentry.captureMessage('[cron/morning-briefing] VAPID not configured', {
+        level: 'error',
+        tags: { route: 'cron/morning-briefing' },
+      });
+      Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
+      return;
+    }
 
-  const { data: settingRows, error: settingsError } = await supabase
-    .from('notification_settings')
-    .select('user_id')
-    .eq('push_enabled', true)
-    .eq('morning_briefing_enabled', true);
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      Sentry.captureMessage('[cron/morning-briefing] Supabase env not configured', {
+        level: 'error',
+        tags: { route: 'cron/morning-briefing' },
+      });
+      Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
+      return;
+    }
 
-  if (settingsError) {
-    Sentry.captureException(settingsError, {
-      tags: { route: 'cron/morning-briefing', stage: 'notification_settings' },
-    });
-    Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
-    return NextResponse.json({ error: 'DB error' }, { status: 500 });
-  }
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const now = new Date();
+    const results: Result[] = [];
 
-  for (const { user_id: userId } of settingRows ?? []) {
-    try {
-      const { data: profileRow } = await supabase
-        .from('profiles')
-        .select('timezone')
-        .eq('id', userId)
-        .maybeSingle();
-      const timeZone = typeof profileRow?.timezone === 'string' ? profileRow.timezone : 'UTC';
+    const { data: settingRows, error: settingsError } = await supabase
+      .from('notification_settings')
+      .select('user_id')
+      .eq('push_enabled', true)
+      .eq('morning_briefing_enabled', true);
 
-      const { data: connRow } = await supabase
-        .from('external_health_connections')
-        .select('sleep_window')
-        .eq('user_id', userId)
-        .eq('source', 'oura')
-        .maybeSingle();
-      const optimalBedtime = (
-        connRow?.sleep_window as { optimal_bedtime?: unknown } | null
-      )?.optimal_bedtime;
-      if (isInQuietHours(now, timeZone, optimalBedtime)) {
-        results.push({ userId, status: 'quiet-hours' });
-        continue;
-      }
+    if (settingsError) {
+      Sentry.captureException(settingsError, {
+        tags: { route: 'cron/morning-briefing', stage: 'notification_settings' },
+      });
+      Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
+      return;
+    }
 
-      const localDate = localDateFor(now, timeZone);
-      const dedupeKey = deterministicNotificationUuid('morning-briefing', localDate);
-      const { data: lockRows, error: lockError } = await supabase
-        .from('notification_log')
-        .upsert(
-          {
-            user_id: userId,
-            scheduled_dose_id: dedupeKey,
-            sent_at: now.toISOString(),
-            notification_count: 0,
-          },
-          { onConflict: 'user_id,scheduled_dose_id', ignoreDuplicates: true },
-        )
-        .select('scheduled_dose_id');
+    for (const { user_id: userId } of settingRows ?? []) {
+      try {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('timezone')
+          .eq('id', userId)
+          .maybeSingle();
+        const timeZone = typeof profileRow?.timezone === 'string' ? profileRow.timezone : 'UTC';
 
-      if (lockError) {
-        console.error('[cron/morning-briefing] lock failed', userId, lockError);
-        results.push({ userId, status: 'error' });
-        continue;
-      }
-      if (!lockRows || lockRows.length === 0) {
-        results.push({ userId, status: 'already-sent' });
-        continue;
-      }
+        const { data: connRow } = await supabase
+          .from('external_health_connections')
+          .select('sleep_window')
+          .eq('user_id', userId)
+          .eq('source', 'oura')
+          .maybeSingle();
+        const optimalBedtime = (
+          connRow?.sleep_window as { optimal_bedtime?: unknown } | null
+        )?.optimal_bedtime;
+        if (isInQuietHours(now, timeZone, optimalBedtime)) {
+          results.push({ userId, status: 'quiet-hours' });
+          continue;
+        }
 
-      const releaseClaim = () =>
-        supabase
+        const localDate = localDateFor(now, timeZone);
+        const dedupeKey = deterministicNotificationUuid('morning-briefing', localDate);
+        const { data: lockRows, error: lockError } = await supabase
           .from('notification_log')
-          .delete()
+          .upsert(
+            {
+              user_id: userId,
+              scheduled_dose_id: dedupeKey,
+              sent_at: now.toISOString(),
+              notification_count: 0,
+            },
+            { onConflict: 'user_id,scheduled_dose_id', ignoreDuplicates: true },
+          )
+          .select('scheduled_dose_id');
+
+        if (lockError) {
+          console.error('[cron/morning-briefing] lock failed', userId, lockError);
+          results.push({ userId, status: 'error' });
+          continue;
+        }
+        if (!lockRows || lockRows.length === 0) {
+          results.push({ userId, status: 'already-sent' });
+          continue;
+        }
+
+        const releaseClaim = () =>
+          supabase
+            .from('notification_log')
+            .delete()
+            .eq('user_id', userId)
+            .eq('scheduled_dose_id', dedupeKey)
+            .eq('notification_count', 0);
+
+        const { data: snapshotRows, error: snapshotError } = await supabase
+          .from('external_health_daily_snapshots')
+          .select('local_date, readiness_score, sleep_score, sleep_avg_hrv, temperature_deviation')
+          .eq('user_id', userId)
+          .eq('source', 'oura')
+          .gte('local_date', addDaysIso(localDate, -BASELINE_DAYS))
+          .lte('local_date', localDate)
+          .order('local_date', { ascending: true });
+        if (snapshotError) {
+          console.error('[cron/morning-briefing] snapshots fetch failed', userId, snapshotError);
+          await releaseClaim();
+          results.push({ userId, status: 'error' });
+          continue;
+        }
+
+        const rows = ((snapshotRows ?? []) as SnapshotRow[]);
+        const todayRow = rows.find((row) => row.local_date === localDate) ?? null;
+        const baselineRows = rows.filter((row) => row.local_date !== localDate);
+        const snapshot: BriefingSnapshot | null = todayRow
+          ? {
+              readinessScore: numberOrNull(todayRow.readiness_score),
+              sleepScore: numberOrNull(todayRow.sleep_score),
+              sleepAvgHrv: numberOrNull(todayRow.sleep_avg_hrv),
+              temperatureDeviation: numberOrNull(todayRow.temperature_deviation),
+            }
+          : null;
+        const baseline = {
+          readinessAvg30: baselineAverage(baselineRows.map((row) => numberOrNull(row.readiness_score))),
+          hrvAvg30: baselineAverage(baselineRows.map((row) => numberOrNull(row.sleep_avg_hrv))),
+        };
+
+        const { data: occRows, error: occError } = await supabase
+          .from('planned_occurrences')
+          .select('id, active_protocols!inner ( status )')
+          .eq('user_id', userId)
+          .eq('occurrence_date', localDate)
+          .eq('status', 'planned')
+          .eq('active_protocols.status', 'active');
+        if (occError) {
+          console.error('[cron/morning-briefing] occurrences fetch failed', userId, occError);
+          await releaseClaim();
+          results.push({ userId, status: 'error' });
+          continue;
+        }
+
+        const briefing = buildBriefing(snapshot, baseline, (occRows ?? []).length);
+        const sendResult = await sendPushToUser(supabase, userId, {
+          title: briefing.title,
+          body: briefing.body,
+          url: '/app',
+          tag: `briefing-${localDate}`,
+        });
+
+        if (sendResult.sent === 0) {
+          Sentry.captureMessage(
+            '[cron/morning-briefing] briefing user has zero deliverable subscriptions',
+            { level: 'warning', tags: { route: 'cron/morning-briefing', userId } },
+          );
+          await releaseClaim();
+          results.push({ userId, status: 'no-subscriptions' });
+          continue;
+        }
+
+        const { error: promoteError } = await supabase
+          .from('notification_log')
+          .update({ notification_count: 1 })
           .eq('user_id', userId)
           .eq('scheduled_dose_id', dedupeKey)
           .eq('notification_count', 0);
+        if (promoteError) {
+          Sentry.captureException(promoteError, {
+            tags: { route: 'cron/morning-briefing', stage: 'promote', userId },
+          });
+        }
 
-      const { data: snapshotRows, error: snapshotError } = await supabase
-        .from('external_health_daily_snapshots')
-        .select('local_date, readiness_score, sleep_score, sleep_avg_hrv, temperature_deviation')
-        .eq('user_id', userId)
-        .eq('source', 'oura')
-        .gte('local_date', addDaysIso(localDate, -BASELINE_DAYS))
-        .lte('local_date', localDate)
-        .order('local_date', { ascending: true });
-      if (snapshotError) {
-        console.error('[cron/morning-briefing] snapshots fetch failed', userId, snapshotError);
-        await releaseClaim();
+        results.push({ userId, status: 'sent' });
+      } catch (err) {
+        console.error('[cron/morning-briefing] user failed', userId, err);
+        Sentry.captureException(err, { tags: { route: 'cron/morning-briefing', userId } });
         results.push({ userId, status: 'error' });
-        continue;
       }
-
-      const rows = ((snapshotRows ?? []) as SnapshotRow[]);
-      const todayRow = rows.find((row) => row.local_date === localDate) ?? null;
-      const baselineRows = rows.filter((row) => row.local_date !== localDate);
-      const snapshot: BriefingSnapshot | null = todayRow
-        ? {
-            readinessScore: numberOrNull(todayRow.readiness_score),
-            sleepScore: numberOrNull(todayRow.sleep_score),
-            sleepAvgHrv: numberOrNull(todayRow.sleep_avg_hrv),
-            temperatureDeviation: numberOrNull(todayRow.temperature_deviation),
-          }
-        : null;
-      const baseline = {
-        readinessAvg30: baselineAverage(baselineRows.map((row) => numberOrNull(row.readiness_score))),
-        hrvAvg30: baselineAverage(baselineRows.map((row) => numberOrNull(row.sleep_avg_hrv))),
-      };
-
-      const { data: occRows, error: occError } = await supabase
-        .from('planned_occurrences')
-        .select('id, active_protocols!inner ( status )')
-        .eq('user_id', userId)
-        .eq('occurrence_date', localDate)
-        .eq('status', 'planned')
-        .eq('active_protocols.status', 'active');
-      if (occError) {
-        console.error('[cron/morning-briefing] occurrences fetch failed', userId, occError);
-        await releaseClaim();
-        results.push({ userId, status: 'error' });
-        continue;
-      }
-
-      const briefing = buildBriefing(snapshot, baseline, (occRows ?? []).length);
-      const sendResult = await sendPushToUser(supabase, userId, {
-        title: briefing.title,
-        body: briefing.body,
-        url: '/app',
-        tag: `briefing-${localDate}`,
-      });
-
-      if (sendResult.sent === 0) {
-        Sentry.captureMessage(
-          '[cron/morning-briefing] briefing user has zero deliverable subscriptions',
-          { level: 'warning', tags: { route: 'cron/morning-briefing', userId } },
-        );
-        await releaseClaim();
-        results.push({ userId, status: 'no-subscriptions' });
-        continue;
-      }
-
-      const { error: promoteError } = await supabase
-        .from('notification_log')
-        .update({ notification_count: 1 })
-        .eq('user_id', userId)
-        .eq('scheduled_dose_id', dedupeKey)
-        .eq('notification_count', 0);
-      if (promoteError) {
-        Sentry.captureException(promoteError, {
-          tags: { route: 'cron/morning-briefing', stage: 'promote', userId },
-        });
-      }
-
-      results.push({ userId, status: 'sent' });
-    } catch (err) {
-      console.error('[cron/morning-briefing] user failed', userId, err);
-      Sentry.captureException(err, { tags: { route: 'cron/morning-briefing', userId } });
-      results.push({ userId, status: 'error' });
     }
-  }
 
-  Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'ok' });
-  return NextResponse.json({ processed: results.length, results });
+    Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'ok' });
+  } catch (err) {
+    Sentry.captureException(err, { tags: { route: 'cron/morning-briefing', stage: 'after' } });
+    Sentry.captureCheckIn({ checkInId, monitorSlug: MONITOR_SLUG, status: 'error' });
+  }
 }

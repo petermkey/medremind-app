@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 
 import { syncOuraSnapshots } from '@/lib/health/ouraSyncEngine';
 import {
@@ -34,33 +34,37 @@ export async function GET(request: NextRequest) {
     },
   );
 
-  const results: Array<{ userId: string; status: string; snapshots?: number }> = [];
+  // Decouple trigger from work. The sync legitimately takes 20-70s, which
+  // crosses cron-job.org's fixed 30s client timeout and logs a false
+  // "Timeout" even though the Vercel function (maxDuration 300) completes and
+  // writes data. after() keeps the function alive to finish the sync AFTER the
+  // 200 is sent, so cron-job.org only confirms the trigger fired (<1s). The
+  // Sentry check-in below remains the real success/failure monitor.
+  after(async () => {
+    try {
+      const connections = await listConnectedOuraUserIds();
 
-  try {
-    const connections = await listConnectedOuraUserIds();
-
-    for (const connection of connections) {
-      const range = computeOuraCronSyncRange(new Date(), connection.lastSyncAt);
-      try {
-        const snapshots = await syncOuraSnapshots(connection.userId, range, 'daily');
-        results.push({ userId: connection.userId, status: 'ok', snapshots });
-      } catch (err) {
-        console.error('[cron/oura-sync] user sync failed', connection.userId, err);
-        Sentry.captureException(err, { tags: { route: 'cron/oura-sync', userId: connection.userId } });
-        await markHealthConnectionSyncError(
-          connection.userId,
-          'oura',
-          err instanceof Error ? err.message : 'Scheduled Oura sync failed.',
-        ).catch(() => undefined);
-        results.push({ userId: connection.userId, status: 'error' });
+      for (const connection of connections) {
+        const range = computeOuraCronSyncRange(new Date(), connection.lastSyncAt);
+        try {
+          await syncOuraSnapshots(connection.userId, range, 'daily');
+        } catch (err) {
+          console.error('[cron/oura-sync] user sync failed', connection.userId, err);
+          Sentry.captureException(err, { tags: { route: 'cron/oura-sync', userId: connection.userId } });
+          await markHealthConnectionSyncError(
+            connection.userId,
+            'oura',
+            err instanceof Error ? err.message : 'Scheduled Oura sync failed.',
+          ).catch(() => undefined);
+        }
       }
-    }
-  } catch (err) {
-    Sentry.captureException(err, { tags: { route: 'cron/oura-sync', stage: 'listConnectedOuraUserIds' } });
-    Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-oura-sync', status: 'error' });
-    throw err;
-  }
 
-  Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-oura-sync', status: 'ok' });
-  return NextResponse.json({ synced: results.filter((r) => r.status === 'ok').length, results });
+      Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-oura-sync', status: 'ok' });
+    } catch (err) {
+      Sentry.captureException(err, { tags: { route: 'cron/oura-sync', stage: 'listConnectedOuraUserIds' } });
+      Sentry.captureCheckIn({ checkInId, monitorSlug: 'cron-oura-sync', status: 'error' });
+    }
+  });
+
+  return NextResponse.json({ triggered: true });
 }
