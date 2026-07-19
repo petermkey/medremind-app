@@ -186,10 +186,9 @@ export async function unsubscribeFromPush(): Promise<void> {
  */
 export async function saveNotificationSettingsToSupabase(settings: {
   pushEnabled: boolean;
-  emailEnabled: boolean;
   leadTimeMin: number;
-  digestTime: string;
   morningBriefingEnabled: boolean;
+  weeklyReviewEnabled: boolean;
   smartFoodTiming: boolean;
 }): Promise<void> {
   const supabase = getSupabase();
@@ -200,10 +199,9 @@ export async function saveNotificationSettingsToSupabase(settings: {
     {
       user_id: user.id,
       push_enabled: settings.pushEnabled,
-      email_enabled: settings.emailEnabled,
       lead_time_min: settings.leadTimeMin,
-      digest_time: settings.digestTime,
       morning_briefing_enabled: settings.morningBriefingEnabled,
+      weekly_review_enabled: settings.weeklyReviewEnabled,
       smart_food_timing: settings.smartFoodTiming,
     },
     { onConflict: 'user_id' },

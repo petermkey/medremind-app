@@ -4,6 +4,7 @@ import { addDays, eachDayOfInterval, format, subDays } from 'date-fns';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OuraTab } from '@/components/app/oura/OuraTab';
 import { NutrientBalanceCard } from '@/components/app/nutrientBalance/NutrientBalanceCard';
+import { WeeklyReviewSection } from '@/components/app/WeeklyReviewSection';
 import { Button } from '@/components/ui/Button';
 import { useStore } from '@/lib/store/store';
 
@@ -466,6 +467,9 @@ export default function ProgressPage() {
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {activeTab === 'oura' ? <OuraTab /> : (
         <>
+
+        {/* ── 0. WEEKLY AI REVIEW (W4-B) ── */}
+        <WeeklyReviewSection />
 
         {/* ── 1. PRIMARY ADHERENCE STATUS + TREND ── */}
         <div

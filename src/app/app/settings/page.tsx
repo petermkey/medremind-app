@@ -54,10 +54,9 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState(profile?.timezone ?? 'UTC');
   const [ageRange, setAgeRange] = useState<'18-30'|'31-50'|'51-70'|'70+'>(profile?.ageRange ?? '31-50');
   const [pushEnabled, setPushEnabled] = useState(notificationSettings.pushEnabled);
-  const [emailEnabled, setEmailEnabled] = useState(notificationSettings.emailEnabled);
   const [leadTime, setLeadTime] = useState(String(notificationSettings.leadTimeMin));
-  const [digestTime, setDigestTime] = useState(notificationSettings.digestTime);
   const [morningBriefingEnabled, setMorningBriefingEnabled] = useState(notificationSettings.morningBriefingEnabled);
+  const [weeklyReviewEnabled, setWeeklyReviewEnabled] = useState(notificationSettings.weeklyReviewEnabled);
   const [smartFoodTiming, setSmartFoodTiming] = useState(notificationSettings.smartFoodTiming);
   const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
   const [importPayload, setImportPayload] = useState('');
@@ -113,10 +112,9 @@ export default function SettingsPage() {
   // Sync local form state with store after Zustand rehydrates from localStorage.
   useEffect(() => {
     setPushEnabled(notificationSettings.pushEnabled);
-    setEmailEnabled(notificationSettings.emailEnabled);
     setLeadTime(String(notificationSettings.leadTimeMin));
-    setDigestTime(notificationSettings.digestTime);
     setMorningBriefingEnabled(notificationSettings.morningBriefingEnabled);
+    setWeeklyReviewEnabled(notificationSettings.weeklyReviewEnabled);
     setSmartFoodTiming(notificationSettings.smartFoodTiming);
   }, [notificationSettings]);
 
@@ -130,7 +128,7 @@ export default function SettingsPage() {
 
   async function saveNotifications() {
     try {
-      updateNotificationSettings({ pushEnabled, emailEnabled, leadTimeMin: parseInt(leadTime), digestTime, morningBriefingEnabled, smartFoodTiming });
+      updateNotificationSettings({ pushEnabled, leadTimeMin: parseInt(leadTime), morningBriefingEnabled, weeklyReviewEnabled, smartFoodTiming });
     } catch (err) {
       console.error('[settings] store write error', err);
       show(`Store error: ${String(err)}`, 'warning');
@@ -140,10 +138,9 @@ export default function SettingsPage() {
     // Persist to Supabase so the cron job can find this user.
     saveNotificationSettingsToSupabase({
       pushEnabled,
-      emailEnabled,
       leadTimeMin: parseInt(leadTime),
-      digestTime,
       morningBriefingEnabled,
+      weeklyReviewEnabled,
       smartFoodTiming,
     }).catch(err => console.error('[settings] notification_settings sync failed', err));
 
@@ -424,7 +421,7 @@ export default function SettingsPage() {
           <Toggle label="Push notifications" sub="Dose reminders delivered to your device" checked={pushEnabled} onChange={setPushEnabled} />
           <Toggle label="Morning briefing" sub="Daily readiness, sleep, and dose summary (~06:30)" checked={morningBriefingEnabled} onChange={setMorningBriefingEnabled} />
           <Toggle label="Smart reminder timing" sub="Adjusts push reminders around your usual meal times (up to ±90 min)" checked={smartFoodTiming} onChange={setSmartFoodTiming} />
-          <Toggle label="Email digest" sub="Daily summary at set time" checked={emailEnabled} onChange={setEmailEnabled} />
+          <Toggle label="Weekly AI review" sub="Monday morning push when your weekly review is ready" checked={weeklyReviewEnabled} onChange={setWeeklyReviewEnabled} />
           <Select label="Reminder lead time" value={leadTime} onChange={e => setLeadTime(e.target.value)}
             options={[
               { value: '0',  label: 'At dose time' },
@@ -434,14 +431,6 @@ export default function SettingsPage() {
               { value: '30', label: '30 min before' },
             ]}
           />
-          {emailEnabled && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Daily digest time</label>
-              <input type="time" value={digestTime} onChange={e => setDigestTime(e.target.value)}
-                className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6]"
-              />
-            </div>
-          )}
           <Button size="sm" onClick={saveNotifications}>Save Notifications</Button>
         </Section>
 

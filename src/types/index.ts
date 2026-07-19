@@ -140,10 +140,9 @@ export interface UserProfile {
 
 export interface NotificationSettings {
   pushEnabled: boolean;
-  emailEnabled: boolean;
   leadTimeMin: number;       // notify N min before dose
-  digestTime: string;        // HH:MM
   morningBriefingEnabled: boolean; // W3-B daily readiness briefing push (default off)
+  weeklyReviewEnabled: boolean;    // W4-B Monday AI review push (default off)
   smartFoodTiming: boolean;  // W4-A food-aware reminder timing (default off)
 }
 
