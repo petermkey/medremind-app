@@ -50,7 +50,7 @@ test('stored weekly review renders section-by-section on Progress', async ({ pag
   await expect(section).toContainText('Поздние ужины');
   await expect(section).toContainText('Принято 36 из 42 доз (86%)');
   await expect(section).toContainText('Ужин до 21:00');
-  await expect(section).toContainText('Это не медицинская рекомендация');
+  await expect(section).toContainText('This is not medical advice');
 });
 
 test('settings: weekly-review toggle replaced the email-digest block', async ({ page }) => {
