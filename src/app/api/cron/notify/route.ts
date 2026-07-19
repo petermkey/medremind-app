@@ -14,10 +14,21 @@
 //   - Fire window: doses due in [now - 1 min, now + 1 min] (scheduler cadence tolerance).
 //
 import * as Sentry from '@sentry/nextjs';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { computeEatingWindow } from '@/lib/nutrition/eatingWindow';
 import { isInQuietHours } from '@/lib/push/quietHours';
+import {
+  SMART_SHIFT_CAP_MINUTES,
+  computeAdjustedReminderTime,
+  deriveEatingPattern,
+  firesInSegments,
+  hhmmFromMinutes,
+  minutesFromHHMM,
+  resolveSmartTimingActive,
+  type EatingPattern,
+} from '@/lib/push/foodTiming';
 import { isVapidConfigured, sendPushToUser } from '@/lib/push/sendToUser';
 import { computeWindowSegments, segmentsToOrFilter } from '@/lib/push/scheduleWindow';
 
@@ -33,6 +44,54 @@ const REMINDER_INTERVAL_MINUTES = 10;
 const MAX_NOTIFICATIONS = 3;
 
 const ACTIONED_EVENT_TYPES = new Set(['taken', 'skipped']);
+
+// ── W4-A smart food timing ──────────────────────────────────────────────
+// Eating pattern = medians over per-day computeEatingWindow outputs from the
+// last 14 days of food_entries. Any failure returns null → feature inert for
+// this user on this tick (reminders must never be blocked by food data).
+const FOOD_LOOKBACK_DAYS = 14;
+
+function localDateFor(iso: string, timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date(iso));
+    const map = new Map(parts.map(part => [part.type, part.value]));
+    const date = `${map.get('year')}-${map.get('month')}-${map.get('day')}`;
+    return date.length === 10 ? date : iso.slice(0, 10);
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+async function loadEatingPattern(
+  supabase: SupabaseClient,
+  userId: string,
+  tz: string,
+  now: Date,
+): Promise<EatingPattern | null> {
+  try {
+    const since = new Date(now.getTime() - FOOD_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows, error } = await supabase
+      .from('food_entries')
+      .select('consumed_at, timezone')
+      .eq('user_id', userId)
+      .gte('consumed_at', since);
+    if (error || !rows || rows.length === 0) return null;
+    const entries = rows.map((row) => ({
+      consumedAt: String(row.consumed_at),
+      timezone: typeof row.timezone === 'string' ? row.timezone : tz,
+    }));
+    const dates = [...new Set(entries.map((entry) => localDateFor(entry.consumedAt, tz)))];
+    const days = dates.map((date) => {
+      const window = computeEatingWindow(entries, date, tz);
+      return { firstMeal: window.firstMeal, lastMeal: window.lastMeal };
+    });
+    return deriveEatingPattern(days);
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: NextRequest) {
   // Fail closed: reject unless CRON_SECRET is configured and matches.
@@ -80,6 +139,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ processed: 0 });
   }
 
+  // W4-A: separate guarded query so the route keeps working when migration 030
+  // is not applied yet (undefined-column error → smart timing globally inert).
+  const { data: smartRows, error: smartErr } = await supabase
+    .from('notification_settings')
+    .select('user_id')
+    .eq('push_enabled', true)
+    .eq('smart_food_timing', true);
+  const smartUserIds = smartErr
+    ? new Set<string>()
+    : new Set((smartRows ?? []).map((row) => String(row.user_id)));
+
   // Helper: send one push notification and return success boolean.
   // Calls the delivery core directly — no self-fetch over the public URL.
   // sent===0 (no subscriptions on file, or every one was stale and pruned)
@@ -122,6 +192,11 @@ export async function GET(request: NextRequest) {
       const optimalBedtime = (connRow?.sleep_window as { optimal_bedtime?: unknown } | null)?.optimal_bedtime;
       const quietNow = isInQuietHours(now, tz, optimalBedtime);
 
+      // W4-A smart food timing — pattern only when the user opted in.
+      const smartToggleOn = smartUserIds.has(userId);
+      const eatingPattern = smartToggleOn ? await loadEatingPattern(supabase, userId, tz, now) : null;
+      const smartActive = resolveSmartTimingActive(smartToggleOn, eatingPattern);
+
       // ── Stale-claim recovery ─────────────────────────────────────────────
       // Pass A writes an in-flight claim (notification_count=0) before sending
       // and promotes it to 1 only after successful delivery. If a cron worker
@@ -143,7 +218,16 @@ export async function GET(request: NextRequest) {
       // ── Pass A: Initial scheduled notifications ──────────────────────────
       {
         // V2: query planned_occurrences in the fire window, exclude actioned.
-        const segments = computeWindowSegments(now, leadTimeMin ?? 0, tz, WINDOW_MINUTES);
+        // Smart timing widens the DB query by the shift cap; each candidate is
+        // then re-checked in TS against the true ±1 min window at its
+        // EFFECTIVE (adjusted-or-original) time. With smart timing off the two
+        // segment sets are identical and behavior is unchanged.
+        const segments = computeWindowSegments(
+          now, leadTimeMin ?? 0, tz, WINDOW_MINUTES + (smartActive ? SMART_SHIFT_CAP_MINUTES : 0),
+        );
+        const narrowSegments = smartActive
+          ? computeWindowSegments(now, leadTimeMin ?? 0, tz, WINDOW_MINUTES)
+          : segments;
 
         const { data: occurrences, error: occErr } = await supabase
           .from('planned_occurrences')
@@ -152,6 +236,7 @@ export async function GET(request: NextRequest) {
             occurrence_date,
             occurrence_time,
             protocol_item_id,
+            supersedes_occurrence_id,
             active_protocols!inner (
               status,
               end_date,
@@ -179,12 +264,34 @@ export async function GET(request: NextRequest) {
             const itemIds = [...new Set(eligibleOccurrences.map(o => o.protocol_item_id))];
             const { data: items } = await supabase
               .from('protocol_items')
-              .select('id, name')
+              .select('id, name, with_food')
               .in('id', itemIds);
             const itemNameMap = new Map((items ?? []).map(i => [i.id, i.name]));
+            const itemWithFoodMap = new Map((items ?? []).map(i => [i.id, i.with_food]));
 
             for (const occ of eligibleOccurrences) {
               const logKey = occ.id;
+
+              // W4-A: effective fire time = adjusted (when smart timing applies)
+              // or the scheduled time. Only occurrences whose effective time is
+              // inside the true ±1 min window fire on this tick — everything
+              // else in the widened query is a future/past candidate.
+              const scheduledMinutes = minutesFromHHMM(String(occ.occurrence_time).slice(0, 5));
+              if (scheduledMinutes === null) continue;
+              let adjustedMinutes: number | null = null;
+              if (smartActive && eatingPattern) {
+                adjustedMinutes = computeAdjustedReminderTime({
+                  occurrenceMinutes: scheduledMinutes,
+                  withFood: itemWithFoodMap.get(occ.protocol_item_id) ?? null,
+                  pattern: eatingPattern,
+                  isSnoozeReplacement: occ.supersedes_occurrence_id !== null,
+                  quietWindow: optimalBedtime,
+                });
+              }
+              const effectiveMinutes = adjustedMinutes ?? scheduledMinutes;
+              if (!firesInSegments(String(occ.occurrence_date), effectiveMinutes, narrowSegments)) {
+                continue;
+              }
 
               const { data: lockRows, error: lockErr } = await supabase
                 .from('notification_log')
@@ -213,9 +320,15 @@ export async function GET(request: NextRequest) {
               const protocolName: string = (ap?.protocols as { name?: string } | null)?.name ?? 'Medication';
               const itemName = itemNameMap.get(occ.protocol_item_id) ?? 'dose';
               const time = String(occ.occurrence_time).slice(0, 5);
+              const displayTime = adjustedMinutes !== null ? hhmmFromMinutes(adjustedMinutes) : time;
+              const smartNote = adjustedMinutes === null
+                ? ''
+                : itemWithFoodMap.get(occ.protocol_item_id) === 'no'
+                  ? ' · ⏱ adjusted before your usual first meal'
+                  : ' · ⏱ adjusted toward your usual meal time';
 
-              const title = `MedRemind — ${time}`;
-              const body = `${itemName} (${protocolName})`;
+              const title = `MedRemind — ${displayTime}`;
+              const body = `${itemName} (${protocolName})${smartNote}`;
               const tag = `dose-${logKey}`;
 
               const ok = await sendPush(userId, title, body, tag);

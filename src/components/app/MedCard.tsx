@@ -38,6 +38,7 @@ interface Props {
   onDelete: () => void;
   actionsDisabled?: boolean;
   takenAt?: string; // ISO timestamp of actual intake
+  smartAdjustedTime?: string | null; // W4-A: today's push was shifted to this HH:MM
 }
 
 function fmt(t: string) {
@@ -55,7 +56,7 @@ function deriveDisplayStatus(dose: ScheduledDose): string {
   return isPast ? 'overdue' : 'pending';
 }
 
-export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt }: Props) {
+export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt, smartAdjustedTime }: Props) {
   const item = dose.protocolItem;
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const displayStatus = deriveDisplayStatus(dose);
@@ -134,6 +135,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
   if (item.route === 'subcutaneous') tags.push('Subcut.');
   if (item.route === 'intramuscular') tags.push('IM');
   if (item.itemType === 'analysis') tags.push('Lab test');
+  if (smartAdjustedTime) tags.push(`⏱ ${fmt(smartAdjustedTime)} · adjusted`);
 
   const cardTranslate =
     swipeDir === 'left'  ? '-translate-x-[90px]' :

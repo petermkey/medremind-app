@@ -87,7 +87,7 @@ export function MorningBriefingCard({ todayStr, doseCount }: { todayStr: string;
         </div>
         <button
           type="button"
-          aria-label="Скрыть брифинг"
+          aria-label="Dismiss briefing"
           onClick={() => {
             localStorage.setItem(DISMISS_KEY, todayStr);
             setDismissed(true);

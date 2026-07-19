@@ -96,6 +96,7 @@ function defaultNotificationSettings(): NotificationSettings {
     leadTimeMin: 0,
     morningBriefingEnabled: false,
     weeklyReviewEnabled: false,
+    smartFoodTiming: false,
   };
 }
 
@@ -604,6 +605,7 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         leadTimeMin: Number(nRow.lead_time_min ?? 0),
         morningBriefingEnabled: Boolean(nRow.morning_briefing_enabled),
         weeklyReviewEnabled: Boolean(nRow.weekly_review_enabled),
+        smartFoodTiming: Boolean(nRow.smart_food_timing),
       }
     : defaultNotificationSettings();
 

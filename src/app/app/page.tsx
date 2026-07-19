@@ -2,6 +2,9 @@
 import { useMemo, useState, useEffect } from 'react';
 import { addDays, addMinutes, format, parseISO } from 'date-fns';
 import { useStore } from '@/lib/store/store';
+import { useFoodStore } from '@/lib/store/foodStore';
+import { computeEatingWindow } from '@/lib/nutrition/eatingWindow';
+import { computeAdjustedReminderTime, deriveEatingPattern, hhmmFromMinutes, minutesFromHHMM } from '@/lib/push/foodTiming';
 import { WeekStrip } from '@/components/app/WeekStrip';
 import { MedCard } from '@/components/app/MedCard';
 import { AddDoseSheet } from '@/components/app/AddDoseSheet';
@@ -72,6 +75,45 @@ export default function SchedulePage() {
   const pausedHistoryActionMessage = 'Past doses can be moved only in active protocols. Resume this protocol first.';
   const pausedProtocolActionMessage = 'Protocol is paused. Resume it to change this dose.';
 
+  const { entries: foodEntries, loadEntriesForRange } = useFoodStore();
+  const smartTimingOn = notificationSettings.smartFoodTiming;
+
+  // W4-A: the hint needs 14d of food entries; load once when the toggle is on.
+  useEffect(() => {
+    if (!profile?.id || !smartTimingOn) return;
+    const to = new Date();
+    const from = new Date(to.getTime() - 14 * 24 * 60 * 60 * 1000);
+    void loadEntriesForRange(profile.id, from.toISOString(), to.toISOString());
+  }, [profile?.id, smartTimingOn, loadEntriesForRange]);
+
+  const eatingPattern = useMemo(() => {
+    if (!smartTimingOn) return null;
+    const tz = profile?.timezone && profile.timezone.trim().length > 0
+      ? profile.timezone
+      : Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const days: { firstMeal: string | null; lastMeal: string | null }[] = [];
+    for (let i = 1; i <= 14; i += 1) {
+      const date = format(addDays(parseISO(todayStr), -i), 'yyyy-MM-dd');
+      const window = computeEatingWindow(foodEntries, date, tz);
+      days.push({ firstMeal: window.firstMeal, lastMeal: window.lastMeal });
+    }
+    return deriveEatingPattern(days);
+  }, [smartTimingOn, foodEntries, profile?.timezone, todayStr]);
+
+  // Same pure function as the cron route → hint and push agree by construction.
+  function smartHintFor(dose: PlannedOccurrence): string | null {
+    if (!eatingPattern || isHistoryDate || dose.status !== 'pending') return null;
+    const minutes = minutesFromHHMM(dose.scheduledTime);
+    if (minutes === null) return null;
+    const adjusted = computeAdjustedReminderTime({
+      occurrenceMinutes: minutes,
+      withFood: dose.protocolItem.withFood ?? null,
+      pattern: eatingPattern,
+      isSnoozeReplacement: Boolean(dose.predecessorDoseId),
+      quietWindow: null, // v1 limitation — see Task 5 Interfaces note
+    });
+    return adjusted === null ? null : hhmmFromMinutes(adjusted);
+  }
 
   const actionableDoses = useMemo(
     () => (isHistoryDate ? selectHistoryOccurrences(selectedDate) : selectActionableOccurrences(selectedDate)),
@@ -304,6 +346,7 @@ export default function SchedulePage() {
                     dose={dose}
                     actionsDisabled={actionsDisabled}
                     takenAt={takenAtMap.get(dose.id)}
+                    smartAdjustedTime={smartHintFor(dose)}
                     onTake={() => {
                       if (actionsDisabled) {
                         show(disabledMessage, 'warning');

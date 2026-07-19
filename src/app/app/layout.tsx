@@ -12,9 +12,19 @@ import { BottomNav } from '@/components/app/BottomNav';
 import { SyncStatusPill } from '@/components/app/SyncStatusPill';
 import { ToastProvider } from '@/components/ui/Toast';
 
+declare global {
+  interface Window {
+    __medremindFoodStore?: typeof useFoodStore;
+  }
+}
+
 // Expose store for E2E test automation (safe: only runs client-side)
 if (typeof window !== 'undefined') {
   (window as any).__medremindStore = useStore;
+  // W4-A: expose the food store so E2E can seed deterministic meal history
+  // (mirrors __medremindStore above — src/components/app/E2ETestHelpers.tsx
+  // is not mounted anywhere in the app, so this is the actual exposure point).
+  window.__medremindFoodStore = useFoodStore;
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

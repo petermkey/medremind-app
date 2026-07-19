@@ -94,10 +94,10 @@ test.describe('stack guard (requires E2E_EMAIL and E2E_PASSWORD)', () => {
     await page.goto('/app/meds');
     const card = page.getByTestId('stack-guard-card');
     await expect(card).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByText('Железо и кальций в один приём')).toBeVisible();
+    await expect(card.getByText('Iron and calcium in the same slot')).toBeVisible();
 
-    await card.getByText('Железо и кальций в один приём').click();
-    await expect(card.getByText(/Кальций снижает всасывание железа/)).toBeVisible();
-    await expect(card.getByText(/Это не медицинская рекомендация/)).toBeVisible();
+    await card.getByText('Iron and calcium in the same slot').click();
+    await expect(card.getByText(/Calcium can reduce iron absorption/)).toBeVisible();
+    await expect(card.getByText(/This is not medical advice/)).toBeVisible();
   });
 });

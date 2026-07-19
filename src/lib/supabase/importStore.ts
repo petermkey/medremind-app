@@ -117,6 +117,7 @@ export async function importStoreSnapshotToSupabase(raw: string): Promise<Import
       lead_time_min: Number.isFinite(notifPatch.leadTimeMin) ? notifPatch.leadTimeMin : 0,
       morning_briefing_enabled: Boolean(notifPatch.morningBriefingEnabled),
       weekly_review_enabled: Boolean(notifPatch.weeklyReviewEnabled),
+      smart_food_timing: Boolean(notifPatch.smartFoodTiming),
     });
     if (error) throw new Error(`Notification settings import failed: ${error.message}`);
   }

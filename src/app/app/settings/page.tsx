@@ -57,6 +57,7 @@ export default function SettingsPage() {
   const [leadTime, setLeadTime] = useState(String(notificationSettings.leadTimeMin));
   const [morningBriefingEnabled, setMorningBriefingEnabled] = useState(notificationSettings.morningBriefingEnabled);
   const [weeklyReviewEnabled, setWeeklyReviewEnabled] = useState(notificationSettings.weeklyReviewEnabled);
+  const [smartFoodTiming, setSmartFoodTiming] = useState(notificationSettings.smartFoodTiming);
   const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
   const [importPayload, setImportPayload] = useState('');
   const [importStatus, setImportStatus] = useState('');
@@ -114,6 +115,7 @@ export default function SettingsPage() {
     setLeadTime(String(notificationSettings.leadTimeMin));
     setMorningBriefingEnabled(notificationSettings.morningBriefingEnabled);
     setWeeklyReviewEnabled(notificationSettings.weeklyReviewEnabled);
+    setSmartFoodTiming(notificationSettings.smartFoodTiming);
   }, [notificationSettings]);
 
   async function handleSaveProfile() {
@@ -126,7 +128,7 @@ export default function SettingsPage() {
 
   async function saveNotifications() {
     try {
-      updateNotificationSettings({ pushEnabled, leadTimeMin: parseInt(leadTime), morningBriefingEnabled, weeklyReviewEnabled });
+      updateNotificationSettings({ pushEnabled, leadTimeMin: parseInt(leadTime), morningBriefingEnabled, weeklyReviewEnabled, smartFoodTiming });
     } catch (err) {
       console.error('[settings] store write error', err);
       show(`Store error: ${String(err)}`, 'warning');
@@ -139,6 +141,7 @@ export default function SettingsPage() {
       leadTimeMin: parseInt(leadTime),
       morningBriefingEnabled,
       weeklyReviewEnabled,
+      smartFoodTiming,
     }).catch(err => console.error('[settings] notification_settings sync failed', err));
 
     if (!pushEnabled) {
@@ -416,8 +419,10 @@ export default function SettingsPage() {
             </div>
           )}
           <Toggle label="Push notifications" sub="Dose reminders delivered to your device" checked={pushEnabled} onChange={setPushEnabled} />
-          <Toggle label="Утренний брифинг" sub="Ежедневная сводка готовности, сна и приёмов (~06:30)" checked={morningBriefingEnabled} onChange={setMorningBriefingEnabled} />
-          <Toggle label="Недельный AI-разбор" sub="Пуш в понедельник утром, когда готов разбор недели" checked={weeklyReviewEnabled} onChange={setWeeklyReviewEnabled} />
+          <Toggle label="Morning briefing" sub="Daily readiness, sleep, and dose summary (~06:30)" checked={morningBriefingEnabled} onChange={setMorningBriefingEnabled} />
+          <Toggle label="Smart reminder timing" sub="Adjusts push reminders around your usual meal times (up to ±90 min)" checked={smartFoodTiming} onChange={setSmartFoodTiming} />
+          <Toggle label="Email digest" sub="Daily summary at set time" checked={emailEnabled} onChange={setEmailEnabled} />
+          <Toggle label="Weekly AI review" sub="Monday morning push when your weekly review is ready" checked={weeklyReviewEnabled} onChange={setWeeklyReviewEnabled} />
           <Select label="Reminder lead time" value={leadTime} onChange={e => setLeadTime(e.target.value)}
             options={[
               { value: '0',  label: 'At dose time' },
@@ -627,6 +632,8 @@ function Toggle({ label, sub, checked, onChange }: { label: string; sub: string;
       <button
         type="button"
         onClick={() => onChange(!checked)}
+        aria-label={label}
+        aria-pressed={checked}
         className={`w-12 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 ${checked ? 'bg-[#3B82F6]' : 'bg-[#1C2333]'}`}
       >
         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all duration-200 ${checked ? 'left-6' : 'left-0.5'}`} />
