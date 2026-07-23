@@ -369,6 +369,22 @@ export default function ProgressPage() {
     return selectProgressSummaryForDates(weeklyData.map(d => d.date));
   }, [weeklyData, selectProgressSummaryForDates]);
 
+  // Per-day adherence for the 7-day bar chart (same selector/data the weekly section uses)
+  const weekBars = useMemo(() => {
+    const bars = weeklyData.map(({ date, label }) => {
+      const dayStats = selectProgressDayProtocolStats(date);
+      let total = 0;
+      let taken = 0;
+      for (const s of Object.values(dayStats)) {
+        total += s.total;
+        taken += s.taken;
+      }
+      return { date, letter: label.charAt(0), total, pct: total ? Math.round((taken / total) * 100) : 0 };
+    });
+    const best = Math.max(...bars.map(b => b.pct), 0);
+    return bars.map(b => ({ ...b, isBest: b.pct > 0 && b.pct === best }));
+  }, [weeklyData, selectProgressDayProtocolStats]);
+
   const prev7DateStrings = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => format(subDays(today, 13 - i), 'yyyy-MM-dd'));
   }, [today]);
@@ -443,6 +459,9 @@ export default function ProgressPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
+        <div className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#605d56] mb-1">
+          Data · {calendarRange} d window
+        </div>
         <h1 className="text-xl font-extrabold text-[#e8e6e1]">Progress</h1>
         <div className="mt-3 grid grid-cols-2 rounded-xl border border-[#23272d] bg-[#0e1013] p-1">
           {([
@@ -473,19 +492,38 @@ export default function ProgressPage() {
         <WeeklyReviewSection />
 
         {/* ── 1. PRIMARY ADHERENCE STATUS + TREND ── */}
-        <div
-          className="rounded-2xl border p-4 mt-3 mb-3"
-          style={{ background: adherenceStatus.bgColor, borderColor: adherenceStatus.borderColor }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xl font-extrabold" style={{ color: adherenceStatus.color }}>
-              {adherenceStatus.label}
+        <div className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4 mt-3 mb-3">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-[#9b978f]">
+              Adherence
+              {' · '}
+              <span style={{ color: adherenceStatus.color }}>{adherenceStatus.label}</span>
             </span>
-            <span className="text-2xl font-extrabold font-mono tabular-nums" style={{ color: adherenceStatus.color }}>
+            <span className="text-[20px] font-semibold font-mono tabular-nums text-[#e8e6e1]">
               {weekStats.total > 0 ? `${weekStats.pct}%` : '—'}
             </span>
           </div>
-          <div className="text-[11px] font-mono tabular-nums text-[#9b978f]">
+          <div className="flex gap-[3px] items-end h-[44px]">
+            {weekBars.map(bar => (
+              <div
+                key={bar.date}
+                className="flex-1 rounded-[2px]"
+                style={{
+                  height: `${Math.max(bar.pct, 3)}%`,
+                  background: bar.isBest ? '#d9a53f' : '#a67c2a',
+                  opacity: bar.isBest ? 1 : 0.5 + (bar.pct / 100) * 0.3,
+                }}
+              />
+            ))}
+          </div>
+          <div className="flex gap-[3px] mt-1.5">
+            {weekBars.map(bar => (
+              <span key={bar.date} className="flex-1 text-center font-mono text-[9px] uppercase text-[#605d56]">
+                {bar.letter}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 text-[11px] font-mono tabular-nums text-[#9b978f]">
             {weekStats.total > 0
               ? `${weekStats.taken} of ${weekStats.total} doses taken this week`
               : 'No dose data for the last 7 days'}
@@ -618,15 +656,16 @@ export default function ProgressPage() {
                   No pattern cards yet. Enable consent and refresh after medication context, food, hydration, and health summaries are available.
                 </p>
               ) : correlations.cards.map((card) => (
-                <article key={`${card.title}-${card.generatedAt}`} className="rounded-xl border border-[#23272d] bg-[#0e1013] p-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-bold text-[#e8e6e1]">{card.title}</h2>
-                    <span className="rounded-full bg-[rgba(217,165,63,0.12)] px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#d9a53f]">
-                      {card.strength}
-                    </span>
+                <article
+                  key={`${card.title}-${card.generatedAt}`}
+                  className="rounded-xl border border-[#23272d] border-l-2 border-l-[#d9a53f] bg-[#0e1013] p-4"
+                >
+                  <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-[0.08em] tabular-nums text-[#d9a53f]">
+                    Pattern · {card.strength} · R {card.r.toFixed(2)} · N {card.n}
                   </div>
-                  <p className="text-sm leading-relaxed text-[#c4c0b8]">{card.body}</p>
-                  <p className="mt-3 text-xs font-mono tabular-nums text-[#9b978f]">
+                  <h2 className="text-[13.5px] font-bold text-[#e8e6e1]">{card.title}</h2>
+                  <p className="mt-1 text-[13.5px] leading-relaxed text-[#c4c0b8]">{card.body}</p>
+                  <p className="mt-3 text-[10.5px] font-mono tabular-nums text-[#605d56]">
                     Direction: {card.direction} · r {card.r.toFixed(2)} · paired days {card.n}
                   </p>
                 </article>
@@ -761,7 +800,6 @@ export default function ProgressPage() {
 
         {stats.total === 0 && (
           <div className="text-center py-10">
-            <div className="text-4xl mb-3">📊</div>
             <div className="text-sm font-bold text-[#e8e6e1] mb-1">No data yet</div>
             <div className="text-xs text-[#9b978f]">Activate a protocol to start tracking your adherence.</div>
           </div>
