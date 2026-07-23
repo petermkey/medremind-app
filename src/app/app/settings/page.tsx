@@ -394,8 +394,8 @@ export default function SettingsPage() {
           <Select label="Age range" value={ageRange} onChange={e => setAgeRange(e.target.value as '18-30'|'31-50'|'51-70'|'70+')}
             options={['18-30','31-50','51-70','70+'].map(v => ({ value: v, label: v }))} />
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Timezone</label>
-            <p className="text-sm text-[#e8e6e1] bg-[#191d22] px-4 py-3 rounded-xl border border-[rgba(255,255,255,0.08)]">{timezone}</p>
+            <label className="text-[10px] font-mono font-semibold text-[#9b978f] uppercase tracking-wider">Timezone</label>
+            <p className="text-sm text-[#e8e6e1] bg-[#191d22] px-4 py-3 rounded-xl border border-[#23272d]">{timezone}</p>
           </div>
           <Button size="sm" onClick={handleSaveProfile}>Save Profile</Button>
         </Section>
@@ -435,11 +435,11 @@ export default function SettingsPage() {
         </Section>
 
         <Section title="🧭 Integrations">
-          <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] p-4">
+          <div className="pb-4 border-b border-[#23272d]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[#e8e6e1]">Oura</div>
-                <div className="mt-1 text-xs text-[#9b978f]">
+                <div className="mt-1 text-xs text-[#9b978f] font-mono tabular-nums">
                   {ouraStatus?.connected ? 'Connected' : 'Not connected'}
                   {ouraStatus?.lastSyncAt ? ` · Last sync: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : ''}
                   {ouraStatus?.battery
@@ -453,12 +453,12 @@ export default function SettingsPage() {
                     type="button"
                     onClick={handleOuraDisconnect}
                     disabled={disconnectingOura}
-                    className="text-xs font-semibold text-[#e2a89d] hover:underline disabled:opacity-50"
+                    className="text-xs font-semibold text-[#e2a89d] hover:underline disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
                   >
                     Disconnect
                   </button>
                 ) : (
-                  <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#d9a53f] hover:underline">
+                  <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                     Connect
                   </a>
                 )}
@@ -470,20 +470,20 @@ export default function SettingsPage() {
                 <p className="text-xs text-[#9b978f] leading-relaxed">
                   Your Oura connection is missing: {ouraStatus.missingScopes!.join(', ')}. Some data won&apos;t sync until you reconnect.
                 </p>
-                <a href="/api/integrations/oura/connect" className="mt-1 text-xs font-semibold text-[#cf8148] hover:underline">
+                <a href="/api/integrations/oura/connect" className="mt-1 text-xs font-semibold text-[#cf8148] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                   Reconnect Oura →
                 </a>
               </div>
             )}
-            <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#9b978f] hover:text-[#e8e6e1]">
+            <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#9b978f] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Manage Oura app access
             </a>
           </div>
-          <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] p-4">
+          <div>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[#e8e6e1]">Health sync</div>
-                <div className="mt-1 text-xs text-[#9b978f]">
+                <div className="mt-1 text-xs text-[#9b978f] font-mono tabular-nums">
                   {healthSyncStatus || (ouraStatus?.lastSyncAt ? `Last run: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : 'No health sync run shown yet.')}
                   {ringBatteryLow ? ' · Ring battery is low — data may stop arriving.' : ''}
                 </div>
@@ -492,7 +492,7 @@ export default function SettingsPage() {
                 Sync
               </Button>
             </div>
-            <a href="/app/progress" className="text-xs font-semibold text-[#d9a53f] hover:underline">
+            <a href="/app/progress" className="text-xs font-semibold text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Open Progress analytics
             </a>
           </div>
@@ -507,15 +507,15 @@ export default function SettingsPage() {
               <>
                 <br /><br />
                 <span className="text-xs">
-                  Build: <code>{buildInfo.sha.slice(0, 7)}</code> · Env: <code>{buildInfo.environment}</code>
+                  Build: <code className="font-mono tabular-nums">{buildInfo.sha.slice(0, 7)}</code> · Env: <code className="font-mono tabular-nums">{buildInfo.environment}</code>
                 </span>
               </>
             )}
           </div>
           <div className="flex gap-2 text-xs">
-            <a href="#" className="text-[#d9a53f] hover:underline">Privacy Policy</a>
+            <a href="#" className="text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Privacy Policy</a>
             <span className="text-[#9b978f]">·</span>
-            <a href="#" className="text-[#d9a53f] hover:underline">Terms of Service</a>
+            <a href="#" className="text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Terms of Service</a>
           </div>
         </Section>
 
@@ -523,7 +523,7 @@ export default function SettingsPage() {
         <Section title="⚙️ Account">
           <Button variant="secondary" fullWidth onClick={handleSignOut} loading={flushing}>Sign Out</Button>
           {!showDeleteConfirm ? (
-            <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-[#c96a5a] hover:underline text-center w-full mt-1">
+            <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-[#c96a5a] hover:underline text-center w-full mt-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Delete account and all data
             </button>
           ) : (
@@ -538,7 +538,7 @@ export default function SettingsPage() {
         </Section>
 
         <Section title="☁️ Data Recovery">
-          <p className="text-xs text-[#9b978f] leading-relaxed">
+          <p className="text-xs text-[#9b978f] leading-relaxed font-mono tabular-nums">
             Cloud sync: {outbox.pending > 0 ? `${outbox.pending} pending change(s)` : 'all changes synced'}.
             {outbox.lastSuccessAt ? ` Last success: ${new Date(outbox.lastSuccessAt).toLocaleTimeString()}.` : ''}
           </p>
@@ -553,7 +553,7 @@ export default function SettingsPage() {
           )}
           {outbox.deadLettered > 0 && (
             <div className="bg-[rgba(201,106,90,0.08)] border border-[rgba(201,106,90,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
-              <p className="text-xs text-[#e2a89d]">
+              <p className="text-xs text-[#e2a89d] font-mono tabular-nums">
                 {outbox.deadLettered} change(s) failed permanently after repeated retries and will not sync.
               </p>
               <div className="flex gap-2">
@@ -596,7 +596,7 @@ export default function SettingsPage() {
             onChange={e => setImportPayload(e.target.value)}
             placeholder="Paste medremind-store JSON here"
             rows={7}
-            className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-xs font-mono outline-none focus:border-[#d9a53f]"
+            className="w-full bg-[#191d22] border border-[#23272d] rounded-xl px-4 py-3 text-[#e8e6e1] text-xs font-mono outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           />
           {importStatus && (
             <p className="text-xs text-[#9b978f] bg-[rgba(217,165,63,0.06)] border border-[rgba(217,165,63,0.15)] rounded-xl px-3 py-2">
@@ -613,8 +613,8 @@ export default function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-3">{title}</div>
-      <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 flex flex-col gap-4">
+      <div className="text-[10px] font-mono font-semibold text-[#9b978f] uppercase tracking-wider mb-3">{title}</div>
+      <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 flex flex-col gap-4">
         {children}
       </div>
     </div>
@@ -633,7 +633,7 @@ function Toggle({ label, sub, checked, onChange }: { label: string; sub: string;
         onClick={() => onChange(!checked)}
         aria-label={label}
         aria-pressed={checked}
-        className={`w-12 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 ${checked ? 'bg-[#d9a53f]' : 'bg-[#191d22]'}`}
+        className={`w-12 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${checked ? 'bg-[#d9a53f]' : 'bg-[#2e333a]'}`}
       >
         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all duration-200 ${checked ? 'left-6' : 'left-0.5'}`} />
       </button>
