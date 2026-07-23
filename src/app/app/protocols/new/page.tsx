@@ -165,7 +165,7 @@ export default function NewProtocolPage() {
       {/* Header */}
       <div className="px-5 pt-4 pb-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.05)]">
         <div className="flex items-center gap-3">
-          <button onClick={() => step > 1 ? setStep(s => s - 1) : router.back()} className="text-[#9b978f] text-xl">←</button>
+          <button onClick={() => step > 1 ? setStep(s => s - 1) : router.back()} className="text-[#9b978f] text-xl rounded-[8px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">←</button>
           <h1 className="text-lg font-extrabold text-[#e8e6e1]">New Protocol</h1>
         </div>
         {/* Steps */}
@@ -185,29 +185,29 @@ export default function NewProtocolPage() {
           <div className="fade-in flex flex-col gap-5">
             <Input label="Protocol name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Morning Stack" />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Description (optional)</label>
+              <label className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Description (optional)</label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="What is this protocol for?"
                 rows={3}
-                className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f] resize-none"
+                className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 resize-none"
               />
             </div>
             <Select label="Category" value={category} onChange={e => setCategory(e.target.value as ProtocolCategory)} options={CATEGORIES} />
             <div>
-              <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide mb-2 block">Duration</label>
+              <label className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-2 block">Duration</label>
               <div className="flex gap-2">
                 {(['ongoing', 'fixed'] as const).map(d => (
                   <button key={d} onClick={() => setDuration(d)}
-                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors ${duration === d ? 'bg-[#d9a53f] border-[#d9a53f] text-white' : 'border-[rgba(255,255,255,0.08)] text-[#9b978f]'}`}>
+                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${duration === d ? 'bg-[#d9a53f] border-[#d9a53f] text-white' : 'border-[rgba(255,255,255,0.08)] text-[#9b978f]'}`}>
                     {d === 'ongoing' ? '∞ Ongoing' : '📅 Fixed'}
                   </button>
                 ))}
               </div>
               {duration === 'fixed' && (
                 <div className="mt-3">
-                  <Input label="Number of days" type="number" value={durationDays} onChange={e => setDurationDays(e.target.value)} />
+                  <Input label="Number of days" type="number" value={durationDays} onChange={e => setDurationDays(e.target.value)} className="font-mono tabular-nums" />
                 </div>
               )}
             </div>
@@ -225,17 +225,17 @@ export default function NewProtocolPage() {
               <div key={idx} className="flex items-center gap-3 bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-3">
                 <span className="text-xl">{it.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-[#e8e6e1] truncate">{it.name} {it.doseAmount ? `${it.doseAmount}${it.doseUnit}` : ''}</div>
-                  <div className="text-xs text-[#9b978f]">{frequencyLabel(it)} · {it.times.join(', ')}</div>
+                  <div className="text-sm font-semibold text-[#e8e6e1] truncate">{it.name} {it.doseAmount ? <span className="font-mono tabular-nums">{it.doseAmount}{it.doseUnit}</span> : ''}</div>
+                  <div className="text-xs text-[#9b978f]">{frequencyLabel(it)} · <span className="font-mono tabular-nums">{it.times.join(', ')}</span></div>
                 </div>
-                <button onClick={() => { setDraft({ ...it }); setEditingIdx(idx); }} className="text-[#9b978f] hover:text-[#d9a53f] text-sm px-2">✏️</button>
-                <button onClick={() => removeItem(idx)} className="text-[#9b978f] hover:text-[#c96a5a] text-sm px-2">✕</button>
+                <button onClick={() => { setDraft({ ...it }); setEditingIdx(idx); }} className="text-[#9b978f] hover:text-[#d9a53f] text-sm px-2 rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">✏️</button>
+                <button onClick={() => removeItem(idx)} className="text-[#9b978f] hover:text-[#c96a5a] text-sm px-2 rounded-[6px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">✕</button>
               </div>
             ))}
 
             {/* Item form */}
             <div className="bg-[#14171b] border border-[rgba(217,165,63,0.25)] rounded-2xl p-4 flex flex-col gap-3">
-              <div className="text-xs font-bold text-[#d9a53f] uppercase tracking-wide mb-1">
+              <div className="text-[10px] font-mono font-bold text-[#d9a53f] uppercase tracking-wider mb-1">
                 {editingIdx !== null ? 'Edit item' : 'Add item'}
               </div>
 
@@ -253,7 +253,7 @@ export default function NewProtocolPage() {
               {draft.itemType === 'medication' && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input label="Amount" type="number" value={draft.doseAmount?.toString() ?? ''} onChange={e => setDraft(d => ({ ...d, doseAmount: e.target.value ? parseFloat(e.target.value) : undefined }))} placeholder="500" />
+                    <Input label="Amount" type="number" value={draft.doseAmount?.toString() ?? ''} onChange={e => setDraft(d => ({ ...d, doseAmount: e.target.value ? parseFloat(e.target.value) : undefined }))} placeholder="500" className="font-mono tabular-nums" />
                     <Select label="Unit" value={draft.doseUnit ?? 'mg'} onChange={e => setDraft(d => ({ ...d, doseUnit: e.target.value }))}
                       options={['mg','mcg','IU','ml','units','g'].map(v => ({ value: v, label: v }))} />
                   </div>
@@ -326,23 +326,24 @@ export default function NewProtocolPage() {
                     }))
                   }
                   placeholder="e.g. 3"
+                  className="font-mono tabular-nums"
                 />
               )}
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Time</label>
+                <label className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Time</label>
                 <input type="time" value={draft.times[0] ?? '08:00'} onChange={e => setDraft(d => ({ ...d, times: [e.target.value] }))}
-                  className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f]"
+                  className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm font-mono tabular-nums outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
                 />
               </div>
 
               {/* Color picker */}
               <div>
-                <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide mb-2 block">Colour</label>
+                <label className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-2 block">Colour</label>
                 <div className="flex gap-2">
                   {COLORS.map(c => (
                     <button key={c} onClick={() => setDraft(d => ({ ...d, color: c }))}
-                      className={`w-7 h-7 rounded-full transition-all ${draft.color === c ? 'scale-125 ring-2 ring-white/40' : ''}`}
+                      className={`w-7 h-7 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${draft.color === c ? 'scale-125 ring-2 ring-white/40' : ''}`}
                       style={{ background: COLOR_VALS[c] }}
                     />
                   ))}
@@ -368,9 +369,9 @@ export default function NewProtocolPage() {
               <div className="text-base font-extrabold text-[#e8e6e1] mb-1">{name}</div>
               {description && <div className="text-sm text-[#9b978f] mb-3">{description}</div>}
               <div className="flex gap-2 text-xs text-[#9b978f]">
-                <span className="bg-[rgba(217,165,63,0.12)] text-[#d9a53f] px-2 py-1 rounded-full font-semibold">{category}</span>
-                <span className="bg-[rgba(255,255,255,0.05)] px-2 py-1 rounded-full">{duration === 'ongoing' ? '∞ Ongoing' : `${durationDays} days`}</span>
-                <span className="bg-[rgba(255,255,255,0.05)] px-2 py-1 rounded-full">{items.length} items</span>
+                <span className="font-mono text-[10px] uppercase tracking-wider bg-[rgba(217,165,63,0.12)] text-[#d9a53f] px-2 py-1 rounded-full font-semibold">{category}</span>
+                <span className="font-mono text-[10px] tabular-nums uppercase tracking-wider bg-[rgba(255,255,255,0.05)] px-2 py-1 rounded-full">{duration === 'ongoing' ? '∞ Ongoing' : `${durationDays} days`}</span>
+                <span className="font-mono text-[10px] tabular-nums uppercase tracking-wider bg-[rgba(255,255,255,0.05)] px-2 py-1 rounded-full">{items.length} items</span>
               </div>
             </div>
 
@@ -381,7 +382,7 @@ export default function NewProtocolPage() {
             )}
 
             <div className="flex items-center gap-3 bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-4">
-              <input type="checkbox" checked={activateNow} onChange={e => setActivateNow(e.target.checked)} className="w-4 h-4 accent-[#d9a53f]" />
+              <input type="checkbox" checked={activateNow} onChange={e => setActivateNow(e.target.checked)} className="w-4 h-4 accent-[#d9a53f] rounded-[4px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
               <div>
                 <div className="text-sm font-semibold text-[#e8e6e1]">Activate now</div>
                 <div className="text-xs text-[#9b978f]">Start generating doses from today</div>
