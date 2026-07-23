@@ -621,7 +621,7 @@ export default function ProgressPage() {
                 <article key={`${card.title}-${card.generatedAt}`} className="rounded-xl border border-[#23272d] bg-[#0e1013] p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-bold text-[#e8e6e1]">{card.title}</h2>
-                    <span className="rounded-full bg-[rgba(217,165,63,0.12)] px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#93C5FD]">
+                    <span className="rounded-full bg-[rgba(217,165,63,0.12)] px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#d9a53f]">
                       {card.strength}
                     </span>
                   </div>
