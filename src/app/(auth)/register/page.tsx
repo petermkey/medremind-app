@@ -117,8 +117,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-[#0e1013] flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 justify-center mb-10">
-          <div className="w-10 h-10 rounded-xl bg-[#d9a53f] flex items-center justify-center text-xl">💊</div>
-          <span className="text-xl font-bold text-[#e8e6e1]">MedRemind</span>
+          <div className="w-10 h-10 rounded-xl bg-[#14171b] border border-[#23272d] flex items-center justify-center text-xl">💊</div>
+          <span className="text-xl font-bold text-[#e8e6e1] tracking-tight">MedRemind</span>
         </div>
         <h1 className="text-2xl font-extrabold text-[#e8e6e1] mb-2">Create your account</h1>
         <p className="text-sm text-[#9b978f] mb-8">Free to use. No subscription required.</p>
@@ -129,7 +129,7 @@ export default function RegisterPage() {
             type="button"
             onClick={() => handleOAuth('google')}
             disabled={oauthLoading !== null}
-            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-[#23272d] bg-[#14171b] text-[#c4c0b8] text-sm font-medium hover:bg-[#16191e] disabled:opacity-60 transition-colors"
+            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-[#23272d] bg-[#14171b] text-[#c4c0b8] text-sm font-medium hover:bg-[#16191e] disabled:opacity-60 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -140,27 +140,27 @@ export default function RegisterPage() {
             {oauthLoading === 'google' ? 'Redirecting…' : 'Continue with Google'}
           </button>
 
-          {oauthError && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] px-4 py-3 rounded-xl">{oauthError}</p>}
+          {oauthError && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] border border-[rgba(201,106,90,0.25)] px-4 py-3 rounded-xl">{oauthError}</p>}
         </div>
 
         <div className="flex items-center gap-3 mb-2">
           <div className="flex-1 h-px bg-[#23272d]" />
-          <span className="text-xs text-[#9b978f]">or sign up with email</span>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">or sign up with email</span>
           <div className="flex-1 h-px bg-[#23272d]" />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input label="Full name" type="text" placeholder="Peter" value={name} onChange={e => setName(e.target.value)} autoComplete="name" />
-          <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
-          <Input label="Password" type="password" placeholder="Min 8 chars, 1 number" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
-          <Input label="Confirm password" type="password" placeholder="Repeat password" value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" />
+          <Input label="Full name" type="text" placeholder="Peter" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
+          <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
+          <Input label="Password" type="password" placeholder="Min 8 chars, 1 number" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
+          <Input label="Confirm password" type="password" placeholder="Repeat password" value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
           <label className="flex items-start gap-3 cursor-pointer mt-1">
-            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#d9a53f]" />
+            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
             <span className="text-xs text-[#9b978f] leading-relaxed">
-              I agree to the <a href="#" className="text-[#d9a53f]">Terms of Service</a> and <a href="#" className="text-[#d9a53f]">Privacy Policy</a>. This app does not provide medical advice.
+              I agree to the <a href="#" className="text-[#e8e6e1] underline decoration-[#3a372f] underline-offset-2 hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm">Terms of Service</a> and <a href="#" className="text-[#e8e6e1] underline decoration-[#3a372f] underline-offset-2 hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm">Privacy Policy</a>. This app does not provide medical advice.
             </span>
           </label>
-          {error && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] px-4 py-3 rounded-xl">{error}</p>}
+          {error && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] border border-[rgba(201,106,90,0.25)] px-4 py-3 rounded-xl">{error}</p>}
           {info && (
             <div className="text-sm bg-[rgba(217,165,63,0.1)] border border-[rgba(217,165,63,0.3)] text-[#c4c0b8] px-4 py-3 rounded-xl">
               <p>{info}</p>
@@ -169,7 +169,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={handleResendConfirmation}
                   disabled={resendLoading || resendCooldownLeft > 0}
-                  className="mt-2 text-xs font-semibold text-[#d9a53f] hover:underline disabled:opacity-60"
+                  className="mt-2 text-xs font-semibold text-[#e8e6e1] underline decoration-[#3a372f] underline-offset-2 tabular-nums hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm disabled:opacity-60 disabled:no-underline"
                 >
                   {resendLoading
                     ? 'Sending…'
@@ -181,16 +181,16 @@ export default function RegisterPage() {
               {resendMessage && (
                 <p className={`text-xs mt-2 ${resendError ? 'text-[#c96a5a]' : 'text-[#9b978f]'}`}>{resendMessage}</p>
               )}
-              <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#d9a53f] hover:underline">
+              <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#e8e6e1] underline decoration-[#3a372f] underline-offset-2 hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm">
                 Go to sign in
               </button>
             </div>
           )}
-          <Button type="submit" size="lg" fullWidth loading={loading} className="mt-2">Create account</Button>
+          <Button type="submit" size="lg" fullWidth loading={loading} className="mt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Create account</Button>
         </form>
         <p className="text-center text-sm text-[#9b978f] mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-[#d9a53f] font-semibold hover:underline">Sign in</Link>
+          <Link href="/login" className="text-[#e8e6e1] font-semibold underline decoration-[#3a372f] underline-offset-2 hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm">Sign in</Link>
         </p>
       </div>
     </div>
