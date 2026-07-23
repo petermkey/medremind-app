@@ -23,7 +23,7 @@ export function BottomNav() {
             key={href}
             href={href}
             className={[
-              'flex min-w-0 flex-1 flex-col items-center gap-1 text-[8px] sm:text-[9px] font-semibold px-0.5 py-1 rounded-xl transition-colors duration-200',
+              'flex min-w-0 flex-1 flex-col items-center gap-1 text-[8px] sm:text-[9px] font-semibold px-0.5 py-1 rounded-xl transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
               active ? 'text-[#d9a53f]' : 'text-[#9b978f] hover:text-[#e8e6e1]',
             ].join(' ')}
           >

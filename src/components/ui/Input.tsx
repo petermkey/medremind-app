@@ -24,7 +24,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
             'w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-[12px]',
             'px-4 py-3 text-[#e8e6e1] text-sm outline-none',
             'placeholder:text-[#9b978f]',
-            'focus:border-[#d9a53f] transition-colors duration-200',
+            'focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 transition-colors duration-200',
             error ? 'border-[#c96a5a]' : '',
             className,
           ].join(' ')}
@@ -61,7 +61,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           className={[
             'w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-[12px]',
             'px-4 py-3 text-[#e8e6e1] text-sm outline-none',
-            'focus:border-[#d9a53f] transition-colors duration-200',
+            'focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 transition-colors duration-200',
             error ? 'border-[#c96a5a]' : '',
             className,
           ].join(' ')}

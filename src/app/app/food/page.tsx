@@ -779,7 +779,7 @@ export default function FoodPage() {
               <button
                 type="button"
                 onClick={handleGenerateTargets}
-                className="mt-5 w-full rounded-xl bg-[#d9a53f] px-4 py-3 text-sm font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                className="mt-5 w-full rounded-xl bg-[#d9a53f] px-4 py-3 text-sm font-bold text-[#14120b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
               >
                 Calculate targets
               </button>
@@ -846,7 +846,7 @@ export default function FoodPage() {
                 'rounded-xl px-3 py-2 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                 analyzing
                   ? 'cursor-not-allowed bg-[#23272d] text-[#9b978f] opacity-50'
-                  : 'bg-[#d9a53f] text-white hover:bg-[#a67c2a]',
+                  : 'bg-[#d9a53f] text-[#14120b] hover:bg-[#a67c2a]',
               ].join(' ')}
             >
               {analyzing ? 'Analyzing' : 'Capture'}
@@ -876,7 +876,7 @@ export default function FoodPage() {
                 'rounded-xl px-3 py-2 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                 analyzing
                   ? 'cursor-not-allowed bg-[#23272d] text-[#9b978f] opacity-50'
-                  : 'bg-[#23272d] text-[#e8e6e1] hover:bg-[#363B42]',
+                  : 'bg-[#23272d] text-[#e8e6e1] hover:bg-[#2e333a]',
               ].join(' ')}
             >
               Gallery
@@ -906,7 +906,7 @@ export default function FoodPage() {
             type="button"
             onClick={() => void analyzeText()}
             disabled={analyzing || mealText.trim().length < 3}
-            className="rounded-xl bg-[#238636] px-3 py-2 text-xs font-bold text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            className="rounded-xl bg-[#8fae74] px-3 py-2 text-xs font-bold text-[#14120b] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           >
             Analyze
           </button>
@@ -1041,7 +1041,7 @@ export default function FoodPage() {
                   onClick={() => setPortionFactor(factor)}
                   className={[
                     'rounded-lg px-2.5 py-1 font-mono text-xs font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
-                    portionFactor === factor ? 'bg-[#d9a53f] text-white' : 'bg-[#23272d] text-[#c4c0b8]',
+                    portionFactor === factor ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#23272d] text-[#c4c0b8]',
                   ].join(' ')}
                 >
                   ×{factor}
@@ -1332,10 +1332,10 @@ function WaterTracker({
           </div>
         </div>
         <div className="flex flex-shrink-0 gap-2">
-          <button type="button" onClick={() => onAdd(250)} className="rounded-xl bg-[#0EA5E9] px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+          <button type="button" onClick={() => onAdd(250)} className="rounded-xl bg-[#7fa6bf] px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
             +250 ml
           </button>
-          <button type="button" onClick={() => onAdd(500)} className="rounded-xl bg-[#0369A1] px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+          <button type="button" onClick={() => onAdd(500)} className="rounded-xl bg-[#5a8199] px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
             +500 ml
           </button>
         </div>
@@ -1375,7 +1375,7 @@ function EatingWindowCard({
         </div>
         <Link
           href="/app/insights"
-          className="flex-shrink-0 text-[11px] font-bold text-[#A855F7] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+          className="flex-shrink-0 text-[11px] font-bold text-[#a292c9] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
         >
           7-day averages →
         </Link>

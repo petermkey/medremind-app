@@ -16,7 +16,7 @@ export default function Home() {
       <div className="flex flex-col gap-3 w-full max-w-xs">
         <Link
           href="/register"
-          className="w-full bg-[#d9a53f] hover:bg-[#a67c2a] text-white font-semibold py-4 rounded-[14px] text-center transition-colors shadow-[0_8px_32px_rgba(217,165,63,0.35)]"
+          className="w-full bg-[#d9a53f] hover:bg-[#a67c2a] text-[#14120b] font-semibold py-4 rounded-[14px] text-center transition-colors shadow-[0_8px_32px_rgba(217,165,63,0.35)]"
         >
           Get started — it&apos;s free
         </Link>

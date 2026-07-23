@@ -150,7 +150,7 @@ export function TrendChart({
           const isLatest = index === bars.length - 1;
           let y = padY + bar.y * plotHeight;
           let h = Math.max(1, bar.height * plotHeight);
-          let fill = isLatest ? '#60A5FA' : '#d9a53f';
+          let fill = isLatest ? '#e6b654' : '#d9a53f';
 
           if (mode === 'diverging') {
             const magnitude = Math.min(1, Math.abs(bar.value) / 1);

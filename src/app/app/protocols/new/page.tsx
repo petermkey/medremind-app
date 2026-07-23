@@ -200,7 +200,7 @@ export default function NewProtocolPage() {
               <div className="flex gap-2">
                 {(['ongoing', 'fixed'] as const).map(d => (
                   <button key={d} onClick={() => setDuration(d)}
-                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${duration === d ? 'bg-[#d9a53f] border-[#d9a53f] text-white' : 'border-[rgba(255,255,255,0.08)] text-[#9b978f]'}`}>
+                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${duration === d ? 'bg-[#d9a53f] border-[#d9a53f] text-[#14120b]' : 'border-[rgba(255,255,255,0.08)] text-[#9b978f]'}`}>
                     {d === 'ongoing' ? '∞ Ongoing' : '📅 Fixed'}
                   </button>
                 ))}

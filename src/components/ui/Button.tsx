@@ -12,10 +12,10 @@ interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const styles: Record<Variant, string> = {
-  primary:   'bg-[#d9a53f] text-white hover:bg-[#a67c2a] shadow-[0_8px_32px_rgba(217,165,63,0.35)]',
+  primary:   'bg-[#d9a53f] text-[#14120b] hover:bg-[#a67c2a] shadow-[0_8px_32px_rgba(217,165,63,0.35)]',
   secondary: 'bg-transparent border border-[rgba(255,255,255,0.08)] text-[#e8e6e1] hover:border-[#d9a53f] hover:text-[#d9a53f]',
   ghost:     'bg-transparent text-[#9b978f] hover:text-[#e8e6e1] hover:bg-[rgba(255,255,255,0.05)]',
-  danger:    'bg-[#c96a5a] text-white hover:bg-[#DC2626]',
+  danger:    'bg-[#c96a5a] text-white hover:bg-[#b85c4d]',
 };
 
 const sizes: Record<Size, string> = {

@@ -135,7 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-[#070A10] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0e1013] flex items-center justify-center">
         <div className="
           flex flex-col bg-[#0e1013] w-full h-screen
           sm:w-[430px] sm:h-[900px] sm:rounded-[44px] sm:border sm:border-[rgba(255,255,255,0.08)]

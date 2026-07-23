@@ -38,7 +38,7 @@ export function WeekStrip({ selectedDate, onSelectDate, doseDateSet }: Props) {
             onClick={() => onSelectDate(dateStr)}
             className={[
               'flex flex-col items-center min-w-[44px] px-1 py-2 rounded-2xl border transition-all duration-200 flex-shrink-0',
-              isSelected && isToday  ? 'bg-[#d9a53f] border-transparent text-white' :
+              isSelected && isToday  ? 'bg-[#d9a53f] border-transparent text-[#14120b]' :
               isSelected             ? 'bg-[#191d22] border-[rgba(255,255,255,0.15)] text-[#e8e6e1]' :
               isToday                ? 'border-[#d9a53f] text-[#d9a53f]' :
               'border-transparent text-[#9b978f] hover:text-[#e8e6e1]',

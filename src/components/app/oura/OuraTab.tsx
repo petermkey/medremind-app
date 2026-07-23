@@ -50,7 +50,7 @@ function StateCard({ title, body, action }: { title: string; body: string; actio
       <div className="text-base font-bold text-[#e8e6e1]">{title}</div>
       <p className="mt-2 text-sm leading-relaxed text-[#9b978f]">{body}</p>
       {action && (
-        <a href="/app/settings" className="mt-4 inline-flex rounded-xl bg-[#d9a53f] px-4 py-2 text-sm font-bold text-white">
+        <a href="/app/settings" className="mt-4 inline-flex rounded-xl bg-[#d9a53f] px-4 py-2 text-sm font-bold text-[#14120b]">
           {action}
         </a>
       )}
@@ -168,7 +168,7 @@ export function OuraTab() {
                 onClick={() => setPeriod(value)}
                 className={[
                   'rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
-                  period === value ? 'bg-[#d9a53f] text-white' : 'text-[#9b978f] hover:text-[#e8e6e1]',
+                  period === value ? 'bg-[#d9a53f] text-[#14120b]' : 'text-[#9b978f] hover:text-[#e8e6e1]',
                 ].join(' ')}
               >
                 {value}
