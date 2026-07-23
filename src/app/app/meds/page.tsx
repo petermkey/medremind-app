@@ -37,13 +37,13 @@ export default function MedsPage() {
           placeholder="Search medications…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#e8e6e1] placeholder:text-[#9b978f] outline-none focus:border-[#d9a53f] mb-3"
+          className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#e8e6e1] placeholder:text-[#9b978f] outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 mb-3"
         />
 
         <div className="flex gap-2">
           {(['mine', 'catalogue'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${tab === t ? 'bg-[#d9a53f] text-white' : 'bg-[#191d22] text-[#9b978f]'}`}>
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${tab === t ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] text-[#9b978f]'}`}>
               {t === 'mine' ? '💊 My Meds' : '📖 Catalogue'}
             </button>
           ))}
@@ -94,7 +94,7 @@ export default function MedsPage() {
                     )}
                   </div>
                   {drug.category && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[#d9a53f] bg-[rgba(217,165,63,0.1)] px-2 py-1 rounded-full flex-shrink-0">
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-[#d9a53f] bg-[rgba(217,165,63,0.1)] px-2 py-1 rounded-full flex-shrink-0">
                       {drug.category}
                     </span>
                   )}
@@ -102,7 +102,7 @@ export default function MedsPage() {
                 {drug.routes && drug.routes.length > 0 && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {drug.routes.map(r => (
-                      <span key={r} className="text-[10px] bg-[rgba(255,255,255,0.05)] text-[#9b978f] px-2 py-0.5 rounded-full capitalize">{r}</span>
+                      <span key={r} className="font-mono text-[10px] bg-[rgba(255,255,255,0.05)] text-[#9b978f] px-2 py-0.5 rounded-full capitalize">{r}</span>
                     ))}
                   </div>
                 )}
