@@ -444,7 +444,7 @@ export default function ProgressPage() {
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
         <h1 className="text-xl font-extrabold text-[#e8e6e1]">Progress</h1>
-        <div className="mt-3 grid grid-cols-2 rounded-xl bg-[#0e1013] p-1">
+        <div className="mt-3 grid grid-cols-2 rounded-xl border border-[#23272d] bg-[#0e1013] p-1">
           {([
             ['correlations', 'Correlations'],
             ['oura', 'Oura'],
@@ -454,8 +454,9 @@ export default function ProgressPage() {
               type="button"
               onClick={() => setActiveTab(value)}
               className={[
-                'rounded-lg px-3 py-2 text-sm font-bold transition-colors',
-                activeTab === value ? 'bg-[#d9a53f] text-white' : 'text-[#9b978f] hover:text-[#e8e6e1]',
+                'rounded-lg px-3 py-2 text-[10px] font-mono uppercase tracking-wider transition-colors',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                activeTab === value ? 'bg-[#d9a53f] text-[#14120b]' : 'text-[#9b978f] hover:text-[#e8e6e1]',
               ].join(' ')}
             >
               {label}
@@ -480,18 +481,18 @@ export default function ProgressPage() {
             <span className="text-xl font-extrabold" style={{ color: adherenceStatus.color }}>
               {adherenceStatus.label}
             </span>
-            <span className="text-2xl font-extrabold" style={{ color: adherenceStatus.color }}>
+            <span className="text-2xl font-extrabold font-mono tabular-nums" style={{ color: adherenceStatus.color }}>
               {weekStats.total > 0 ? `${weekStats.pct}%` : '—'}
             </span>
           </div>
-          <div className="text-[11px] text-[#9b978f]">
+          <div className="text-[11px] font-mono tabular-nums text-[#9b978f]">
             {weekStats.total > 0
               ? `${weekStats.taken} of ${weekStats.total} doses taken this week`
               : 'No dose data for the last 7 days'}
           </div>
           {trendDelta !== null && (
             <div
-              className="text-[11px] mt-1 font-semibold"
+              className="text-[11px] mt-1 font-mono tabular-nums font-semibold"
               style={{ color: trendDelta > 3 ? '#8fae74' : trendDelta < -3 ? '#c96a5a' : '#9b978f' }}
             >
               {trendDelta > 3
@@ -506,18 +507,18 @@ export default function ProgressPage() {
         {/* ── 2. TODAY SUMMARY ── */}
         {(todayStatus.taken + todayStatus.remaining + todayStatus.skipped) > 0 && (
           <div className="mb-4">
-          <div className="text-[10px] font-bold text-[#9b978f] uppercase tracking-widest mb-1.5">Today</div>
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1.5">Today</div>
           <div className="flex gap-2">
-            <div className="flex-1 bg-[#14171b] border border-[rgba(255,255,255,0.06)] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold text-[#8fae74] flex-shrink-0">✓ {todayStatus.taken}</span>
+            <div className="flex-1 bg-[#14171b] border border-[#23272d] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-[#8fae74] flex-shrink-0">✓ {todayStatus.taken}</span>
               <span className="text-[10px] text-[#9b978f] truncate">taken</span>
             </div>
-            <div className="flex-1 bg-[#14171b] border border-[rgba(255,255,255,0.06)] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold text-[#d9a53f] flex-shrink-0">→ {todayStatus.remaining}</span>
+            <div className="flex-1 bg-[#14171b] border border-[#23272d] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-[#d9a53f] flex-shrink-0">→ {todayStatus.remaining}</span>
               <span className="text-[10px] text-[#9b978f] truncate">left</span>
             </div>
-            <div className="flex-1 bg-[#14171b] border border-[rgba(255,255,255,0.06)] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold text-[#9b978f] flex-shrink-0">— {todayStatus.skipped}</span>
+            <div className="flex-1 bg-[#14171b] border border-[#23272d] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-[#9b978f] flex-shrink-0">— {todayStatus.skipped}</span>
               <span className="text-[10px] text-[#9b978f] truncate">skipped</span>
             </div>
           </div>
@@ -532,24 +533,27 @@ export default function ProgressPage() {
             { label: 'Active',    value: `${activeCount}`,    color: '#a292c9', sub: 'protocols' },
             { label: 'Taken',     value: `${stats.taken}`,    color: '#8fae74', sub: `of ${stats.total} (${calendarRange}d)` },
           ].map(({ label, value, color, sub }) => (
-            <div key={label} className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
-              <div className="text-2xl font-extrabold" style={{ color }}>{value}</div>
-              <div className="text-xs font-semibold text-[#e8e6e1] mt-0.5">{label}</div>
-              <div className="text-[11px] text-[#9b978f]">{sub}</div>
+            <div key={label} className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4">
+              <div className="text-2xl font-extrabold font-mono tabular-nums" style={{ color }}>{value}</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mt-1">{label}</div>
+              <div className="text-[11px] font-mono tabular-nums text-[#9b978f]">{sub}</div>
             </div>
           ))}
         </div>
 
         {/* ── 4. HEALTH AND MEDICATION PATTERNS ── */}
-        <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
+        <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 mb-4">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
-              <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest">Health & Medication Patterns</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Health & Medication Patterns</div>
               <div className="mt-1 text-xs leading-relaxed text-[#9b978f]">
                 Oura connection and health sync are managed in Settings.
               </div>
             </div>
-            <a href="/app/settings" className="text-xs font-semibold text-[#d9a53f] hover:underline">
+            <a
+              href="/app/settings"
+              className="text-xs font-semibold text-[#d9a53f] hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            >
               Settings
             </a>
           </div>
@@ -558,12 +562,12 @@ export default function ProgressPage() {
             <p className="text-sm text-[#9b978f]">Loading analytics...</p>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#0e1013] p-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#23272d] bg-[#0e1013] p-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[#e8e6e1]">
-                    {medicationStatus?.counts?.mapItems ?? 0} medication map item(s)
+                    <span className="font-mono tabular-nums">{medicationStatus?.counts?.mapItems ?? 0}</span> medication map item(s)
                   </div>
-                  <div className="mt-1 text-xs text-[#9b978f]">
+                  <div className="mt-1 text-xs font-mono tabular-nums text-[#9b978f]">
                     {medicationStatus?.counts?.rules ?? 0} rule card(s), {medicationStatus?.counts?.clinicianReviewFlags ?? 0} clinician-review flag(s)
                   </div>
                 </div>
@@ -572,7 +576,7 @@ export default function ProgressPage() {
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-xl bg-[#0e1013] p-3">
+              <div className="flex flex-col gap-3 rounded-xl border border-[#23272d] bg-[#0e1013] p-3">
                 <ConsentToggle
                   label="Medication pattern analysis"
                   checked={correlations.consent.enabled && correlations.consent.includesMedicationPatterns}
@@ -614,15 +618,15 @@ export default function ProgressPage() {
                   No pattern cards yet. Enable consent and refresh after medication context, food, hydration, and health summaries are available.
                 </p>
               ) : correlations.cards.map((card) => (
-                <article key={`${card.title}-${card.generatedAt}`} className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] p-4">
+                <article key={`${card.title}-${card.generatedAt}`} className="rounded-xl border border-[#23272d] bg-[#0e1013] p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-bold text-[#e8e6e1]">{card.title}</h2>
-                    <span className="rounded-full bg-[rgba(217,165,63,0.12)] px-2 py-1 text-[10px] font-bold uppercase text-[#93C5FD]">
+                    <span className="rounded-full bg-[rgba(217,165,63,0.12)] px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#93C5FD]">
                       {card.strength}
                     </span>
                   </div>
                   <p className="text-sm leading-relaxed text-[#c4c0b8]">{card.body}</p>
-                  <p className="mt-3 text-xs text-[#9b978f]">
+                  <p className="mt-3 text-xs font-mono tabular-nums text-[#9b978f]">
                     Direction: {card.direction} · r {card.r.toFixed(2)} · paired days {card.n}
                   </p>
                 </article>
@@ -634,14 +638,14 @@ export default function ProgressPage() {
         <NutrientBalanceCard />
 
         {/* ── 5. LAST 7 DAYS (weekly rings — unchanged) ── */}
-        <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
-          <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-4">Last 7 Days</div>
+        <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 mb-4">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-4">Last 7 Days</div>
           <div className="grid grid-cols-7 gap-2">
             {weeklyData.map(({ date, label, day }) => (
               <div key={date} className="flex flex-col items-center gap-1.5">
                 <DayRings rings={buildRingsForDate(date)} size={weeklyRingSize} stroke={weeklyRingStroke} />
-                <span className="text-[10px] text-[#9b978f]">{label}</span>
-                <span className="text-[10px] text-[#e8e6e1] font-semibold">{day}</span>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{label}</span>
+                <span className="text-[10px] font-mono tabular-nums text-[#e8e6e1] font-semibold">{day}</span>
               </div>
             ))}
           </div>
@@ -658,17 +662,18 @@ export default function ProgressPage() {
         </div>
 
         {/* ── 6. MONTHLY PATTERN (heatmap cells) ── */}
-        <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
+        <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest">Monthly Pattern</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Monthly Pattern</div>
             <div className="flex items-center gap-1">
               {([30, 60, 90] as const).map(value => (
                 <button
                   key={value}
                   onClick={() => setCalendarRange(value)}
                   className={[
-                    'px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors',
-                    calendarRange === value ? 'bg-[#d9a53f] text-white' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
+                    'px-2 py-1 rounded-lg text-[10px] font-mono tabular-nums font-semibold transition-colors',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                    calendarRange === value ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
                   ].join(' ')}
                 >
                   {value}d
@@ -676,7 +681,7 @@ export default function ProgressPage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3 mb-3 text-[10px] text-[#9b978f]">
+          <div className="flex items-center gap-3 mb-3 text-[10px] font-mono tabular-nums text-[#9b978f]">
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(143,174,116,0.18)', border: '1px solid rgba(143,174,116,0.32)' }} />
               ≥80%
@@ -692,7 +697,7 @@ export default function ProgressPage() {
           </div>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-              <div key={d} className="text-[10px] text-[#9b978f] text-center font-semibold">{d}</div>
+              <div key={d} className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] text-center">{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -717,14 +722,14 @@ export default function ProgressPage() {
                   }}
                   className="flex items-center justify-center"
                 >
-                  <span className={`text-[10px] leading-none ${isToday ? 'text-[#e8e6e1] font-bold' : 'text-[#9b978f]'}`}>
+                  <span className={`text-[10px] font-mono tabular-nums leading-none ${isToday ? 'text-[#e8e6e1] font-bold' : 'text-[#9b978f]'}`}>
                     {format(d, 'd')}
                   </span>
                 </div>
               );
             })}
           </div>
-          <div className="flex items-center justify-between mt-2 text-[11px] text-[#9b978f]">
+          <div className="flex items-center justify-between mt-2 text-[11px] font-mono tabular-nums text-[#9b978f]">
             <span>{format(calendarDays[0], 'MMM d')}</span>
             <span>{format(calendarDays[calendarDays.length - 1], 'MMM d')}</span>
           </div>
@@ -732,8 +737,8 @@ export default function ProgressPage() {
 
         {/* ── 7. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
         {sortedActiveProtocols.length > 0 && (
-          <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
-            <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-4">By Protocol</div>
+          <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-4">By Protocol</div>
             {sortedActiveProtocols.map(ap => {
               const protocolStats = protocolBreakdownStats[ap.id] ?? { total: 0, taken: 0 };
               const pct = protocolStats.total ? Math.round(protocolStats.taken / protocolStats.total * 100) : 0;
@@ -742,12 +747,12 @@ export default function ProgressPage() {
                 <div key={ap.id} className="mb-4 last:mb-0">
                   <div className="flex justify-between mb-1.5">
                     <span className="text-sm font-semibold text-[#e8e6e1]">{ap.protocol.name}</span>
-                    <span className="text-sm font-bold" style={{ color: barColor }}>{pct}%</span>
+                    <span className="text-sm font-mono tabular-nums font-bold" style={{ color: barColor }}>{pct}%</span>
                   </div>
                   <div className="h-2 bg-[#191d22] rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
                   </div>
-                  <div className="text-[11px] text-[#9b978f] mt-1">{protocolStats.taken} of {protocolStats.total} doses · {ap.status}</div>
+                  <div className="text-[11px] font-mono tabular-nums text-[#9b978f] mt-1">{protocolStats.taken} of {protocolStats.total} doses · {ap.status}</div>
                 </div>
               );
             })}
@@ -773,7 +778,7 @@ function ConsentToggle({ label, checked, onChange }: { label: string; checked: b
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex items-center justify-between gap-3 text-left"
+      className="flex items-center justify-between gap-3 text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
     >
       <span className="text-sm font-semibold leading-relaxed text-[#e8e6e1]">{label}</span>
       <span className={`relative h-6 w-12 flex-shrink-0 rounded-full transition-colors ${checked ? 'bg-[#d9a53f]' : 'bg-[#191d22]'}`}>
