@@ -238,21 +238,27 @@ export default function SchedulePage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-5 pb-4 flex-shrink-0">
-        <div className="flex justify-between items-center mb-3">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-[#605d56]">
+          {format(parseISO(selectedDate), 'EEE d MMM')}
+        </div>
+        <div className="flex justify-between items-center mt-1 mb-3">
           <div>
-            <div className="text-xs text-[#9b978f] font-medium">{greeting()} ☀️</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{greeting()} ☀️</div>
             <div className="text-xl font-extrabold text-[#e8e6e1]">{profile?.name}</div>
           </div>
-          <Link href="/app/settings" className="w-9 h-9 rounded-full bg-gradient-to-br from-[#d9a53f] to-[#a292c9] flex items-center justify-center text-sm font-bold text-white">
+          <Link
+            href="/app/settings"
+            className="w-9 h-9 rounded-full bg-gradient-to-br from-[#d9a53f] to-[#a292c9] flex items-center justify-center text-sm font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+          >
             {profile?.name?.charAt(0).toUpperCase()}
           </Link>
         </div>
 
         {/* Progress */}
-        <div className="mb-4">
-          <div className="flex justify-between text-xs text-[#9b978f] mb-1.5">
-            <span>Today&apos;s progress</span>
-            <span className="text-[#8fae74] font-semibold">{taken} of {total} taken</span>
+        <div className="mb-4 rounded-xl border border-[#23272d] bg-[#14171b] px-3.5 py-3">
+          <div className="flex justify-between items-baseline mb-1.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Today&apos;s progress</span>
+            <span className="text-[#8fae74] font-semibold font-mono tabular-nums text-xs">{taken} of {total} taken</span>
           </div>
           <div className="h-1.5 bg-[#191d22] rounded-full overflow-hidden">
             <div
@@ -291,15 +297,15 @@ export default function SchedulePage() {
 
         {/* Next dose banner */}
         {nextDose && (
-          <div className="bg-gradient-to-r from-[rgba(217,165,63,0.12)] to-[rgba(162,146,201,0.08)] border border-[rgba(217,165,63,0.2)] rounded-2xl p-4 mb-5 flex items-center gap-3">
+          <div className="bg-[#14171b] border border-[#2e333a] rounded-2xl p-4 mb-5 flex items-center gap-3">
             <span className="text-2xl">⏰</span>
             <div className="flex-1">
-              <div className="text-sm font-bold text-[#e8e6e1]">Next dose</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Next dose</div>
               <div className="text-xs text-[#9b978f] mt-0.5">
                 {nextDose.protocolItem.name} {nextDose.protocolItem.doseAmount ?? ''}{nextDose.protocolItem.doseUnit ?? ''}
               </div>
             </div>
-            <div className="text-sm font-bold text-[#d9a53f]">{fmtTime(nextDose.scheduledTime)}</div>
+            <div className="text-sm font-bold font-mono tabular-nums text-[#d9a53f]">{fmtTime(nextDose.scheduledTime)}</div>
           </div>
         )}
 
@@ -310,73 +316,92 @@ export default function SchedulePage() {
             <div className="text-base font-bold text-[#e8e6e1] mb-2">No doses scheduled</div>
             <div className="text-sm text-[#9b978f] mb-6">Activate a protocol or add a medication to get started.</div>
             <div className="flex gap-3 justify-center">
-              <Link href="/app/protocols" className="text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-4 py-2.5 rounded-xl hover:bg-[rgba(217,165,63,0.1)]">
-                Browse Protocols
+              <Link href="/app/protocols" className="text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-4 py-2.5 rounded-xl hover:bg-[rgba(217,165,63,0.1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+                Browse protocols
               </Link>
               <button
                 type="button"
                 aria-label="Add dose manually"
                 onClick={() => setSheetOpen(true)}
-                className="text-sm font-semibold text-white bg-[#d9a53f] px-4 py-2.5 rounded-xl hover:bg-[#a67c2a]"
+                className="text-sm font-semibold text-[#14120b] bg-[#d9a53f] px-4 py-2.5 rounded-xl hover:bg-[#a67c2a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
               >
-                + Add Manually
+                + Add manually
               </button>
             </div>
           </div>
         )}
 
-        {/* Grouped doses */}
-        {grouped.map(({ label, doses: group }) => (
-          <div key={label} className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[11px] font-bold text-[#9b978f] uppercase tracking-widest">{label}</span>
-              <div className="flex-1 h-px bg-[rgba(255,255,255,0.05)]" />
-            </div>
-            {group.map(dose => (
-              (() => {
-                const protocolLocked = dose.activeProtocol.status !== 'active';
-                const actionsDisabled = isFutureDate || protocolLocked;
-                const disabledMessage = protocolLocked
-                  ? (isHistoryDate ? pausedHistoryActionMessage : pausedProtocolActionMessage)
-                  : futureActionMessage;
+        {/* Grouped doses — vertical timeline rail */}
+        {grouped.length > 0 && (
+          <div className="relative pl-[18px]">
+            <div className="absolute left-[3px] top-1.5 bottom-1.5 w-px bg-[#23272d]" />
+            {grouped.map(({ label, doses: group }) => (
+              <div key={label} className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] font-mono font-bold text-[#9b978f] uppercase tracking-wider">{label}</span>
+                  <div className="flex-1 h-px bg-[rgba(255,255,255,0.05)]" />
+                </div>
+                {group.map(dose => (
+                  (() => {
+                    const protocolLocked = dose.activeProtocol.status !== 'active';
+                    const actionsDisabled = isFutureDate || protocolLocked;
+                    const disabledMessage = protocolLocked
+                      ? (isHistoryDate ? pausedHistoryActionMessage : pausedProtocolActionMessage)
+                      : futureActionMessage;
+                    const isNextDose = nextDose?.id === dose.id;
+                    const dotClass =
+                      dose.status === 'taken'
+                        ? 'bg-[#8fae74]'
+                        : dose.status === 'skipped'
+                        ? 'bg-[#605d56]'
+                        : isNextDose
+                        ? 'bg-[#0e1013] border-[1.5px] border-[#d9a53f]'
+                        : 'bg-[#0e1013] border-[1.5px] border-[#605d56]';
 
-                return (
-                  <MedCard
-                    key={dose.id}
-                    dose={dose}
-                    actionsDisabled={actionsDisabled}
-                    takenAt={takenAtMap.get(dose.id)}
-                    smartAdjustedTime={smartHintFor(dose)}
-                    onTake={() => {
-                      if (actionsDisabled) {
-                        show(disabledMessage, 'warning');
-                        return;
-                      }
-                      takeDose(dose.id);
-                      show(`✓ ${dose.protocolItem.name} taken`);
-                    }}
-                    onSkip={() => {
-                      if (actionsDisabled) {
-                        show(disabledMessage, 'warning');
-                        return;
-                      }
-                      skipDose(dose.id);
-                      show(`Skipped ${dose.protocolItem.name}`, 'warning');
-                    }}
-                    onSnooze={() => {
-                      if (actionsDisabled) {
-                        show(disabledMessage, 'warning');
-                        return;
-                      }
-                      setSnoozeTargetDose(dose);
-                    }}
-                    onDelete={() => setDeleteTargetDose(dose)}
-                  />
-                );
-              })()
+                    return (
+                      <div key={dose.id} className="relative">
+                        <span
+                          aria-hidden="true"
+                          className={`absolute left-[-23px] top-[18px] w-[7px] h-[7px] rounded-full ${dotClass}`}
+                        />
+                        <MedCard
+                          dose={dose}
+                          actionsDisabled={actionsDisabled}
+                          takenAt={takenAtMap.get(dose.id)}
+                          smartAdjustedTime={smartHintFor(dose)}
+                          onTake={() => {
+                            if (actionsDisabled) {
+                              show(disabledMessage, 'warning');
+                              return;
+                            }
+                            takeDose(dose.id);
+                            show(`✓ ${dose.protocolItem.name} taken`);
+                          }}
+                          onSkip={() => {
+                            if (actionsDisabled) {
+                              show(disabledMessage, 'warning');
+                              return;
+                            }
+                            skipDose(dose.id);
+                            show(`Skipped ${dose.protocolItem.name}`, 'warning');
+                          }}
+                          onSnooze={() => {
+                            if (actionsDisabled) {
+                              show(disabledMessage, 'warning');
+                              return;
+                            }
+                            setSnoozeTargetDose(dose);
+                          }}
+                          onDelete={() => setDeleteTargetDose(dose)}
+                        />
+                      </div>
+                    );
+                  })()
+                ))}
+              </div>
             ))}
           </div>
-        ))}
+        )}
       </div>
 
       {/* FAB */}
@@ -384,7 +409,7 @@ export default function SchedulePage() {
         type="button"
         aria-label="Open add dose sheet"
         onClick={() => setSheetOpen(true)}
-        className="absolute bottom-24 right-5 w-12 h-12 bg-[#d9a53f] hover:bg-[#a67c2a] rounded-[16px] shadow-[0_4px_20px_rgba(217,165,63,0.5)] flex items-center justify-center text-2xl text-white transition-all duration-200 z-10"
+        className="absolute bottom-24 right-5 w-12 h-12 bg-[#d9a53f] hover:bg-[#a67c2a] rounded-[16px] shadow-[0_4px_20px_rgba(217,165,63,0.5)] flex items-center justify-center text-2xl text-[#14120b] transition-all duration-200 z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
       >
         ＋
       </button>
@@ -392,31 +417,31 @@ export default function SchedulePage() {
       <AddDoseSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
       {deleteTargetDose && (
         <div className="fixed inset-0 z-40 bg-black/50 flex items-end">
-          <div className="w-full rounded-t-2xl bg-[#111419] border-t border-[rgba(255,255,255,0.08)] p-4 pb-6">
+          <div className="w-full rounded-t-2xl bg-[#111419] border-t border-[#23272d] p-4 pb-6">
             <div className="text-sm font-bold text-[#e8e6e1] mb-1">Remove dose</div>
             <div className="text-xs text-[#9b978f] mb-3">{deleteTargetDose.protocolItem.name}</div>
             <div className="flex flex-col gap-2">
-              <button type="button" aria-label="Delete today only" onClick={() => applyDelete('today')} className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold">Delete today only</button>
-              <button type="button" aria-label="Delete from all following days" onClick={() => applyDelete('forward')} className="bg-[#191d22] border border-red-900/50 rounded-xl py-3 text-sm text-red-400 font-semibold">Delete from all following days</button>
+              <button type="button" aria-label="Delete today only" onClick={() => applyDelete('today')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Delete today only</button>
+              <button type="button" aria-label="Delete from all following days" onClick={() => applyDelete('forward')} className="bg-[#191d22] border border-red-900/50 rounded-xl py-3 text-sm text-red-400 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Delete from all following days</button>
             </div>
-            <button type="button" aria-label="Cancel delete" onClick={() => setDeleteTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#9b978f]">Cancel</button>
+            <button type="button" aria-label="Cancel delete" onClick={() => setDeleteTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#9b978f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Cancel</button>
           </div>
         </div>
       )}
       {snoozeTargetDose && (
         <div className="fixed inset-0 z-40 bg-black/50 flex items-end">
-          <div className="w-full rounded-t-2xl bg-[#111419] border-t border-[rgba(255,255,255,0.08)] p-4 pb-6">
+          <div className="w-full rounded-t-2xl bg-[#111419] border-t border-[#23272d] p-4 pb-6">
             <div className="text-sm font-bold text-[#e8e6e1] mb-1">Snooze dose</div>
             <div className="text-xs text-[#9b978f] mb-3">
               {snoozeTargetDose.protocolItem.name}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" aria-label="Snooze by one hour" onClick={() => applySnooze('1h')} className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold">1 hour</button>
-              <button type="button" aria-label="Snooze until this evening" onClick={() => applySnooze('evening')} className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold">This evening</button>
-              <button type="button" aria-label="Snooze until tomorrow" onClick={() => applySnooze('tomorrow')} className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold">Tomorrow</button>
-              <button type="button" aria-label="Snooze until next week" onClick={() => applySnooze('next_week')} className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold">Next week</button>
+              <button type="button" aria-label="Snooze by one hour" onClick={() => applySnooze('1h')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">1 hour</button>
+              <button type="button" aria-label="Snooze until this evening" onClick={() => applySnooze('evening')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">This evening</button>
+              <button type="button" aria-label="Snooze until tomorrow" onClick={() => applySnooze('tomorrow')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Tomorrow</button>
+              <button type="button" aria-label="Snooze until next week" onClick={() => applySnooze('next_week')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Next week</button>
             </div>
-            <button type="button" aria-label="Cancel snooze selection" onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#9b978f]">Cancel</button>
+            <button type="button" aria-label="Cancel snooze selection" onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#9b978f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Cancel</button>
           </div>
         </div>
       )}
