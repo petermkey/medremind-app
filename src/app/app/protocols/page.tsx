@@ -17,7 +17,7 @@ const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
 const FILTERS = [
   { value: 'active', label: 'Current' },
   { value: 'templates', label: 'Templates' },
-  { value: 'custom', label: 'My Protocols' },
+  { value: 'custom', label: 'My protocols' },
   { value: 'all', label: 'All' },
 ];
 
@@ -148,7 +148,7 @@ export default function ProtocolsPage() {
           <h1 className="text-xl font-extrabold text-[#e8e6e1]">Protocols</h1>
           <button
             onClick={() => router.push('/app/protocols/new')}
-            className="flex items-center gap-1.5 text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(217,165,63,0.1)] transition-colors"
+            className="flex items-center gap-1.5 text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(217,165,63,0.1)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           >
             ＋ New
           </button>
@@ -159,7 +159,7 @@ export default function ProtocolsPage() {
           placeholder="Search protocols…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#e8e6e1] placeholder:text-[#9b978f] outline-none focus:border-[#d9a53f] mb-3"
+          className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#e8e6e1] placeholder:text-[#9b978f] outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 mb-3"
         />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -168,8 +168,8 @@ export default function ProtocolsPage() {
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors',
-                filter === f.value ? 'bg-[#d9a53f] text-white' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
+                'px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                filter === f.value ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
               ].join(' ')}
             >
               {f.label}
@@ -212,19 +212,19 @@ export default function ProtocolsPage() {
                   <span className="block text-sm font-bold text-[#e8e6e1] truncate">{p.name}</span>
                   <div className="mt-1 flex items-center gap-2">
                     {p.isArchived ? (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#9b978f] flex-shrink-0">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#9b978f] flex-shrink-0">
                         archived
                       </span>
                     ) : instance ? (
                       <span
-                        className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+                        className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: `${statusColor}20`, color: statusColor }}
                       >
                         {getStatusLabel(instance.status)}
                       </span>
                     ) : null}
                     {p.isTemplate && !instance && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#a292c9] flex-shrink-0">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#a292c9] flex-shrink-0">
                         template
                       </span>
                     )}
@@ -233,9 +233,9 @@ export default function ProtocolsPage() {
                     <div className="text-xs text-[#9b978f] mt-0.5 line-clamp-2">{p.description}</div>
                   )}
                   <div className="flex items-center gap-3 mt-2">
-                    <span className="text-[11px] text-[#9b978f]">{p.items.length} items</span>
+                    <span className="text-[11px] font-mono tabular-nums text-[#9b978f]">{p.items.length} items</span>
                     {instance?.startDate && (
-                      <span className="text-[11px] text-[#9b978f]">Started {instance.startDate}</span>
+                      <span className="text-[11px] font-mono tabular-nums text-[#9b978f]">Started {instance.startDate}</span>
                     )}
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export default function ProtocolsPage() {
                     else handleActivate(p.id);
                   }}
                   className={[
-                    'text-xs font-semibold px-3 py-2 rounded-xl flex-shrink-0 transition-colors',
+                    'text-xs font-semibold px-3 py-2 rounded-xl flex-shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                     instance?.status === 'active'
                       ? 'bg-[rgba(207,129,72,0.15)] text-[#cf8148] hover:bg-[rgba(207,129,72,0.25)]'
                       : instance?.status === 'paused'
@@ -324,7 +324,7 @@ function ProtocolRow({
         tabIndex={0}
         onKeyDown={handleCardKeyDown}
         className={[
-          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200',
+          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
           swiped ? '-translate-x-[132px]' : '',
         ].join(' ')}
         onClick={() => {
@@ -348,7 +348,7 @@ function ProtocolRow({
             onEdit();
             setSwiped(false);
           }}
-          className="px-5 bg-[#d9a53f] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+          className="px-5 bg-[#d9a53f] text-[#14120b] text-[11px] font-bold flex flex-col items-center justify-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
           ✏️<br />Edit
         </button>
@@ -360,7 +360,7 @@ function ProtocolRow({
             onDelete();
             setSwiped(false);
           }}
-          className="px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl"
+          className="px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
           ✕<br />Delete
         </button>
