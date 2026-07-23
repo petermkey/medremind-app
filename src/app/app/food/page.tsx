@@ -98,13 +98,14 @@ const BODY_FAT_OPTIONS: { value: NutritionBodyFatRange; label: string }[] = [
   { value: '25%+', label: '25%+' },
 ];
 
-const TARGET_CARDS = [
-  { key: 'caloriesKcal', totalKey: 'caloriesKcal', label: 'Calories', unit: 'kcal' },
+const MACRO_CELLS = [
   { key: 'proteinG', totalKey: 'proteinG', label: 'Protein', unit: 'g' },
   { key: 'fatG', totalKey: 'totalFatG', label: 'Fat', unit: 'g' },
   { key: 'carbsG', totalKey: 'carbsG', label: 'Carbs', unit: 'g' },
-  { key: 'fiberG', totalKey: 'fiberG', label: 'Fiber', unit: 'g' },
 ] as const;
+
+const BTN_QUIET =
+  'rounded-[10px] border border-[#2e333a] bg-transparent text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2';
 
 const ENTRY_NUTRIENTS = [
   { key: 'caloriesKcal', label: 'kcal', unit: '' },
@@ -709,7 +710,7 @@ export default function FoodPage() {
   if (loadingProfile && !targetProfile) {
     return (
       <div className="flex h-full flex-col px-5 pt-2">
-        <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-5 text-sm font-semibold text-[#9b978f]">
+        <div className="rounded-2xl border border-[#23272d] bg-[#14171b] p-5 text-sm font-semibold text-[#9b978f]">
           Loading nutrition targets...
         </div>
       </div>
@@ -723,13 +724,13 @@ export default function FoodPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Nutrition targets</div>
-              <h1 className="text-2xl font-extrabold text-[#e8e6e1]">{editingTargets ? 'Edit targets' : 'Food setup'}</h1>
+              <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">{editingTargets ? 'Edit targets' : 'Food setup'}</h1>
             </div>
             {editingTargets && (
               <button
                 type="button"
                 onClick={cancelEditingTargets}
-                className="rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                className={`${BTN_QUIET} px-3 py-2 text-xs font-bold`}
               >
                 Cancel
               </button>
@@ -745,7 +746,7 @@ export default function FoodPage() {
           )}
 
           {setupStep === 'input' ? (
-            <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
+            <div className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4">
               <div className="mb-4">
                 <h2 className="text-base font-bold text-[#e8e6e1]">Body profile</h2>
                 <p className="mt-1 text-xs text-[#9b978f]">Targets are calculated first, then every value can be edited before saving.</p>
@@ -779,7 +780,7 @@ export default function FoodPage() {
               <button
                 type="button"
                 onClick={handleGenerateTargets}
-                className="mt-5 w-full rounded-xl bg-[#d9a53f] px-4 py-3 text-sm font-bold text-[#14120b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                className="mt-5 w-full rounded-[10px] bg-[#d9a53f] px-4 py-3 text-sm font-bold text-[#14120b] hover:bg-[#e6b654] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
               >
                 Calculate targets
               </button>
@@ -809,7 +810,7 @@ export default function FoodPage() {
                 <button
                   type="button"
                   onClick={() => setSetupStep('input')}
-                  className="rounded-xl bg-[#23272d] px-4 py-3 text-sm font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                  className={`${BTN_QUIET} px-4 py-3 text-sm font-bold`}
                 >
                   Back
                 </button>
@@ -817,7 +818,7 @@ export default function FoodPage() {
                   type="button"
                   onClick={handleSaveTargets}
                   disabled={savingTargets}
-                  className="rounded-xl bg-[#8fae74] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                  className="rounded-[10px] bg-[#d9a53f] px-4 py-3 text-sm font-bold text-[#14120b] hover:bg-[#e6b654] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
                 >
                   {savingTargets ? 'Saving...' : 'Save targets'}
                 </button>
@@ -834,8 +835,8 @@ export default function FoodPage() {
       <div className="flex-shrink-0 px-5 pb-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{activeDate === today ? 'Today' : format(new Date(`${activeDate}T12:00:00`), 'EEE, MMM d')}</div>
-            <h1 className="text-2xl font-extrabold text-[#e8e6e1]">Food</h1>
+            <div className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.08em] text-[#9b978f]">FOOD · {activeDate === today ? 'Today' : format(new Date(`${activeDate}T12:00:00`), 'EEE, MMM d')}</div>
+            <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Food</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -843,10 +844,10 @@ export default function FoodPage() {
               onClick={() => fileInputRef.current?.click()}
               disabled={analyzing}
               className={[
-                'rounded-xl px-3 py-2 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                'rounded-[10px] px-3 py-2 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                 analyzing
                   ? 'cursor-not-allowed bg-[#23272d] text-[#9b978f] opacity-50'
-                  : 'bg-[#d9a53f] text-[#14120b] hover:bg-[#a67c2a]',
+                  : 'bg-[#d9a53f] text-[#14120b] hover:bg-[#e6b654]',
               ].join(' ')}
             >
               {analyzing ? 'Analyzing' : 'Capture'}
@@ -873,10 +874,8 @@ export default function FoodPage() {
               onClick={() => galleryInputRef.current?.click()}
               disabled={analyzing}
               className={[
-                'rounded-xl px-3 py-2 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
-                analyzing
-                  ? 'cursor-not-allowed bg-[#23272d] text-[#9b978f] opacity-50'
-                  : 'bg-[#23272d] text-[#e8e6e1] hover:bg-[#2e333a]',
+                'px-3 py-2 text-xs font-bold',
+                analyzing ? `${BTN_QUIET} cursor-not-allowed opacity-50` : BTN_QUIET,
               ].join(' ')}
             >
               Gallery
@@ -884,7 +883,7 @@ export default function FoodPage() {
             <button
               type="button"
               onClick={startEditingTargets}
-              className="rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+              className={`${BTN_QUIET} px-3 py-2 text-xs font-bold`}
             >
               {targetProfile ? 'Targets' : 'Set targets'}
             </button>
@@ -900,13 +899,13 @@ export default function FoodPage() {
             placeholder="Describe your meal…"
             aria-label="Describe your meal"
             disabled={analyzing}
-            className="flex-1 rounded-xl bg-[#14171b] px-3 py-2 text-sm text-[#e8e6e1] placeholder-[#9b978f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            className="flex-1 rounded-[10px] border border-[#23272d] bg-[#14171b] px-3 py-2 text-sm text-[#e8e6e1] placeholder-[#605d56] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           />
           <button
             type="button"
             onClick={() => void analyzeText()}
             disabled={analyzing || mealText.trim().length < 3}
-            className="rounded-xl bg-[#8fae74] px-3 py-2 text-xs font-bold text-[#14120b] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            className={`${BTN_QUIET} px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50`}
           >
             Analyze
           </button>
@@ -919,10 +918,10 @@ export default function FoodPage() {
               type="button"
               onClick={() => setSelectedDate(date)}
               className={[
-                'min-w-[58px] rounded-xl border px-3 py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                'min-w-[58px] rounded-[10px] border px-3 py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                 date === activeDate
-                  ? 'border-[#d9a53f] bg-[rgba(217,165,63,0.18)] text-[#e8e6e1]'
-                  : 'border-[rgba(255,255,255,0.08)] bg-[#14171b] text-[#9b978f]',
+                  ? 'border-[#d9a53f] bg-[rgba(217,165,63,0.1)] text-[#e8e6e1]'
+                  : 'border-[#23272d] bg-transparent text-[#9b978f]',
               ].join(' ')}
             >
               <div className="font-mono text-[10px] font-bold uppercase tracking-wider">{date === today ? 'Today' : format(new Date(`${date}T12:00:00`), 'EEE')}</div>
@@ -933,7 +932,7 @@ export default function FoodPage() {
             <button
               type="button"
               onClick={() => setSelectedDate(today)}
-              className="min-w-[74px] rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+              className={`${BTN_QUIET} min-w-[74px] px-3 py-2 text-xs font-bold`}
             >
               Today
             </button>
@@ -948,36 +947,89 @@ export default function FoodPage() {
 
         {targetProfile && (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              {TARGET_CARDS.map(card => {
-                const consumed = Math.round(Number(totals[card.totalKey] ?? 0));
-                const target = targetProfile[card.key];
-                return (
-                  <TargetCard
-                    key={card.key}
-                    label={card.label}
-                    unit={card.unit}
-                    consumed={consumed}
-                    target={target}
+            <div className="rounded-2xl border border-[#23272d] bg-[#14171b] p-3">
+              <div className="rounded-xl">
+                <div className="flex items-end justify-between gap-3">
+                  <div className="font-mono tabular-nums">
+                    <span className="text-[26px] font-semibold leading-none text-[#e8e6e1]">{Math.round(Number(totals.caloriesKcal ?? 0)).toLocaleString()}</span>
+                    <span className="text-xs font-medium text-[#605d56]"> / {targetProfile.caloriesKcal.toLocaleString()} kcal</span>
+                  </div>
+                  <div className="pb-0.5 font-mono text-[10px] text-[#9b978f]">Calories</div>
+                </div>
+                <div className="mt-2 h-[5px] overflow-hidden rounded-full bg-[#23272d]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#a67c2a] to-[#d9a53f]"
+                    style={{ width: `${progressPercent(Math.round(Number(totals.caloriesKcal ?? 0)), targetProfile.caloriesKcal)}%` }}
                   />
-                );
-              })}
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-1.5">
+                {MACRO_CELLS.map(cell => (
+                  <MacroCell
+                    key={cell.key}
+                    label={cell.label}
+                    unit={cell.unit}
+                    consumed={Math.round(Number(totals[cell.totalKey] ?? 0))}
+                    target={targetProfile[cell.key]}
+                  />
+                ))}
+              </div>
+              <div className="mt-1.5 rounded-xl">
+                <div className="grid grid-cols-3 gap-1.5">
+                  <MacroCell
+                    label="Fiber"
+                    unit="g"
+                    consumed={Math.round(Number(totals.fiberG ?? 0))}
+                    target={targetProfile.fiberG}
+                  />
+                  <div className="rounded-xl bg-[#0e1013] px-2 py-1.5">
+                    <div className="font-mono text-xs font-semibold tabular-nums text-[#e8e6e1]">
+                      {waterDisplay(waterTotal)}<span className="text-[#605d56]">/{waterDisplay(targetProfile.waterMl)}</span>
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10.5px] text-[#9b978f]">
+                      <span>Water</span>
+                      {loadingWater && <span className="ml-1 text-[#605d56]">Loading...</span>}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-[#0e1013] px-2 py-1.5">
+                    <div className="font-mono text-sm font-semibold tabular-nums text-[#e8e6e1]">
+                      {progressPercent(Math.round(Number(totals.caloriesKcal ?? 0)), targetProfile.caloriesKcal)}<span className="text-[10px] font-medium text-[#605d56]">%</span>
+                    </div>
+                    <div className="mt-0.5 truncate font-mono text-[10.5px] tabular-nums text-[#9b978f]">
+                      {remainingLabel(Math.round(Number(totals.caloriesKcal ?? 0)), targetProfile.caloriesKcal, 'kcal')}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!profile?.id) return;
+                      quickAddWater({ userId: profile.id, timezone, selectedDate: activeDate, amountMl: 250 });
+                    }}
+                    className={`${BTN_QUIET} flex-1 px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums`}
+                  >
+                    +250 ml
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!profile?.id) return;
+                      quickAddWater({ userId: profile.id, timezone, selectedDate: activeDate, amountMl: 500 });
+                    }}
+                    className={`${BTN_QUIET} flex-1 px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums`}
+                  >
+                    +500 ml
+                  </button>
+                </div>
+              </div>
             </div>
-            <WaterTracker
-              consumedMl={waterTotal}
-              targetMl={targetProfile.waterMl}
-              loading={loadingWater}
-              onAdd={amountMl => {
-                if (!profile?.id) return;
-                quickAddWater({ userId: profile.id, timezone, selectedDate: activeDate, amountMl });
-              }}
-            />
             {showSuggestButton && (
               <button
                 type="button"
                 onClick={() => void openSuggestions()}
                 disabled={suggestLoading}
-                className="mt-2 w-full rounded-xl border border-[rgba(143,174,116,0.28)] bg-[rgba(143,174,116,0.08)] px-3 py-2.5 text-sm font-bold text-[#a3bf8a] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                className={`${BTN_QUIET} mt-2 w-full px-3 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {suggestLoading ? 'Finding options...' : 'Close today’s gaps'}
               </button>
@@ -1041,7 +1093,9 @@ export default function FoodPage() {
                   onClick={() => setPortionFactor(factor)}
                   className={[
                     'rounded-lg px-2.5 py-1 font-mono text-xs font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
-                    portionFactor === factor ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#23272d] text-[#c4c0b8]',
+                    portionFactor === factor
+                      ? 'bg-[#d9a53f] text-[#14120b]'
+                      : 'border border-[#2e333a] bg-transparent text-[#9b978f] hover:border-[#605d56] hover:text-[#e8e6e1]',
                   ].join(' ')}
                 >
                   ×{factor}
@@ -1049,16 +1103,16 @@ export default function FoodPage() {
               ))}
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <button onClick={handleSaveDraft} className="rounded-xl bg-[#8fae74] px-3 py-2 text-xs font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+              <button onClick={handleSaveDraft} className="rounded-[10px] bg-[#d9a53f] px-3 py-2 text-xs font-bold text-[#14120b] hover:bg-[#e6b654] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                 Save
               </button>
-              <button onClick={handleRetake} className="rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+              <button onClick={handleRetake} className={`${BTN_QUIET} px-3 py-2 text-xs font-bold`}>
                 Retake
               </button>
               <button onClick={() => {
                 setDraft(null);
                 setDraftSource('photo_ai');
-              }} className="rounded-xl bg-transparent px-3 py-2 text-xs font-bold text-[#9b978f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+              }} className={`${BTN_QUIET} px-3 py-2 text-xs font-bold`}>
                 Cancel
               </button>
             </div>
@@ -1079,9 +1133,9 @@ export default function FoodPage() {
         </div>
 
         {entries.length === 0 ? (
-          <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] px-5 py-10 text-center">
-            <div className="text-4xl">🍽️</div>
-            <div className="mt-3 text-sm font-bold text-[#e8e6e1]">No food logged for this day</div>
+          <div className="rounded-2xl border border-[#23272d] bg-[#14171b] px-5 py-10 text-center">
+            <div className="font-mono text-[10px] uppercase tracking-[0.08em] text-[#605d56]">No entries yet</div>
+            <div className="mt-2 text-sm font-semibold text-[#e8e6e1]">No food logged for this day</div>
             <div className="mt-1 text-xs text-[#9b978f]">Capture a meal photo to start this diary.</div>
           </div>
         ) : (
@@ -1110,7 +1164,7 @@ export default function FoodPage() {
               <button
                 type="button"
                 onClick={() => setSuggestOpen(false)}
-                className="rounded-xl bg-[#23272d] px-3 py-1.5 text-xs font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                className={`${BTN_QUIET} px-3 py-1.5 text-xs font-bold`}
               >
                 Close
               </button>
@@ -1169,7 +1223,7 @@ export default function FoodPage() {
               <button
                 type="button"
                 onClick={() => setConfirmDeleteEntry(null)}
-                className="rounded-xl bg-[#23272d] px-4 py-3 text-sm font-bold text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                className={`${BTN_QUIET} px-4 py-3 text-sm font-bold`}
               >
                 Cancel
               </button>
@@ -1214,7 +1268,7 @@ function NumberField({
   return (
     <label className="block">
       <span className="mb-1 block text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{label}</span>
-      <div className="flex items-center rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] px-3 py-2 focus-within:outline focus-within:outline-2 focus-within:outline-[#d9a53f] focus-within:outline-offset-2">
+      <div className="flex items-center rounded-xl border border-[#23272d] bg-[#0e1013] px-3 py-2 focus-within:outline focus-within:outline-2 focus-within:outline-[#d9a53f] focus-within:outline-offset-2">
         <input
           type="number"
           inputMode="decimal"
@@ -1249,7 +1303,7 @@ function SelectField({
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] px-3 py-2 text-sm font-bold text-[#e8e6e1] outline-none focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+        className="w-full rounded-xl border border-[#23272d] bg-[#0e1013] px-3 py-2 text-sm font-bold text-[#e8e6e1] outline-none focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
       >
         {children}
       </select>
@@ -1277,7 +1331,7 @@ function FoodPhotoThumb({ photoPath, title }: { photoPath: string; title: string
   return <img src={url} alt={`Photo of ${title}`} className="h-11 w-11 flex-shrink-0 rounded-[10px] object-cover" />;
 }
 
-function TargetCard({
+function MacroCell({
   label,
   unit,
   consumed,
@@ -1289,57 +1343,12 @@ function TargetCard({
   target: number;
 }) {
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-2.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{label}</div>
-        <div className="font-mono text-[10px] font-semibold tabular-nums text-[#9b978f]">{progressPercent(consumed, target)}%</div>
+    <div className="rounded-xl bg-[#0e1013] px-2 py-1.5">
+      <div className="font-mono text-sm font-semibold tabular-nums text-[#e8e6e1]">
+        {consumed.toLocaleString()}<span className="text-[#605d56]">/{target.toLocaleString()}</span>
+        <span className="ml-0.5 text-[10px] font-medium text-[#605d56]">{unit}</span>
       </div>
-      <div className="mt-0.5 font-mono text-[13px] font-extrabold tabular-nums text-[#e8e6e1]">
-        {consumed.toLocaleString()} / {target.toLocaleString()} {unit}
-      </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0e1013]">
-        <div className="h-full rounded-full bg-[#d9a53f]" style={{ width: `${progressPercent(consumed, target)}%` }} />
-      </div>
-      <div className="mt-1 font-mono text-[10px] font-semibold tabular-nums text-[#9b978f]">{remainingLabel(consumed, target, unit)}</div>
-    </div>
-  );
-}
-
-function WaterTracker({
-  consumedMl,
-  targetMl,
-  loading,
-  onAdd,
-}: {
-  consumedMl: number;
-  targetMl: number;
-  loading: boolean;
-  onAdd: (amountMl: number) => void;
-}) {
-  return (
-    <div className="mt-2 rounded-xl border border-[rgba(127,166,191,0.24)] bg-[rgba(127,166,191,0.08)] p-2.5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-[13px] font-bold text-[#e8e6e1]">Water</div>
-            {loading && <div className="text-[10px] font-semibold text-[#9b978f]">Loading...</div>}
-          </div>
-          <div className="mt-0.5 font-mono text-[11px] font-semibold tabular-nums text-[#c4c0b8]">
-            {waterDisplay(consumedMl)} / {waterDisplay(targetMl)} - {remainingLabel(consumedMl, targetMl, 'ml')}
-          </div>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0e1013]">
-            <div className="h-full rounded-full bg-[#7fa6bf]" style={{ width: `${progressPercent(consumedMl, targetMl)}%` }} />
-          </div>
-        </div>
-        <div className="flex flex-shrink-0 gap-2">
-          <button type="button" onClick={() => onAdd(250)} className="rounded-xl bg-[#7fa6bf] px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
-            +250 ml
-          </button>
-          <button type="button" onClick={() => onAdd(500)} className="rounded-xl bg-[#5a8199] px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
-            +500 ml
-          </button>
-        </div>
-      </div>
+      <div className="mt-0.5 font-mono text-[10.5px] text-[#9b978f]">{label}</div>
     </div>
   );
 }
@@ -1351,34 +1360,43 @@ function EatingWindowCard({
   window: ReturnType<typeof computeEatingWindow>;
   streak: number;
 }) {
+  const startPct = ((window.firstMealHour ?? 0) / 24) * 100;
+  const endPct = ((window.lastMealHour ?? 0) / 24) * 100;
   return (
-    <div className="mt-2 rounded-xl border border-[rgba(162,146,201,0.24)] bg-[rgba(162,146,201,0.08)] p-2.5">
+    <div className="mt-2 rounded-xl border border-[#23272d] bg-[#14171b] p-2.5">
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-[13px] font-bold text-[#e8e6e1]">Eating window</div>
-            {window.lateFlag && (
-              <span className="rounded-full bg-[rgba(207,129,72,0.16)] px-2 py-0.5 text-[10px] font-bold text-[#cf8148]">
-                late
-              </span>
-            )}
-          </div>
-          <div className="mt-0.5 font-mono text-[11px] font-semibold tabular-nums text-[#c4c0b8]">
-            {window.firstMeal} → {window.lastMeal}
-            {window.windowHours !== null && window.windowHours > 0 && (
-              <> · {formatWindowDuration(window.windowHours)}</>
-            )}
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] font-semibold tabular-nums text-[#9b978f]">
-            ≤{STREAK_MAX_WINDOW_HOURS}h streak: {streak} day{streak === 1 ? '' : 's'}
-          </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="font-mono text-[10px] text-[#9b978f]">Eating window</div>
+          {window.lateFlag && (
+            <span className="rounded-full bg-[rgba(207,129,72,0.16)] px-2 py-0.5 font-mono text-[10px] font-bold text-[#cf8148]">
+              late
+            </span>
+          )}
         </div>
         <Link
           href="/app/insights"
-          className="flex-shrink-0 text-[11px] font-bold text-[#a292c9] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+          className="flex-shrink-0 font-mono text-[10px] font-semibold text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
         >
           7-day averages →
         </Link>
+      </div>
+      <div className="mt-2 flex items-center gap-2 font-mono text-[11px] font-semibold tabular-nums text-[#c4c0b8]">
+        <span>{window.firstMeal}</span>
+        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[#23272d]">
+          <div
+            className="absolute inset-y-0 rounded-full bg-[rgba(217,165,63,0.35)]"
+            style={{ left: `${startPct}%`, width: `${Math.max(endPct - startPct, 2)}%` }}
+          />
+        </div>
+        <span>{window.lastMeal}</span>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] tabular-nums text-[#605d56]">
+        <span>
+          {window.windowHours !== null && window.windowHours > 0 && <>{formatWindowDuration(window.windowHours)}</>}
+        </span>
+        <span>
+          ≤{STREAK_MAX_WINDOW_HOURS}h streak: {streak} day{streak === 1 ? '' : 's'}
+        </span>
       </div>
     </div>
   );
@@ -1468,7 +1486,7 @@ function FoodEntryCard({
 
       <div
         className={[
-          'rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-3 transition-all duration-200',
+          'rounded-2xl border border-[#23272d] bg-[#14171b] p-3 transition-all duration-200',
           swiped ? '-translate-x-[92px]' : '',
         ].join(' ')}
       >
@@ -1494,28 +1512,20 @@ function FoodEntryCard({
           }}
           className="outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
         >
-          <div className="flex items-start justify-between gap-3">
-            {entry.photoPath && <FoodPhotoThumb photoPath={entry.photoPath} title={entry.title} />}
+          <div className="flex items-start gap-3">
+            <div className="w-[56px] flex-shrink-0 pt-0.5 font-mono text-[11px] font-semibold tabular-nums text-[#d9a53f]">
+              {formatEntryTime(entry.consumedAt, timezone)}
+            </div>
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-xs font-semibold tabular-nums text-[#9b978f]">
-                {formatEntryTime(entry.consumedAt, timezone)} · Photo · {confidenceLabel(entry.estimationConfidence)}
+              <h3 className="truncate text-[13.5px] font-semibold text-[#e8e6e1]">{entry.title}</h3>
+              <div className="mt-0.5 font-mono text-[11px] tabular-nums text-[#605d56]">
+                {formatAmount(entry.nutrients.caloriesKcal)} kcal · P{formatAmount(nutrientValue(entry.nutrients, 'proteinG'))} F{formatAmount(nutrientValue(entry.nutrients, 'totalFatG'))} C{formatAmount(nutrientValue(entry.nutrients, 'carbsG'))}
               </div>
-              <h3 className="mt-1 truncate text-base font-extrabold text-[#e8e6e1]">{entry.title}</h3>
-            </div>
-            <div className="flex flex-shrink-0 items-center gap-2">
-              <div className="rounded-full bg-[#0e1013] px-2.5 py-1 font-mono text-xs font-bold tabular-nums text-[#e8e6e1]">
-                {formatAmount(entry.nutrients.caloriesKcal)} kcal
+              <div className="mt-0.5 font-mono text-[10px] tabular-nums text-[#605d56]">
+                Photo · {confidenceLabel(entry.estimationConfidence)}
               </div>
             </div>
-          </div>
-
-          <div className="mt-2.5 grid grid-cols-4 gap-1.5">
-            {ENTRY_NUTRIENTS.filter(item => item.key !== 'caloriesKcal').map(item => (
-              <div key={item.key} className="rounded-xl bg-[#0e1013] p-1.5">
-                <div className="font-mono text-[13px] font-bold tabular-nums text-[#e8e6e1]">{formatAmount(nutrientValue(entry.nutrients, item.key), item.unit)}</div>
-                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-[#9b978f]">{item.label}</div>
-              </div>
-            ))}
+            {entry.photoPath && <FoodPhotoThumb photoPath={entry.photoPath} title={entry.title} />}
           </div>
 
           {expanded && (
@@ -1556,7 +1566,7 @@ function FoodEntryCard({
             <button
               type="button"
               onClick={onDuplicate}
-              className="flex-1 rounded-lg bg-[#23272d] px-2.5 py-1 text-xs font-bold text-[#c4c0b8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+              className={`${BTN_QUIET} flex-1 px-2.5 py-1 text-xs font-bold`}
             >
               ↺ Ate this again
             </button>
