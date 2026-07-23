@@ -140,7 +140,7 @@ export default function SchedulePage() {
     return blocks;
   }, [actionableDoses]);
 
-  const { taken, total, pct } = useMemo(
+  const { taken, total } = useMemo(
     () => {
       if (!isHistoryDate) return selectAppSummaryMetrics(selectedDate);
       const historyTotal = actionableDoses.length;
@@ -231,7 +231,7 @@ export default function SchedulePage() {
             : option === 'tomorrow'
             ? `to ${format(until, 'EEE, MMM d')} (${fmtTime(format(until, 'HH:mm'))})`
             : `to ${format(until, 'EEE, MMM d')} (${fmtTime(format(until, 'HH:mm'))})`;
-    show(`⏰ Snoozed to ${label}`, 'warning');
+    show(`Snoozed to ${label}`, 'warning');
   }
 
   return (
@@ -243,28 +243,38 @@ export default function SchedulePage() {
         </div>
         <div className="flex justify-between items-center mt-1 mb-3">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{greeting()} ☀️</div>
-            <div className="text-xl font-extrabold text-[#e8e6e1]">{profile?.name}</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{greeting()}</div>
+            <div className="text-2xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">{profile?.name}</div>
           </div>
           <Link
             href="/app/settings"
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-[#d9a53f] to-[#a292c9] flex items-center justify-center text-sm font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            className="w-9 h-9 rounded-full bg-gradient-to-br from-[#d9a53f] to-[#a292c9] flex items-center justify-center text-sm font-bold text-[#14120b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           >
             {profile?.name?.charAt(0).toUpperCase()}
           </Link>
         </div>
 
-        {/* Progress */}
-        <div className="mb-4 rounded-xl border border-[#23272d] bg-[#14171b] px-3.5 py-3">
-          <div className="flex justify-between items-baseline mb-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Today&apos;s progress</span>
-            <span className="text-[#8fae74] font-semibold font-mono tabular-nums text-xs">{taken} of {total} taken</span>
+        {/* Status strip — 3 stats with hairline dividers */}
+        <div className="mb-4 rounded-xl border border-[#23272d] bg-[#14171b] px-4 py-3 flex items-center gap-4">
+          <div className="flex-1">
+            <div className="font-mono tabular-nums text-[22px] font-semibold leading-none text-[#e8e6e1]">
+              {taken}<span className="text-[#605d56]">/{total}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-[#9b978f]">doses taken</div>
           </div>
-          <div className="h-1.5 bg-[#191d22] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#d9a53f] to-[#8fae74] transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
+          <div className="w-px h-[34px] bg-[#23272d]" />
+          <div className="flex-1">
+            <div className="font-mono tabular-nums text-[22px] font-semibold leading-none text-[#e8e6e1]">
+              {nextDose ? nextDose.scheduledTime : '—'}
+            </div>
+            <div className="mt-1 text-[11px] text-[#9b978f]">next dose</div>
+          </div>
+          <div className="w-px h-[34px] bg-[#23272d]" />
+          <div className="flex-1">
+            <div className="font-mono tabular-nums text-[22px] font-semibold leading-none text-[#d9a53f]">
+              {total - taken}
+            </div>
+            <div className="mt-1 text-[11px] text-[#9b978f]">remaining</div>
           </div>
         </div>
 
@@ -295,24 +305,9 @@ export default function SchedulePage() {
           <MorningBriefingCard todayStr={todayStr} doseCount={total} />
         )}
 
-        {/* Next dose banner */}
-        {nextDose && (
-          <div className="bg-[#14171b] border border-[#2e333a] rounded-2xl p-4 mb-5 flex items-center gap-3">
-            <span className="text-2xl">⏰</span>
-            <div className="flex-1">
-              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Next dose</div>
-              <div className="text-xs text-[#9b978f] mt-0.5">
-                {nextDose.protocolItem.name} {nextDose.protocolItem.doseAmount ?? ''}{nextDose.protocolItem.doseUnit ?? ''}
-              </div>
-            </div>
-            <div className="text-sm font-bold font-mono tabular-nums text-[#d9a53f]">{fmtTime(nextDose.scheduledTime)}</div>
-          </div>
-        )}
-
         {/* Empty state */}
         {total === 0 && (
           <div className="text-center py-16 fade-in">
-            <div className="text-5xl mb-4">💊</div>
             <div className="text-base font-bold text-[#e8e6e1] mb-2">No doses scheduled</div>
             <div className="text-sm text-[#9b978f] mb-6">Activate a protocol or add a medication to get started.</div>
             <div className="flex gap-3 justify-center">
@@ -366,6 +361,7 @@ export default function SchedulePage() {
                         />
                         <MedCard
                           dose={dose}
+                          isNext={isNextDose}
                           actionsDisabled={actionsDisabled}
                           takenAt={takenAtMap.get(dose.id)}
                           smartAdjustedTime={smartHintFor(dose)}
@@ -411,7 +407,7 @@ export default function SchedulePage() {
         onClick={() => setSheetOpen(true)}
         className="absolute bottom-24 right-5 w-12 h-12 bg-[#d9a53f] hover:bg-[#a67c2a] rounded-[16px] shadow-[0_4px_20px_rgba(217,165,63,0.5)] flex items-center justify-center text-2xl text-[#14120b] transition-all duration-200 z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
       >
-        ＋
+        +
       </button>
 
       <AddDoseSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
@@ -421,10 +417,10 @@ export default function SchedulePage() {
             <div className="text-sm font-bold text-[#e8e6e1] mb-1">Remove dose</div>
             <div className="text-xs text-[#9b978f] mb-3">{deleteTargetDose.protocolItem.name}</div>
             <div className="flex flex-col gap-2">
-              <button type="button" aria-label="Delete today only" onClick={() => applyDelete('today')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Delete today only</button>
-              <button type="button" aria-label="Delete from all following days" onClick={() => applyDelete('forward')} className="bg-[#191d22] border border-red-900/50 rounded-xl py-3 text-sm text-red-400 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Delete from all following days</button>
+              <button type="button" aria-label="Delete today only" onClick={() => applyDelete('today')} className="bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm text-[#9b978f] font-semibold hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Delete today only</button>
+              <button type="button" aria-label="Delete from all following days" onClick={() => applyDelete('forward')} className="bg-transparent border border-red-900/50 rounded-xl py-3 text-sm text-red-400 font-semibold hover:border-red-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Delete from all following days</button>
             </div>
-            <button type="button" aria-label="Cancel delete" onClick={() => setDeleteTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#9b978f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Cancel</button>
+            <button type="button" aria-label="Cancel delete" onClick={() => setDeleteTargetDose(null)} className="w-full mt-2 bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm font-semibold text-[#9b978f] hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Cancel</button>
           </div>
         </div>
       )}
@@ -436,12 +432,12 @@ export default function SchedulePage() {
               {snoozeTargetDose.protocolItem.name}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" aria-label="Snooze by one hour" onClick={() => applySnooze('1h')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">1 hour</button>
-              <button type="button" aria-label="Snooze until this evening" onClick={() => applySnooze('evening')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">This evening</button>
-              <button type="button" aria-label="Snooze until tomorrow" onClick={() => applySnooze('tomorrow')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Tomorrow</button>
-              <button type="button" aria-label="Snooze until next week" onClick={() => applySnooze('next_week')} className="bg-[#191d22] border border-[#23272d] rounded-xl py-3 text-sm text-[#e8e6e1] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Next week</button>
+              <button type="button" aria-label="Snooze by one hour" onClick={() => applySnooze('1h')} className="bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm text-[#9b978f] font-semibold hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">1 hour</button>
+              <button type="button" aria-label="Snooze until this evening" onClick={() => applySnooze('evening')} className="bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm text-[#9b978f] font-semibold hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">This evening</button>
+              <button type="button" aria-label="Snooze until tomorrow" onClick={() => applySnooze('tomorrow')} className="bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm text-[#9b978f] font-semibold hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Tomorrow</button>
+              <button type="button" aria-label="Snooze until next week" onClick={() => applySnooze('next_week')} className="bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm text-[#9b978f] font-semibold hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Next week</button>
             </div>
-            <button type="button" aria-label="Cancel snooze selection" onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 rounded-xl py-3 text-sm font-semibold text-[#9b978f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Cancel</button>
+            <button type="button" aria-label="Cancel snooze selection" onClick={() => setSnoozeTargetDose(null)} className="w-full mt-2 bg-transparent border border-[#2e333a] rounded-xl py-3 text-sm font-semibold text-[#9b978f] hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Cancel</button>
           </div>
         </div>
       )}
