@@ -3,15 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ScheduledDose } from '@/types';
 
-const COLOR_MAP: Record<string, { bg: string; text: string }> = {
-  red:    { bg: 'rgba(201,106,90,0.15)',   text: '#c96a5a' },
-  blue:   { bg: 'rgba(217,165,63,0.15)',  text: '#d9a53f' },
-  green:  { bg: 'rgba(143,174,116,0.15)',  text: '#8fae74' },
-  yellow: { bg: 'rgba(207,129,72,0.15)',  text: '#cf8148' },
-  purple: { bg: 'rgba(162,146,201,0.15)',  text: '#a292c9' },
-  pink:   { bg: 'rgba(201,124,152,0.15)',  text: '#c97c98' },
-};
-
 const STATUS_COLOR: Record<string, string> = {
   taken:     '#8fae74',
   upcoming:  '#d9a53f',
@@ -22,11 +13,11 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  taken:    '✓ Taken',
+  taken:    'Taken',
   upcoming: 'Upcoming',
-  overdue:  '⚠ Overdue',
-  skipped:  '— Skipped',
-  snoozed:  '⏰ Snoozed',
+  overdue:  'Overdue',
+  skipped:  'Skipped',
+  snoozed:  'Snoozed',
   pending:  'Scheduled',
 };
 
@@ -39,6 +30,7 @@ interface Props {
   actionsDisabled?: boolean;
   takenAt?: string; // ISO timestamp of actual intake
   smartAdjustedTime?: string | null; // W4-A: today's push was shifted to this HH:MM
+  isNext?: boolean; // presentational only: emphasized panel for the next upcoming dose
 }
 
 function fmt(t: string) {
@@ -56,10 +48,10 @@ function deriveDisplayStatus(dose: ScheduledDose): string {
   return isPast ? 'overdue' : 'pending';
 }
 
-export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt, smartAdjustedTime }: Props) {
+export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt, smartAdjustedTime, isNext = false }: Props) {
   const item = dose.protocolItem;
-  const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const displayStatus = deriveDisplayStatus(dose);
+  const settled = displayStatus === 'taken' || displayStatus === 'skipped';
   const statusColor = STATUS_COLOR[displayStatus] ?? '#9b978f';
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const gesture = useRef<{
@@ -135,7 +127,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
   if (item.route === 'subcutaneous') tags.push('Subcut.');
   if (item.route === 'intramuscular') tags.push('IM');
   if (item.itemType === 'analysis') tags.push('Lab test');
-  if (smartAdjustedTime) tags.push(`⏱ ${fmt(smartAdjustedTime)} · adjusted`);
+  if (smartAdjustedTime) tags.push(`${fmt(smartAdjustedTime)} · adjusted`);
 
   const cardTranslate =
     swipeDir === 'left'  ? '-translate-x-[90px]' :
@@ -143,7 +135,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
 
   return (
     <div
-      className="relative overflow-hidden rounded-[18px] mb-2.5"
+      className={`relative overflow-hidden rounded-[14px] ${settled ? 'mb-1' : 'mb-2.5'}`}
       data-dose-id={dose.id}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -166,11 +158,12 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#cf8148] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-l-[18px]',
+            'px-5 bg-[#cf8148] text-[#14120b] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-l-[14px]',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
-          ⏰<br />Snooze
+          Snooze
         </button>
         <button
           type="button"
@@ -181,53 +174,54 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1',
+            'px-5 bg-[#c96a5a] text-white font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
-          ✕<br />Skip
+          Skip
         </button>
       </div>
 
-      {/* Card */}
+      {/* Card: settled doses render as quiet text rows, active ones as hairline panels (Night Shift) */}
       <div
         className={[
-          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
+          settled
+            ? 'rounded-[14px] px-3 py-2'
+            : isNext
+            ? 'bg-[#14171b] border border-[#2e333a] rounded-[14px] px-4 py-3.5'
+            : 'bg-[#14171b] border border-[#23272d] rounded-[14px] px-4 py-3',
           'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
           cardTranslate,
-          actionsDisabled ? 'opacity-70' : displayStatus === 'taken' ? 'opacity-60' : '',
+          actionsDisabled ? 'opacity-70' : '',
         ].join(' ')}
       >
-        {/* Status stripe */}
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-sm" style={{ background: statusColor }} />
-
-        {/* Icon */}
-        <div
-          className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px] flex-shrink-0"
-          style={{ background: color.bg }}
-        >
-          {item.icon ?? '💊'}
-        </div>
-
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-[#e8e6e1] truncate">
-            {item.name} {item.doseAmount ? `${item.doseAmount}${item.doseUnit}` : ''}
+          <div className={['truncate', settled ? 'text-sm font-medium text-[#9b978f]' : isNext ? 'text-[15px] font-semibold text-[#e8e6e1]' : 'text-sm font-medium text-[#e8e6e1]'].join(' ')}>
+            {item.name}{' '}
+            {item.doseAmount ? (
+              <span className="font-mono tabular-nums text-xs text-[#9b978f]">{item.doseAmount}{item.doseUnit}</span>
+            ) : null}
           </div>
-          <div className="text-xs mt-0.5" style={{ color: statusColor }}>
+          <div
+            className="font-mono tabular-nums text-[10.5px] mt-0.5"
+            style={{ color: settled ? '#605d56' : statusColor }}
+          >
             {displayStatus === 'taken' && takenAt
               ? (() => {
                   const d = new Date(takenAt);
                   const hh = String(d.getHours()).padStart(2, '0');
                   const mm = String(d.getMinutes()).padStart(2, '0');
-                  return `✓ Taken at ${fmt(`${hh}:${mm}`)}`;
+                  return `taken ${fmt(`${hh}:${mm}`)}`;
                 })()
-              : `${STATUS_LABEL[displayStatus] ?? STATUS_LABEL[dose.status]} · ${fmt(dose.scheduledTime)}`}
+              : `${(STATUS_LABEL[displayStatus] ?? STATUS_LABEL[dose.status]).toLowerCase()} · ${fmt(dose.scheduledTime)}`}
+            {settled && tags.length > 0 ? ` · ${tags.join(' · ').toLowerCase()}` : ''}
           </div>
-          {tags.length > 0 && (
+          {!settled && tags.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {tags.map(tag => (
-                <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#9b978f]">
+                <span key={tag} className="font-mono text-[9.5px] uppercase tracking-wide px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#9b978f]">
                   {tag}
                 </span>
               ))}
@@ -245,13 +239,19 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           }}
           aria-disabled={actionsDisabled}
           className={[
-            'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
+            'rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+            settled ? 'w-7 h-7 border text-xs' : 'w-9 h-9 border-[1.5px] text-base',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
             displayStatus === 'taken'
-              ? 'bg-[#8fae74] border-[#8fae74] text-white cursor-default'
+              ? 'bg-transparent border-[#8fae74] text-[#8fae74] cursor-default'
+              : displayStatus === 'skipped'
+              ? 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]'
               : displayStatus === 'overdue'
               ? 'border-[#c96a5a] text-[#c96a5a] hover:bg-[#c96a5a] hover:text-white'
-              : 'border-[rgba(255,255,255,0.15)] text-[#9b978f] hover:border-[#8fae74] hover:text-[#8fae74]',
+              : isNext
+              ? 'border-[#d9a53f] text-[#d9a53f] hover:bg-[#d9a53f] hover:text-[#14120b]'
+              : 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]',
           ].join(' ')}
         >
           {displayStatus === 'taken' ? '✓' : ''}
@@ -272,9 +272,9 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             onDelete();
             setSwipeDir(null);
           }}
-          className="px-5 bg-[#4a2620] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
+          className="px-5 bg-[#4a2620] text-[#e2a89d] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-r-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
-          🗑<br />Delete
+          Delete
         </button>
       </div>
     </div>
