@@ -14,9 +14,9 @@ const ERROR_DISPLAY_DELAY_MS = 4000;
 const IDLE_HIDE_DELAY_MS = 3000;
 
 function tone(status: SyncStatus) {
-  if (status.lastError) return 'border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.12)] text-[#FCA5A5]';
-  if (status.pending > 0 || status.running) return 'border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.12)] text-[#FCD34D]';
-  return 'border-[rgba(16,185,129,0.35)] bg-[rgba(16,185,129,0.12)] text-[#6EE7B7]';
+  if (status.lastError) return 'border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.12)] text-[#e2a89d]';
+  if (status.pending > 0 || status.running) return 'border-[rgba(207,129,72,0.35)] bg-[rgba(207,129,72,0.12)] text-[#FCD34D]';
+  return 'border-[rgba(143,174,116,0.35)] bg-[rgba(143,174,116,0.12)] text-[#6EE7B7]';
 }
 
 function label(status: SyncStatus) {

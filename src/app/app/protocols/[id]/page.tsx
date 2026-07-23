@@ -26,8 +26,8 @@ const CATEGORY_OPTIONS: { value: ProtocolCategory; label: string }[] = [
 
 const COLORS = ['blue', 'green', 'purple', 'yellow', 'red', 'pink'];
 const COLOR_VALS: Record<string, string> = {
-  blue: '#3B82F6', green: '#10B981', purple: '#8B5CF6',
-  yellow: '#FBBF24', red: '#EF4444', pink: '#EC4899',
+  blue: '#d9a53f', green: '#8fae74', purple: '#a292c9',
+  yellow: '#cf8148', red: '#c96a5a', pink: '#c97c98',
 };
 
 type ItemDraft = {
@@ -139,7 +139,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
         <div className="text-4xl">🤷</div>
-        <div className="text-sm text-[#8B949E]">Protocol not found</div>
+        <div className="text-sm text-[#9b978f]">Protocol not found</div>
         <Button onClick={() => router.back()}>Go back</Button>
       </div>
     );
@@ -241,9 +241,9 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
     return status === 'abandoned' ? 'Archived' : status;
   }
 
-  const statusColor = !instance ? '#8B949E' :
-    instance.status === 'active' ? '#10B981' :
-    instance.status === 'paused' ? '#FBBF24' : '#8B949E';
+  const statusColor = !instance ? '#9b978f' :
+    instance.status === 'active' ? '#8fae74' :
+    instance.status === 'paused' ? '#cf8148' : '#9b978f';
   const courseFinishedWithoutClosure = Boolean(
     instance
     && instance.status === 'active'
@@ -255,12 +255,12 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.05)]">
-        <button onClick={() => router.back()} className="text-[#8B949E] text-xl mb-3">← Back</button>
+        <button onClick={() => router.back()} className="text-[#9b978f] text-xl mb-3">← Back</button>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-extrabold text-[#F0F6FC]">{protocol.name}</h1>
-            {protocol.description && <p className="text-xs text-[#8B949E] mt-1">{protocol.description}</p>}
-            {detailReadModel.isArchived && <p className="text-[11px] text-[#FBBF24] mt-1 uppercase tracking-wide font-bold">Archived</p>}
+            <h1 className="text-lg font-extrabold text-[#e8e6e1]">{protocol.name}</h1>
+            {protocol.description && <p className="text-xs text-[#9b978f] mt-1">{protocol.description}</p>}
+            {detailReadModel.isArchived && <p className="text-[11px] text-[#cf8148] mt-1 uppercase tracking-wide font-bold">Archived</p>}
           </div>
           {instance && (
             <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-full flex-shrink-0" style={{ background: `${statusColor}20`, color: statusColor }}>
@@ -308,8 +308,8 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         </div>
 
         {courseFinishedWithoutClosure && instance && (
-          <div className="mt-3 bg-[rgba(251,191,36,0.12)] border border-[rgba(251,191,36,0.35)] rounded-xl p-3">
-            <div className="text-xs font-bold text-[#FBBF24] uppercase tracking-wide mb-1">Course finished</div>
+          <div className="mt-3 bg-[rgba(207,129,72,0.12)] border border-[rgba(207,129,72,0.35)] rounded-xl p-3">
+            <div className="text-xs font-bold text-[#cf8148] uppercase tracking-wide mb-1">Course finished</div>
             <div className="text-sm text-[#E6EDF3]">
               This course reached its end date. Mark as completed, or keep it active for history context.
             </div>
@@ -329,16 +329,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <div id="protocol-edit-section" className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5 flex flex-col gap-3">
-          <div className="text-xs font-bold text-[#3B82F6] uppercase tracking-wide">Edit protocol</div>
+        <div id="protocol-edit-section" className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5 flex flex-col gap-3">
+          <div className="text-xs font-bold text-[#d9a53f] uppercase tracking-wide">Edit protocol</div>
           <Input label="Name" value={metaName} onChange={e => setMetaName(e.target.value)} />
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Description</label>
+            <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Description</label>
             <textarea
               value={metaDescription}
               onChange={e => setMetaDescription(e.target.value)}
               rows={3}
-              className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
+              className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f] resize-none"
             />
           </div>
           <Select
@@ -358,26 +358,26 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             { label: 'Duration', value: protocol.durationDays ? `${protocol.durationDays}d` : '∞' },
             { label: 'Started', value: instance?.startDate ?? '—' },
           ].map(({ label, value }) => (
-            <div key={label} className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-xl p-3 text-center">
-              <div className="text-base font-extrabold text-[#F0F6FC]">{value}</div>
-              <div className="text-[11px] text-[#8B949E] mt-0.5">{label}</div>
+            <div key={label} className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-3 text-center">
+              <div className="text-base font-extrabold text-[#e8e6e1]">{value}</div>
+              <div className="text-[11px] text-[#9b978f] mt-0.5">{label}</div>
             </div>
           ))}
         </div>
 
-        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
-          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Future plan</div>
-          <div className="text-[12px] text-[#8B949E] mb-2">
+        <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
+          <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-3">Future plan</div>
+          <div className="text-[12px] text-[#9b978f] mb-2">
             {detailReadModel.futureBoundaryDate
               ? `Fixed boundary: ${detailReadModel.futureBoundaryDate}`
               : 'Ongoing protocol (no fixed end boundary)'}
           </div>
           {detailReadModel.actionableFutureRows.length === 0 ? (
-            <div className="text-sm text-[#8B949E]">No actionable future rows.</div>
+            <div className="text-sm text-[#9b978f]">No actionable future rows.</div>
           ) : (
             <div className="flex flex-col gap-1.5">
               {detailReadModel.actionableFutureRows.slice(0, 5).map(dose => (
-                <div key={dose.id} className="text-sm text-[#F0F6FC]">
+                <div key={dose.id} className="text-sm text-[#e8e6e1]">
                   {dose.scheduledDate} · {dose.scheduledTime} · {dose.protocolItem.name}
                 </div>
               ))}
@@ -385,14 +385,14 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
 
-        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
-          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Handled history</div>
+        <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-5">
+          <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-3">Handled history</div>
           {detailReadModel.handledHistoryRows.length === 0 ? (
-            <div className="text-sm text-[#8B949E]">No handled history yet.</div>
+            <div className="text-sm text-[#9b978f]">No handled history yet.</div>
           ) : (
             <div className="flex flex-col gap-1.5">
               {detailReadModel.handledHistoryRows.slice(0, 5).map(dose => (
-                <div key={dose.id} className="text-sm text-[#F0F6FC]">
+                <div key={dose.id} className="text-sm text-[#e8e6e1]">
                   {dose.scheduledDate} · {dose.scheduledTime} · {dose.protocolItem.name} · {dose.status}
                 </div>
               ))}
@@ -400,8 +400,8 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
 
-        <div className="bg-[#161B22] border border-[rgba(59,130,246,0.25)] rounded-2xl p-4 flex flex-col gap-3 mb-5">
-          <div className="text-xs font-bold text-[#3B82F6] uppercase tracking-wide">
+        <div className="bg-[#14171b] border border-[rgba(217,165,63,0.25)] rounded-2xl p-4 flex flex-col gap-3 mb-5">
+          <div className="text-xs font-bold text-[#d9a53f] uppercase tracking-wide">
             {editingItem ? 'Edit item' : 'Add item'}
           </div>
 
@@ -516,27 +516,27 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Time</label>
+            <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Time</label>
             <input
               type="time"
               value={itemDraft.time}
               onChange={e => setItemDraft(d => ({ ...d, time: e.target.value }))}
-              className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6]"
+              className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f]"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Instructions</label>
+            <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Instructions</label>
             <textarea
               value={itemDraft.instructions}
               onChange={e => setItemDraft(d => ({ ...d, instructions: e.target.value }))}
               rows={2}
-              className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
+              className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f] resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide mb-2 block">Colour</label>
+            <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide mb-2 block">Colour</label>
             <div className="flex gap-2">
               {COLORS.map(c => (
                 <button
@@ -557,9 +557,9 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">Items</div>
+        <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-3">Items</div>
         {protocol.items.length === 0 && (
-          <div className="text-center py-8 text-sm text-[#8B949E]">No items yet. Use the editor above to add medications.</div>
+          <div className="text-center py-8 text-sm text-[#9b978f]">No items yet. Use the editor above to add medications.</div>
         )}
         {protocol.items.map(item => (
           <ItemRow
@@ -570,35 +570,35 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
             <div className="flex items-start gap-3">
               <span className="text-xl flex-shrink-0">{item.icon ?? '💊'}</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-[#F0F6FC]">
+                <div className="text-sm font-bold text-[#e8e6e1]">
                   {item.name} {item.doseAmount ? `${item.doseAmount}${item.doseUnit}` : ''}
                 </div>
-                <div className="text-xs text-[#8B949E] mt-0.5">
+                <div className="text-xs text-[#9b978f] mt-0.5">
                   {frequencyLabel(item)} · {item.times.join(', ')}
                 </div>
                 <div className="flex gap-1.5 mt-2 flex-wrap">
                   {item.doseForm && (
-                    <span className="text-[10px] bg-[rgba(255,255,255,0.05)] text-[#8B949E] px-2 py-0.5 rounded-full capitalize">{item.doseForm}</span>
+                    <span className="text-[10px] bg-[rgba(255,255,255,0.05)] text-[#9b978f] px-2 py-0.5 rounded-full capitalize">{item.doseForm}</span>
                   )}
                   {item.route && (
-                    <span className="text-[10px] bg-[rgba(255,255,255,0.05)] text-[#8B949E] px-2 py-0.5 rounded-full">{ROUTE_LABELS[item.route] ?? item.route}</span>
+                    <span className="text-[10px] bg-[rgba(255,255,255,0.05)] text-[#9b978f] px-2 py-0.5 rounded-full">{ROUTE_LABELS[item.route] ?? item.route}</span>
                   )}
                   {item.withFood === 'yes' && (
-                    <span className="text-[10px] bg-[rgba(251,191,36,0.1)] text-[#FBBF24] px-2 py-0.5 rounded-full">With food</span>
+                    <span className="text-[10px] bg-[rgba(207,129,72,0.1)] text-[#cf8148] px-2 py-0.5 rounded-full">With food</span>
                   )}
                   {item.withFood === 'no' && (
-                    <span className="text-[10px] bg-[rgba(239,68,68,0.1)] text-[#EF4444] px-2 py-0.5 rounded-full">Empty stomach</span>
+                    <span className="text-[10px] bg-[rgba(201,106,90,0.1)] text-[#c96a5a] px-2 py-0.5 rounded-full">Empty stomach</span>
                   )}
                 </div>
                 {item.instructions && (
-                  <div className="text-xs text-[#8B949E] mt-1.5 italic">{item.instructions}</div>
+                  <div className="text-xs text-[#9b978f] mt-1.5 italic">{item.instructions}</div>
                 )}
               </div>
             </div>
           </ItemRow>
         ))}
 
-        <div className="mt-6 text-[11px] text-[#8B949E] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 leading-relaxed">
+        <div className="mt-6 text-[11px] text-[#9b978f] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 leading-relaxed">
           ⚠️ This protocol is for personal tracking purposes only. MedRemind does not provide medical advice. Always consult your healthcare provider before starting, modifying, or stopping any medication or supplement protocol.
         </div>
       </div>
@@ -643,7 +643,7 @@ function ItemRow({
     >
       <div
         className={[
-          'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 transition-all duration-200',
+          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 transition-all duration-200',
           swiped ? '-translate-x-[132px]' : '',
         ].join(' ')}
       >
@@ -657,13 +657,13 @@ function ItemRow({
       >
         <button
           onClick={() => { onEdit(); setSwiped(false); }}
-          className="px-5 bg-[#3B82F6] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+          className="px-5 bg-[#d9a53f] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1"
         >
           ✏️<br />Edit
         </button>
         <button
           onClick={() => { onDelete(); setSwiped(false); }}
-          className="px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-xl"
+          className="px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-xl"
         >
           ✕<br />Delete
         </button>

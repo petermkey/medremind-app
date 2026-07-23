@@ -145,10 +145,10 @@ export default function ProtocolsPage() {
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-extrabold text-[#F0F6FC]">Protocols</h1>
+          <h1 className="text-xl font-extrabold text-[#e8e6e1]">Protocols</h1>
           <button
             onClick={() => router.push('/app/protocols/new')}
-            className="flex items-center gap-1.5 text-sm font-semibold text-[#3B82F6] border border-[rgba(59,130,246,0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(59,130,246,0.1)] transition-colors"
+            className="flex items-center gap-1.5 text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(217,165,63,0.1)] transition-colors"
           >
             ＋ New
           </button>
@@ -159,7 +159,7 @@ export default function ProtocolsPage() {
           placeholder="Search protocols…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#F0F6FC] placeholder:text-[#8B949E] outline-none focus:border-[#3B82F6] mb-3"
+          className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#e8e6e1] placeholder:text-[#9b978f] outline-none focus:border-[#d9a53f] mb-3"
         />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -169,7 +169,7 @@ export default function ProtocolsPage() {
               onClick={() => setFilter(f.value)}
               className={[
                 'px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors',
-                filter === f.value ? 'bg-[#3B82F6] text-white' : 'bg-[#1C2333] text-[#8B949E] hover:text-[#F0F6FC]',
+                filter === f.value ? 'bg-[#d9a53f] text-white' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
               ].join(' ')}
             >
               {f.label}
@@ -182,8 +182,8 @@ export default function ProtocolsPage() {
         {filtered.length === 0 && (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📁</div>
-            <div className="text-sm font-bold text-[#F0F6FC] mb-1">No protocols found</div>
-            <div className="text-xs text-[#8B949E]">Try a different filter or create a custom protocol.</div>
+            <div className="text-sm font-bold text-[#e8e6e1] mb-1">No protocols found</div>
+            <div className="text-xs text-[#9b978f]">Try a different filter or create a custom protocol.</div>
           </div>
         )}
 
@@ -192,10 +192,10 @@ export default function ProtocolsPage() {
           const statusColor = !instance
             ? 'transparent'
             : instance.status === 'active'
-            ? '#10B981'
+            ? '#8fae74'
             : instance.status === 'paused'
-            ? '#FBBF24'
-            : '#8B949E';
+            ? '#cf8148'
+            : '#9b978f';
 
           return (
             <ProtocolRow
@@ -205,14 +205,14 @@ export default function ProtocolsPage() {
               onDelete={() => handleDelete(p)}
             >
               <div className="flex items-start gap-3" data-protocol-name={p.name}>
-                <div className="w-10 h-10 rounded-xl bg-[rgba(59,130,246,0.12)] flex items-center justify-center text-xl flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[rgba(217,165,63,0.12)] flex items-center justify-center text-xl flex-shrink-0">
                   {CATEGORY_ICONS[p.category] ?? '💊'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="block text-sm font-bold text-[#F0F6FC] truncate">{p.name}</span>
+                  <span className="block text-sm font-bold text-[#e8e6e1] truncate">{p.name}</span>
                   <div className="mt-1 flex items-center gap-2">
                     {p.isArchived ? (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B949E] flex-shrink-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#9b978f] flex-shrink-0">
                         archived
                       </span>
                     ) : instance ? (
@@ -224,18 +224,18 @@ export default function ProtocolsPage() {
                       </span>
                     ) : null}
                     {p.isTemplate && !instance && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#8B5CF6] flex-shrink-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#a292c9] flex-shrink-0">
                         template
                       </span>
                     )}
                   </div>
                   {p.description && (
-                    <div className="text-xs text-[#8B949E] mt-0.5 line-clamp-2">{p.description}</div>
+                    <div className="text-xs text-[#9b978f] mt-0.5 line-clamp-2">{p.description}</div>
                   )}
                   <div className="flex items-center gap-3 mt-2">
-                    <span className="text-[11px] text-[#8B949E]">{p.items.length} items</span>
+                    <span className="text-[11px] text-[#9b978f]">{p.items.length} items</span>
                     {instance?.startDate && (
-                      <span className="text-[11px] text-[#8B949E]">Started {instance.startDate}</span>
+                      <span className="text-[11px] text-[#9b978f]">Started {instance.startDate}</span>
                     )}
                   </div>
                 </div>
@@ -257,10 +257,10 @@ export default function ProtocolsPage() {
                   className={[
                     'text-xs font-semibold px-3 py-2 rounded-xl flex-shrink-0 transition-colors',
                     instance?.status === 'active'
-                      ? 'bg-[rgba(251,191,36,0.15)] text-[#FBBF24] hover:bg-[rgba(251,191,36,0.25)]'
+                      ? 'bg-[rgba(207,129,72,0.15)] text-[#cf8148] hover:bg-[rgba(207,129,72,0.25)]'
                       : instance?.status === 'paused'
-                      ? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] hover:bg-[rgba(16,185,129,0.25)]'
-                      : 'bg-[rgba(59,130,246,0.15)] text-[#3B82F6] hover:bg-[rgba(59,130,246,0.25)]',
+                      ? 'bg-[rgba(143,174,116,0.15)] text-[#8fae74] hover:bg-[rgba(143,174,116,0.25)]'
+                      : 'bg-[rgba(217,165,63,0.15)] text-[#d9a53f] hover:bg-[rgba(217,165,63,0.25)]',
                   ].join(' ')}
                 >
                   {instance?.status === 'active' ? 'Pause' : instance?.status === 'paused' ? 'Resume' : 'Activate'}
@@ -324,7 +324,7 @@ function ProtocolRow({
         tabIndex={0}
         onKeyDown={handleCardKeyDown}
         className={[
-          'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200',
+          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200',
           swiped ? '-translate-x-[132px]' : '',
         ].join(' ')}
         onClick={() => {
@@ -348,7 +348,7 @@ function ProtocolRow({
             onEdit();
             setSwiped(false);
           }}
-          className="px-5 bg-[#3B82F6] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1"
+          className="px-5 bg-[#d9a53f] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1"
         >
           ✏️<br />Edit
         </button>
@@ -360,7 +360,7 @@ function ProtocolRow({
             onDelete();
             setSwiped(false);
           }}
-          className="px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl"
+          className="px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl"
         >
           ✕<br />Delete
         </button>

@@ -114,14 +114,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0D1117] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#0e1013] flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 justify-center mb-10">
-          <div className="w-10 h-10 rounded-xl bg-[#3B82F6] flex items-center justify-center text-xl">💊</div>
-          <span className="text-xl font-bold text-[#F0F6FC]">MedRemind</span>
+          <div className="w-10 h-10 rounded-xl bg-[#d9a53f] flex items-center justify-center text-xl">💊</div>
+          <span className="text-xl font-bold text-[#e8e6e1]">MedRemind</span>
         </div>
-        <h1 className="text-2xl font-extrabold text-[#F0F6FC] mb-2">Create your account</h1>
-        <p className="text-sm text-[#8B949E] mb-8">Free to use. No subscription required.</p>
+        <h1 className="text-2xl font-extrabold text-[#e8e6e1] mb-2">Create your account</h1>
+        <p className="text-sm text-[#9b978f] mb-8">Free to use. No subscription required.</p>
 
         {/* OAuth providers */}
         <div className="flex flex-col gap-3 mb-6">
@@ -129,7 +129,7 @@ export default function RegisterPage() {
             type="button"
             onClick={() => handleOAuth('google')}
             disabled={oauthLoading !== null}
-            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-[#30363D] bg-[#161B22] text-[#C9D1D9] text-sm font-medium hover:bg-[#1C2128] disabled:opacity-60 transition-colors"
+            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-[#23272d] bg-[#14171b] text-[#c4c0b8] text-sm font-medium hover:bg-[#16191e] disabled:opacity-60 transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -140,13 +140,13 @@ export default function RegisterPage() {
             {oauthLoading === 'google' ? 'Redirecting…' : 'Continue with Google'}
           </button>
 
-          {oauthError && <p className="text-sm text-[#EF4444] bg-[rgba(239,68,68,0.1)] px-4 py-3 rounded-xl">{oauthError}</p>}
+          {oauthError && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] px-4 py-3 rounded-xl">{oauthError}</p>}
         </div>
 
         <div className="flex items-center gap-3 mb-2">
-          <div className="flex-1 h-px bg-[#30363D]" />
-          <span className="text-xs text-[#8B949E]">or sign up with email</span>
-          <div className="flex-1 h-px bg-[#30363D]" />
+          <div className="flex-1 h-px bg-[#23272d]" />
+          <span className="text-xs text-[#9b978f]">or sign up with email</span>
+          <div className="flex-1 h-px bg-[#23272d]" />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -155,21 +155,21 @@ export default function RegisterPage() {
           <Input label="Password" type="password" placeholder="Min 8 chars, 1 number" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
           <Input label="Confirm password" type="password" placeholder="Repeat password" value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" />
           <label className="flex items-start gap-3 cursor-pointer mt-1">
-            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#3B82F6]" />
-            <span className="text-xs text-[#8B949E] leading-relaxed">
-              I agree to the <a href="#" className="text-[#3B82F6]">Terms of Service</a> and <a href="#" className="text-[#3B82F6]">Privacy Policy</a>. This app does not provide medical advice.
+            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#d9a53f]" />
+            <span className="text-xs text-[#9b978f] leading-relaxed">
+              I agree to the <a href="#" className="text-[#d9a53f]">Terms of Service</a> and <a href="#" className="text-[#d9a53f]">Privacy Policy</a>. This app does not provide medical advice.
             </span>
           </label>
-          {error && <p className="text-sm text-[#EF4444] bg-[rgba(239,68,68,0.1)] px-4 py-3 rounded-xl">{error}</p>}
+          {error && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] px-4 py-3 rounded-xl">{error}</p>}
           {info && (
-            <div className="text-sm bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] text-[#C9D1D9] px-4 py-3 rounded-xl">
+            <div className="text-sm bg-[rgba(217,165,63,0.1)] border border-[rgba(217,165,63,0.3)] text-[#c4c0b8] px-4 py-3 rounded-xl">
               <p>{info}</p>
               {confirmationPending && (
                 <button
                   type="button"
                   onClick={handleResendConfirmation}
                   disabled={resendLoading || resendCooldownLeft > 0}
-                  className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline disabled:opacity-60"
+                  className="mt-2 text-xs font-semibold text-[#d9a53f] hover:underline disabled:opacity-60"
                 >
                   {resendLoading
                     ? 'Sending…'
@@ -179,18 +179,18 @@ export default function RegisterPage() {
                 </button>
               )}
               {resendMessage && (
-                <p className={`text-xs mt-2 ${resendError ? 'text-[#EF4444]' : 'text-[#8B949E]'}`}>{resendMessage}</p>
+                <p className={`text-xs mt-2 ${resendError ? 'text-[#c96a5a]' : 'text-[#9b978f]'}`}>{resendMessage}</p>
               )}
-              <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#3B82F6] hover:underline">
+              <button type="button" onClick={() => router.push('/login')} className="mt-2 text-xs font-semibold text-[#d9a53f] hover:underline">
                 Go to sign in
               </button>
             </div>
           )}
           <Button type="submit" size="lg" fullWidth loading={loading} className="mt-2">Create account</Button>
         </form>
-        <p className="text-center text-sm text-[#8B949E] mt-6">
+        <p className="text-center text-sm text-[#9b978f] mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-[#3B82F6] font-semibold hover:underline">Sign in</Link>
+          <Link href="/login" className="text-[#d9a53f] font-semibold hover:underline">Sign in</Link>
         </p>
       </div>
     </div>

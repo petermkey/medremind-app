@@ -4,21 +4,21 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ScheduledDose } from '@/types';
 
 const COLOR_MAP: Record<string, { bg: string; text: string }> = {
-  red:    { bg: 'rgba(239,68,68,0.15)',   text: '#EF4444' },
-  blue:   { bg: 'rgba(59,130,246,0.15)',  text: '#3B82F6' },
-  green:  { bg: 'rgba(16,185,129,0.15)',  text: '#10B981' },
-  yellow: { bg: 'rgba(251,191,36,0.15)',  text: '#FBBF24' },
-  purple: { bg: 'rgba(139,92,246,0.15)',  text: '#8B5CF6' },
-  pink:   { bg: 'rgba(236,72,153,0.15)',  text: '#EC4899' },
+  red:    { bg: 'rgba(201,106,90,0.15)',   text: '#c96a5a' },
+  blue:   { bg: 'rgba(217,165,63,0.15)',  text: '#d9a53f' },
+  green:  { bg: 'rgba(143,174,116,0.15)',  text: '#8fae74' },
+  yellow: { bg: 'rgba(207,129,72,0.15)',  text: '#cf8148' },
+  purple: { bg: 'rgba(162,146,201,0.15)',  text: '#a292c9' },
+  pink:   { bg: 'rgba(201,124,152,0.15)',  text: '#c97c98' },
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  taken:     '#10B981',
-  upcoming:  '#3B82F6',
-  overdue:   '#EF4444',
-  skipped:   '#8B949E',
-  snoozed:   '#FBBF24',
-  pending:   '#3B82F6',
+  taken:     '#8fae74',
+  upcoming:  '#d9a53f',
+  overdue:   '#c96a5a',
+  skipped:   '#9b978f',
+  snoozed:   '#cf8148',
+  pending:   '#d9a53f',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -60,7 +60,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
   const item = dose.protocolItem;
   const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const displayStatus = deriveDisplayStatus(dose);
-  const statusColor = STATUS_COLOR[displayStatus] ?? '#8B949E';
+  const statusColor = STATUS_COLOR[displayStatus] ?? '#9b978f';
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const gesture = useRef<{
     pointerId: number | null;
@@ -166,7 +166,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-l-[18px]',
+            'px-5 bg-[#cf8148] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-l-[18px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
@@ -181,7 +181,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1',
+            'px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
@@ -192,7 +192,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
       {/* Card */}
       <div
         className={[
-          'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
+          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
           'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
           cardTranslate,
           actionsDisabled ? 'opacity-70' : displayStatus === 'taken' ? 'opacity-60' : '',
@@ -211,7 +211,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-[#F0F6FC] truncate">
+          <div className="text-sm font-bold text-[#e8e6e1] truncate">
             {item.name} {item.doseAmount ? `${item.doseAmount}${item.doseUnit}` : ''}
           </div>
           <div className="text-xs mt-0.5" style={{ color: statusColor }}>
@@ -227,7 +227,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           {tags.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {tags.map(tag => (
-                <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#8B949E]">
+                <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#9b978f]">
                   {tag}
                 </span>
               ))}
@@ -248,10 +248,10 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
             displayStatus === 'taken'
-              ? 'bg-[#10B981] border-[#10B981] text-white cursor-default'
+              ? 'bg-[#8fae74] border-[#8fae74] text-white cursor-default'
               : displayStatus === 'overdue'
-              ? 'border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white'
-              : 'border-[rgba(255,255,255,0.15)] text-[#8B949E] hover:border-[#10B981] hover:text-[#10B981]',
+              ? 'border-[#c96a5a] text-[#c96a5a] hover:bg-[#c96a5a] hover:text-white'
+              : 'border-[rgba(255,255,255,0.15)] text-[#9b978f] hover:border-[#8fae74] hover:text-[#8fae74]',
           ].join(' ')}
         >
           {displayStatus === 'taken' ? '✓' : ''}
@@ -272,7 +272,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             onDelete();
             setSwipeDir(null);
           }}
-          className="px-5 bg-[#7F1D1D] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
+          className="px-5 bg-[#4a2620] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
         >
           🗑<br />Delete
         </button>

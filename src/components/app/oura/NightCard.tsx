@@ -29,10 +29,10 @@ function dateLabel(localDate: string): string {
 }
 
 function toneClass(tone: string): string {
-  if (tone === 'positive') return 'text-[#10B981] bg-[rgba(16,185,129,0.12)]';
-  if (tone === 'negative') return 'text-[#F87171] bg-[rgba(248,113,113,0.12)]';
-  if (tone === 'warning') return 'text-[#FBBF24] bg-[rgba(251,191,36,0.12)]';
-  return 'text-[#8B949E] bg-[#1C2333]';
+  if (tone === 'positive') return 'text-[#8fae74] bg-[rgba(143,174,116,0.12)]';
+  if (tone === 'negative') return 'text-[#d98a7c] bg-[rgba(217,138,124,0.12)]';
+  if (tone === 'warning') return 'text-[#cf8148] bg-[rgba(207,129,72,0.12)]';
+  return 'text-[#9b978f] bg-[#191d22]';
 }
 
 function DeltaChip({ day, index, metric, transform }: {
@@ -76,9 +76,9 @@ function HeroTile({
 }) {
   const delta = classifyDelta(metric, typeof value === 'number' ? value : null, medianOfPreviousDays((day as OuraStatsDay & { __allDays?: OuraStatsDay[] }).__allDays ?? [], index, metric));
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0D1117] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#8B949E]">{label}</div>
-      <div className="mt-2 text-2xl font-extrabold text-[#F0F6FC]">{formatter(value, suffix)}</div>
+    <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0e1013] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[#9b978f]">{label}</div>
+      <div className="mt-2 text-2xl font-extrabold text-[#e8e6e1]">{formatter(value, suffix)}</div>
       {delta.delta !== null && (
         <div className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${toneClass(delta.tone)}`}>
           {delta.delta > 0 ? '+' : ''}{fmt(delta.delta)} vs norm
@@ -102,11 +102,11 @@ function DetailRow({ label, value, suffix, metric, day, index, hint, formatter =
   return (
     <div className="border-b border-[rgba(255,255,255,0.06)] py-2 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-[#C9D1D9]">{label}</span>
-        <span className="ml-auto text-sm font-bold text-[#F0F6FC]">{formatter(value, suffix)}</span>
+        <span className="text-sm text-[#c4c0b8]">{label}</span>
+        <span className="ml-auto text-sm font-bold text-[#e8e6e1]">{formatter(value, suffix)}</span>
         <DeltaChip day={day} index={index} metric={metric} transform={transform} />
       </div>
-      {hint && <p className="mt-0.5 text-[11px] leading-snug text-[#8B949E]">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[11px] leading-snug text-[#9b978f]">{hint}</p>}
     </div>
   );
 }
@@ -115,23 +115,23 @@ export function NightCard({ days }: { days: OuraStatsDay[] }) {
   const display = pickDisplayNight(days);
   if (!display.day) {
     return (
-      <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
-        <div className="text-sm font-bold text-[#F0F6FC]">No sleep data yet</div>
-        <p className="mt-1 text-sm text-[#8B949E]">Run a sync from Settings to fill in your latest night.</p>
+      <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
+        <div className="text-sm font-bold text-[#e8e6e1]">No sleep data yet</div>
+        <p className="mt-1 text-sm text-[#9b978f]">Run a sync from Settings to fill in your latest night.</p>
       </section>
     );
   }
 
   const day = { ...display.day, __allDays: days };
   return (
-    <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
+    <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold uppercase tracking-widest text-[#8B949E]">Last night</div>
-          <h2 className="mt-1 text-lg font-extrabold text-[#F0F6FC]">Recovery snapshot</h2>
+          <div className="text-xs font-bold uppercase tracking-widest text-[#9b978f]">Last night</div>
+          <h2 className="mt-1 text-lg font-extrabold text-[#e8e6e1]">Recovery snapshot</h2>
         </div>
         {display.isFallback && (
-          <span className="rounded-full bg-[#1C2333] px-3 py-1 text-xs font-bold text-[#FBBF24]">
+          <span className="rounded-full bg-[#191d22] px-3 py-1 text-xs font-bold text-[#cf8148]">
             Night of {dateLabel(day.localDate)}
           </span>
         )}
@@ -144,7 +144,7 @@ export function NightCard({ days }: { days: OuraStatsDay[] }) {
         <HeroTile label="Temperature" value={day.temperatureDeviation} suffix=" °C" metric="temperatureDeviation" day={day} index={display.index} formatter={fmtSignedDecimal} />
       </div>
 
-      <div className="mt-4 rounded-xl bg-[#0D1117] px-3">
+      <div className="mt-4 rounded-xl bg-[#0e1013] px-3">
         <DetailRow label="Deep sleep" value={day.deepSleepMinutes} suffix=" min" metric="deepSleepMinutes" day={day} index={display.index} />
         <DetailRow label="REM" value={day.remSleepMinutes} suffix=" min" metric="remSleepMinutes" day={day} index={display.index} />
         <DetailRow

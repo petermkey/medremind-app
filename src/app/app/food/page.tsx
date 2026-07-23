@@ -709,7 +709,7 @@ export default function FoodPage() {
   if (loadingProfile && !targetProfile) {
     return (
       <div className="flex h-full flex-col px-5 pt-2">
-        <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-5 text-sm font-semibold text-[#8B949E]">
+        <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-5 text-sm font-semibold text-[#9b978f]">
           Loading nutrition targets...
         </div>
       </div>
@@ -722,14 +722,14 @@ export default function FoodPage() {
         <div className="flex-shrink-0 px-5 pb-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-medium text-[#8B949E]">Nutrition targets</div>
-              <h1 className="text-2xl font-extrabold text-[#F0F6FC]">{editingTargets ? 'Edit targets' : 'Food setup'}</h1>
+              <div className="text-xs font-medium text-[#9b978f]">Nutrition targets</div>
+              <h1 className="text-2xl font-extrabold text-[#e8e6e1]">{editingTargets ? 'Edit targets' : 'Food setup'}</h1>
             </div>
             {editingTargets && (
               <button
                 type="button"
                 onClick={cancelEditingTargets}
-                className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]"
+                className="rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1]"
               >
                 Cancel
               </button>
@@ -739,16 +739,16 @@ export default function FoodPage() {
 
         <div className="flex-1 overflow-y-auto px-5 pb-5">
           {nutritionError && (
-            <div className="mb-4 rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+            <div className="mb-4 rounded-xl border border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.1)] px-3 py-2 text-xs font-medium text-[#e2a89d]">
               Nutrition targets could not be loaded. Complete setup to continue.
             </div>
           )}
 
           {setupStep === 'input' ? (
-            <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
+            <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
               <div className="mb-4">
-                <h2 className="text-base font-bold text-[#F0F6FC]">Body profile</h2>
-                <p className="mt-1 text-xs text-[#8B949E]">Targets are calculated first, then every value can be edited before saving.</p>
+                <h2 className="text-base font-bold text-[#e8e6e1]">Body profile</h2>
+                <p className="mt-1 text-xs text-[#9b978f]">Targets are calculated first, then every value can be edited before saving.</p>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -779,17 +779,17 @@ export default function FoodPage() {
               <button
                 type="button"
                 onClick={handleGenerateTargets}
-                className="mt-5 w-full rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-bold text-white"
+                className="mt-5 w-full rounded-xl bg-[#d9a53f] px-4 py-3 text-sm font-bold text-white"
               >
                 Calculate targets
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl border border-[rgba(16,185,129,0.28)] bg-[rgba(16,185,129,0.08)] p-4">
+            <div className="rounded-2xl border border-[rgba(143,174,116,0.28)] bg-[rgba(143,174,116,0.08)] p-4">
               <div className="mb-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-[#10B981]">Review</div>
-                <h2 className="mt-1 text-base font-bold text-[#F0F6FC]">Daily targets</h2>
-                <p className="mt-1 text-xs text-[#8B949E]">Adjust any generated value before saving.</p>
+                <div className="text-xs font-semibold uppercase tracking-wide text-[#8fae74]">Review</div>
+                <h2 className="mt-1 text-base font-bold text-[#e8e6e1]">Daily targets</h2>
+                <p className="mt-1 text-xs text-[#9b978f]">Adjust any generated value before saving.</p>
               </div>
 
               {reviewForm && (
@@ -809,7 +809,7 @@ export default function FoodPage() {
                 <button
                   type="button"
                   onClick={() => setSetupStep('input')}
-                  className="rounded-xl bg-[#30363D] px-4 py-3 text-sm font-bold text-[#F0F6FC]"
+                  className="rounded-xl bg-[#23272d] px-4 py-3 text-sm font-bold text-[#e8e6e1]"
                 >
                   Back
                 </button>
@@ -817,7 +817,7 @@ export default function FoodPage() {
                   type="button"
                   onClick={handleSaveTargets}
                   disabled={savingTargets}
-                  className="rounded-xl bg-[#10B981] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#8fae74] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingTargets ? 'Saving...' : 'Save targets'}
                 </button>
@@ -834,8 +834,8 @@ export default function FoodPage() {
       <div className="flex-shrink-0 px-5 pb-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-medium text-[#8B949E]">{activeDate === today ? 'Today' : format(new Date(`${activeDate}T12:00:00`), 'EEE, MMM d')}</div>
-            <h1 className="text-2xl font-extrabold text-[#F0F6FC]">Food</h1>
+            <div className="text-xs font-medium text-[#9b978f]">{activeDate === today ? 'Today' : format(new Date(`${activeDate}T12:00:00`), 'EEE, MMM d')}</div>
+            <h1 className="text-2xl font-extrabold text-[#e8e6e1]">Food</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -845,8 +845,8 @@ export default function FoodPage() {
               className={[
                 'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
                 analyzing
-                  ? 'cursor-not-allowed bg-[#30363D] text-[#8B949E]'
-                  : 'bg-[#3B82F6] text-white hover:bg-[#2563EB]',
+                  ? 'cursor-not-allowed bg-[#23272d] text-[#9b978f]'
+                  : 'bg-[#d9a53f] text-white hover:bg-[#a67c2a]',
               ].join(' ')}
             >
               {analyzing ? 'Analyzing' : 'Capture'}
@@ -875,8 +875,8 @@ export default function FoodPage() {
               className={[
                 'rounded-xl px-3 py-2 text-xs font-bold transition-colors',
                 analyzing
-                  ? 'cursor-not-allowed bg-[#30363D] text-[#8B949E]'
-                  : 'bg-[#30363D] text-[#F0F6FC] hover:bg-[#363B42]',
+                  ? 'cursor-not-allowed bg-[#23272d] text-[#9b978f]'
+                  : 'bg-[#23272d] text-[#e8e6e1] hover:bg-[#363B42]',
               ].join(' ')}
             >
               Gallery
@@ -884,7 +884,7 @@ export default function FoodPage() {
             <button
               type="button"
               onClick={startEditingTargets}
-              className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]"
+              className="rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1]"
             >
               {targetProfile ? 'Targets' : 'Set targets'}
             </button>
@@ -900,7 +900,7 @@ export default function FoodPage() {
             placeholder="Describe your meal…"
             aria-label="Describe your meal"
             disabled={analyzing}
-            className="flex-1 rounded-xl bg-[#161B22] px-3 py-2 text-sm text-[#F0F6FC] placeholder-[#8B949E]"
+            className="flex-1 rounded-xl bg-[#14171b] px-3 py-2 text-sm text-[#e8e6e1] placeholder-[#9b978f]"
           />
           <button
             type="button"
@@ -921,8 +921,8 @@ export default function FoodPage() {
               className={[
                 'min-w-[58px] rounded-xl border px-3 py-2 text-center transition-colors',
                 date === activeDate
-                  ? 'border-[#3B82F6] bg-[rgba(59,130,246,0.18)] text-[#F0F6FC]'
-                  : 'border-[rgba(255,255,255,0.08)] bg-[#161B22] text-[#8B949E]',
+                  ? 'border-[#d9a53f] bg-[rgba(217,165,63,0.18)] text-[#e8e6e1]'
+                  : 'border-[rgba(255,255,255,0.08)] bg-[#14171b] text-[#9b978f]',
               ].join(' ')}
             >
               <div className="text-[10px] font-bold uppercase">{date === today ? 'Today' : format(new Date(`${date}T12:00:00`), 'EEE')}</div>
@@ -933,7 +933,7 @@ export default function FoodPage() {
             <button
               type="button"
               onClick={() => setSelectedDate(today)}
-              className="min-w-[74px] rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]"
+              className="min-w-[74px] rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1]"
             >
               Today
             </button>
@@ -941,7 +941,7 @@ export default function FoodPage() {
         </div>
 
         {nutritionError && (
-          <div className="mb-3 rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+          <div className="mb-3 rounded-xl border border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.1)] px-3 py-2 text-xs font-medium text-[#e2a89d]">
             Targets unavailable. Diary logging still works.
           </div>
         )}
@@ -977,7 +977,7 @@ export default function FoodPage() {
                 type="button"
                 onClick={() => void openSuggestions()}
                 disabled={suggestLoading}
-                className="mt-2 w-full rounded-xl border border-[rgba(16,185,129,0.28)] bg-[rgba(16,185,129,0.08)] px-3 py-2.5 text-sm font-bold text-[#34D399] disabled:opacity-60"
+                className="mt-2 w-full rounded-xl border border-[rgba(143,174,116,0.28)] bg-[rgba(143,174,116,0.08)] px-3 py-2.5 text-sm font-bold text-[#a3bf8a] disabled:opacity-60"
               >
                 {suggestLoading ? 'Finding options...' : 'Close today’s gaps'}
               </button>
@@ -991,15 +991,15 @@ export default function FoodPage() {
 
       <div className="flex-1 overflow-y-auto px-5 pb-5">
         {(analyzing || analysisError) && (
-          <div className="mb-4 rounded-xl border border-[rgba(59,130,246,0.22)] bg-[rgba(59,130,246,0.08)] px-3 py-2">
+          <div className="mb-4 rounded-xl border border-[rgba(217,165,63,0.22)] bg-[rgba(217,165,63,0.08)] px-3 py-2">
             {analyzing && (
-              <div className="flex items-center gap-2 text-xs font-medium text-[#8B949E]">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#3B82F6] border-t-transparent" />
+              <div className="flex items-center gap-2 text-xs font-medium text-[#9b978f]">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#d9a53f] border-t-transparent" />
                 Analyzing meal photo...
               </div>
             )}
             {analysisError && (
-              <div className="rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+              <div className="rounded-xl border border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.1)] px-3 py-2 text-xs font-medium text-[#e2a89d]">
                 {analysisError}
               </div>
             )}
@@ -1007,33 +1007,33 @@ export default function FoodPage() {
         )}
 
         {draft && (
-          <div className="mb-5 rounded-2xl border border-[rgba(16,185,129,0.28)] bg-[rgba(16,185,129,0.08)] p-4">
+          <div className="mb-5 rounded-2xl border border-[rgba(143,174,116,0.28)] bg-[rgba(143,174,116,0.08)] p-4">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-[#10B981]">Draft</div>
-                <h2 className="mt-1 text-lg font-extrabold text-[#F0F6FC]">{draft.title}</h2>
-                <p className="mt-1 text-sm text-[#C9D1D9]">{draft.summary}</p>
+                <div className="text-xs font-semibold uppercase tracking-wide text-[#8fae74]">Draft</div>
+                <h2 className="mt-1 text-lg font-extrabold text-[#e8e6e1]">{draft.title}</h2>
+                <p className="mt-1 text-sm text-[#c4c0b8]">{draft.summary}</p>
               </div>
-              <div className="rounded-full bg-[rgba(16,185,129,0.14)] px-2.5 py-1 text-[10px] font-bold text-[#34D399]">
+              <div className="rounded-full bg-[rgba(143,174,116,0.14)] px-2.5 py-1 text-[10px] font-bold text-[#a3bf8a]">
                 {confidenceLabel(draft.estimationConfidence)}
               </div>
             </div>
             <NutrientGrid nutrients={scaleNutrients(draft.nutrients, portionFactor)} />
             <div className="space-y-2">
               {draft.components.map((component, index) => (
-                <div key={`${component.name}-${index}`} className="rounded-xl bg-[rgba(13,17,23,0.7)] px-3 py-2">
-                  <div className="text-sm font-semibold text-[#F0F6FC]">{component.name}</div>
-                  <div className="mt-0.5 text-xs text-[#8B949E]">{componentDetails(component)}</div>
+                <div key={`${component.name}-${index}`} className="rounded-xl bg-[rgba(14,16,19,0.7)] px-3 py-2">
+                  <div className="text-sm font-semibold text-[#e8e6e1]">{component.name}</div>
+                  <div className="mt-0.5 text-xs text-[#9b978f]">{componentDetails(component)}</div>
                 </div>
               ))}
             </div>
             {draft.uncertainties.length > 0 && (
-              <div className="mt-3 text-xs text-[#8B949E]">
+              <div className="mt-3 text-xs text-[#9b978f]">
                 {draft.uncertainties.join(' ')}
               </div>
             )}
             <div className="mt-2 flex items-center gap-1.5">
-              <span className="text-xs text-[#8B949E]">Portion</span>
+              <span className="text-xs text-[#9b978f]">Portion</span>
               {[0.5, 1, 1.5, 2].map(factor => (
                 <button
                   key={factor}
@@ -1041,7 +1041,7 @@ export default function FoodPage() {
                   onClick={() => setPortionFactor(factor)}
                   className={[
                     'rounded-lg px-2.5 py-1 text-xs font-bold',
-                    portionFactor === factor ? 'bg-[#3B82F6] text-white' : 'bg-[#30363D] text-[#C9D1D9]',
+                    portionFactor === factor ? 'bg-[#d9a53f] text-white' : 'bg-[#23272d] text-[#c4c0b8]',
                   ].join(' ')}
                 >
                   ×{factor}
@@ -1049,16 +1049,16 @@ export default function FoodPage() {
               ))}
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <button onClick={handleSaveDraft} className="rounded-xl bg-[#10B981] px-3 py-2 text-xs font-bold text-white">
+              <button onClick={handleSaveDraft} className="rounded-xl bg-[#8fae74] px-3 py-2 text-xs font-bold text-white">
                 Save
               </button>
-              <button onClick={handleRetake} className="rounded-xl bg-[#30363D] px-3 py-2 text-xs font-bold text-[#F0F6FC]">
+              <button onClick={handleRetake} className="rounded-xl bg-[#23272d] px-3 py-2 text-xs font-bold text-[#e8e6e1]">
                 Retake
               </button>
               <button onClick={() => {
                 setDraft(null);
                 setDraftSource('photo_ai');
-              }} className="rounded-xl bg-transparent px-3 py-2 text-xs font-bold text-[#8B949E]">
+              }} className="rounded-xl bg-transparent px-3 py-2 text-xs font-bold text-[#9b978f]">
                 Cancel
               </button>
             </div>
@@ -1066,23 +1066,23 @@ export default function FoodPage() {
         )}
 
         {error && (
-          <div className="mb-4 rounded-2xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-4 py-3 text-sm text-[#FCA5A5]">
+          <div className="mb-4 rounded-2xl border border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.1)] px-4 py-3 text-sm text-[#e2a89d]">
             Food entries could not be loaded.
           </div>
         )}
 
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-[#F0F6FC]">Entries</h2>
-          <div className="text-xs font-medium text-[#8B949E]">
+          <h2 className="text-base font-bold text-[#e8e6e1]">Entries</h2>
+          <div className="text-xs font-medium text-[#9b978f]">
             {loading ? 'Loading...' : `${totals.entryCount} entries`}
           </div>
         </div>
 
         {entries.length === 0 ? (
-          <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] px-5 py-10 text-center">
+          <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] px-5 py-10 text-center">
             <div className="text-4xl">🍽️</div>
-            <div className="mt-3 text-sm font-bold text-[#F0F6FC]">No food logged for this day</div>
-            <div className="mt-1 text-xs text-[#8B949E]">Capture a meal photo to start this diary.</div>
+            <div className="mt-3 text-sm font-bold text-[#e8e6e1]">No food logged for this day</div>
+            <div className="mt-1 text-xs text-[#9b978f]">Capture a meal photo to start this diary.</div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -1104,30 +1104,30 @@ export default function FoodPage() {
 
       {suggestOpen && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 px-5 pb-5">
-          <div className="w-full max-w-[390px] rounded-2xl border border-[rgba(16,185,129,0.28)] bg-[#161B22] p-4 shadow-2xl">
+          <div className="w-full max-w-[390px] rounded-2xl border border-[rgba(143,174,116,0.28)] bg-[#14171b] p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-base font-bold text-[#F0F6FC]">Close today’s gaps</h2>
+              <h2 className="text-base font-bold text-[#e8e6e1]">Close today’s gaps</h2>
               <button
                 type="button"
                 onClick={() => setSuggestOpen(false)}
-                className="rounded-xl bg-[#30363D] px-3 py-1.5 text-xs font-bold text-[#F0F6FC]"
+                className="rounded-xl bg-[#23272d] px-3 py-1.5 text-xs font-bold text-[#e8e6e1]"
               >
                 Close
               </button>
             </div>
             {suggestLoading && (
-              <div className="flex items-center gap-2 py-4 text-xs font-medium text-[#8B949E]">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#10B981] border-t-transparent" />
+              <div className="flex items-center gap-2 py-4 text-xs font-medium text-[#9b978f]">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#8fae74] border-t-transparent" />
                 Finding options...
               </div>
             )}
             {suggestError && (
-              <div className="rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+              <div className="rounded-xl border border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.1)] px-3 py-2 text-xs font-medium text-[#e2a89d]">
                 {suggestError}
               </div>
             )}
             {!suggestLoading && !suggestError && suggestions.length === 0 && (
-              <div className="py-4 text-xs text-[#8B949E]">All targets are already covered today.</div>
+              <div className="py-4 text-xs text-[#9b978f]">All targets are already covered today.</div>
             )}
             <div className="max-h-[50vh] space-y-2 overflow-y-auto">
               {suggestions.map((suggestion, index) => (
@@ -1135,11 +1135,11 @@ export default function FoodPage() {
                   key={`${suggestion.title}-${index}`}
                   type="button"
                   onClick={() => applySuggestion(suggestion)}
-                  className="w-full rounded-xl bg-[#0D1117] px-3 py-2.5 text-left"
+                  className="w-full rounded-xl bg-[#0e1013] px-3 py-2.5 text-left"
                 >
-                  <div className="text-sm font-bold text-[#F0F6FC]">{suggestion.title}</div>
-                  <div className="mt-0.5 text-xs text-[#C9D1D9]">{suggestion.description}</div>
-                  <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold text-[#8B949E]">
+                  <div className="text-sm font-bold text-[#e8e6e1]">{suggestion.title}</div>
+                  <div className="mt-0.5 text-xs text-[#c4c0b8]">{suggestion.description}</div>
+                  <div className="mt-1 flex flex-wrap gap-2 text-[10px] font-semibold text-[#9b978f]">
                     {typeof suggestion.approxNutrients.caloriesKcal === 'number' && (
                       <span>{Math.round(suggestion.approxNutrients.caloriesKcal)} kcal</span>
                     )}
@@ -1151,7 +1151,7 @@ export default function FoodPage() {
                     )}
                   </div>
                   {suggestion.rationale && (
-                    <div className="mt-1 text-[10px] text-[#8B949E]">{suggestion.rationale}</div>
+                    <div className="mt-1 text-[10px] text-[#9b978f]">{suggestion.rationale}</div>
                   )}
                 </button>
               ))}
@@ -1162,21 +1162,21 @@ export default function FoodPage() {
 
       {confirmDeleteEntry && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 px-5 pb-5">
-          <div className="w-full max-w-[390px] rounded-2xl border border-[rgba(248,81,73,0.35)] bg-[#161B22] p-4 shadow-2xl">
-            <h2 className="text-base font-bold text-[#F0F6FC]">Delete food entry?</h2>
-            <p className="mt-2 text-sm text-[#8B949E]">{confirmDeleteEntry.title} will be removed from this diary.</p>
+          <div className="w-full max-w-[390px] rounded-2xl border border-[rgba(201,106,90,0.35)] bg-[#14171b] p-4 shadow-2xl">
+            <h2 className="text-base font-bold text-[#e8e6e1]">Delete food entry?</h2>
+            <p className="mt-2 text-sm text-[#9b978f]">{confirmDeleteEntry.title} will be removed from this diary.</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmDeleteEntry(null)}
-                className="rounded-xl bg-[#30363D] px-4 py-3 text-sm font-bold text-[#F0F6FC]"
+                className="rounded-xl bg-[#23272d] px-4 py-3 text-sm font-bold text-[#e8e6e1]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDelete}
-                className="rounded-xl bg-[#7F1D1D] px-4 py-3 text-sm font-bold text-white"
+                className="rounded-xl bg-[#4a2620] px-4 py-3 text-sm font-bold text-white"
               >
                 Delete
               </button>
@@ -1190,7 +1190,7 @@ export default function FoodPage() {
 
 function InlineError({ message }: { message: string }) {
   return (
-    <div className="mt-3 rounded-xl border border-[rgba(248,81,73,0.35)] bg-[rgba(248,81,73,0.1)] px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+    <div className="mt-3 rounded-xl border border-[rgba(201,106,90,0.35)] bg-[rgba(201,106,90,0.1)] px-3 py-2 text-xs font-medium text-[#e2a89d]">
       {message}
     </div>
   );
@@ -1213,19 +1213,19 @@ function NumberField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-bold text-[#8B949E]">{label}</span>
-      <div className="flex items-center rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] px-3 py-2">
+      <span className="mb-1 block text-[11px] font-bold text-[#9b978f]">{label}</span>
+      <div className="flex items-center rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] px-3 py-2">
         <input
           type="number"
           inputMode="decimal"
           step={step}
           value={value}
           onChange={event => onChange(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[#F0F6FC] outline-none"
+          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[#e8e6e1] outline-none"
         />
-        <span className="ml-1 text-[10px] font-semibold text-[#8B949E]">{suffix}</span>
+        <span className="ml-1 text-[10px] font-semibold text-[#9b978f]">{suffix}</span>
       </div>
-      {error && <span className="mt-1 block text-[10px] font-medium text-[#FCA5A5]">{error}</span>}
+      {error && <span className="mt-1 block text-[10px] font-medium text-[#e2a89d]">{error}</span>}
     </label>
   );
 }
@@ -1245,15 +1245,15 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-bold text-[#8B949E]">{label}</span>
+      <span className="mb-1 block text-[11px] font-bold text-[#9b978f]">{label}</span>
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] px-3 py-2 text-sm font-bold text-[#F0F6FC] outline-none"
+        className="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0e1013] px-3 py-2 text-sm font-bold text-[#e8e6e1] outline-none"
       >
         {children}
       </select>
-      {error && <span className="mt-1 block text-[10px] font-medium text-[#FCA5A5]">{error}</span>}
+      {error && <span className="mt-1 block text-[10px] font-medium text-[#e2a89d]">{error}</span>}
     </label>
   );
 }
@@ -1289,18 +1289,18 @@ function TargetCard({
   target: number;
 }) {
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-2.5">
+    <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-2.5">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-[10px] font-bold text-[#8B949E]">{label}</div>
-        <div className="text-[10px] font-semibold text-[#8B949E]">{progressPercent(consumed, target)}%</div>
+        <div className="text-[10px] font-bold text-[#9b978f]">{label}</div>
+        <div className="text-[10px] font-semibold text-[#9b978f]">{progressPercent(consumed, target)}%</div>
       </div>
-      <div className="mt-0.5 text-[13px] font-extrabold text-[#F0F6FC]">
+      <div className="mt-0.5 text-[13px] font-extrabold text-[#e8e6e1]">
         {consumed.toLocaleString()} / {target.toLocaleString()} {unit}
       </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0D1117]">
-        <div className="h-full rounded-full bg-[#3B82F6]" style={{ width: `${progressPercent(consumed, target)}%` }} />
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0e1013]">
+        <div className="h-full rounded-full bg-[#d9a53f]" style={{ width: `${progressPercent(consumed, target)}%` }} />
       </div>
-      <div className="mt-1 text-[10px] font-semibold text-[#8B949E]">{remainingLabel(consumed, target, unit)}</div>
+      <div className="mt-1 text-[10px] font-semibold text-[#9b978f]">{remainingLabel(consumed, target, unit)}</div>
     </div>
   );
 }
@@ -1317,18 +1317,18 @@ function WaterTracker({
   onAdd: (amountMl: number) => void;
 }) {
   return (
-    <div className="mt-2 rounded-xl border border-[rgba(56,189,248,0.24)] bg-[rgba(56,189,248,0.08)] p-2.5">
+    <div className="mt-2 rounded-xl border border-[rgba(127,166,191,0.24)] bg-[rgba(127,166,191,0.08)] p-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <div className="text-[13px] font-bold text-[#F0F6FC]">Water</div>
-            {loading && <div className="text-[10px] font-semibold text-[#8B949E]">Loading...</div>}
+            <div className="text-[13px] font-bold text-[#e8e6e1]">Water</div>
+            {loading && <div className="text-[10px] font-semibold text-[#9b978f]">Loading...</div>}
           </div>
-          <div className="mt-0.5 text-[11px] font-semibold text-[#C9D1D9]">
+          <div className="mt-0.5 text-[11px] font-semibold text-[#c4c0b8]">
             {waterDisplay(consumedMl)} / {waterDisplay(targetMl)} - {remainingLabel(consumedMl, targetMl, 'ml')}
           </div>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0D1117]">
-            <div className="h-full rounded-full bg-[#38BDF8]" style={{ width: `${progressPercent(consumedMl, targetMl)}%` }} />
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#0e1013]">
+            <div className="h-full rounded-full bg-[#7fa6bf]" style={{ width: `${progressPercent(consumedMl, targetMl)}%` }} />
           </div>
         </div>
         <div className="flex flex-shrink-0 gap-2">
@@ -1352,24 +1352,24 @@ function EatingWindowCard({
   streak: number;
 }) {
   return (
-    <div className="mt-2 rounded-xl border border-[rgba(168,85,247,0.24)] bg-[rgba(168,85,247,0.08)] p-2.5">
+    <div className="mt-2 rounded-xl border border-[rgba(162,146,201,0.24)] bg-[rgba(162,146,201,0.08)] p-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <div className="text-[13px] font-bold text-[#F0F6FC]">Eating window</div>
+            <div className="text-[13px] font-bold text-[#e8e6e1]">Eating window</div>
             {window.lateFlag && (
-              <span className="rounded-full bg-[rgba(251,191,36,0.16)] px-2 py-0.5 text-[10px] font-bold text-[#FBBF24]">
+              <span className="rounded-full bg-[rgba(207,129,72,0.16)] px-2 py-0.5 text-[10px] font-bold text-[#cf8148]">
                 late
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-[11px] font-semibold text-[#C9D1D9]">
+          <div className="mt-0.5 text-[11px] font-semibold text-[#c4c0b8]">
             {window.firstMeal} → {window.lastMeal}
             {window.windowHours !== null && window.windowHours > 0 && (
               <> · {formatWindowDuration(window.windowHours)}</>
             )}
           </div>
-          <div className="mt-0.5 text-[10px] font-semibold text-[#8B949E]">
+          <div className="mt-0.5 text-[10px] font-semibold text-[#9b978f]">
             ≤{STREAK_MAX_WINDOW_HOURS}h streak: {streak} day{streak === 1 ? '' : 's'}
           </div>
         </div>
@@ -1388,9 +1388,9 @@ function NutrientGrid({ nutrients }: { nutrients: FoodNutrients }) {
   return (
     <div className="mb-3 grid grid-cols-5 gap-2">
       {ENTRY_NUTRIENTS.map(item => (
-        <div key={item.key} className="rounded-xl bg-[rgba(13,17,23,0.7)] p-2">
-          <div className="text-sm font-bold text-[#F0F6FC]">{formatAmount(nutrientValue(nutrients, item.key), item.unit)}</div>
-          <div className="mt-0.5 text-[10px] text-[#8B949E]">{item.label}</div>
+        <div key={item.key} className="rounded-xl bg-[rgba(14,16,19,0.7)] p-2">
+          <div className="text-sm font-bold text-[#e8e6e1]">{formatAmount(nutrientValue(nutrients, item.key), item.unit)}</div>
+          <div className="mt-0.5 text-[10px] text-[#9b978f]">{item.label}</div>
         </div>
       ))}
     </div>
@@ -1459,7 +1459,7 @@ function FoodEntryCard({
           setSwiped(false);
         }}
         className={[
-          'absolute right-0 top-0 bottom-0 w-[92px] bg-[#7F1D1D] text-[11px] font-bold text-white transition-transform duration-200',
+          'absolute right-0 top-0 bottom-0 w-[92px] bg-[#4a2620] text-[11px] font-bold text-white transition-transform duration-200',
           swiped ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
       >
@@ -1468,7 +1468,7 @@ function FoodEntryCard({
 
       <div
         className={[
-          'rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-3 transition-all duration-200',
+          'rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-3 transition-all duration-200',
           swiped ? '-translate-x-[92px]' : '',
         ].join(' ')}
       >
@@ -1497,13 +1497,13 @@ function FoodEntryCard({
           <div className="flex items-start justify-between gap-3">
             {entry.photoPath && <FoodPhotoThumb photoPath={entry.photoPath} title={entry.title} />}
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-[#8B949E]">
+              <div className="text-xs font-semibold text-[#9b978f]">
                 {formatEntryTime(entry.consumedAt, timezone)} · Photo · {confidenceLabel(entry.estimationConfidence)}
               </div>
-              <h3 className="mt-1 truncate text-base font-extrabold text-[#F0F6FC]">{entry.title}</h3>
+              <h3 className="mt-1 truncate text-base font-extrabold text-[#e8e6e1]">{entry.title}</h3>
             </div>
             <div className="flex flex-shrink-0 items-center gap-2">
-              <div className="rounded-full bg-[#0D1117] px-2.5 py-1 text-xs font-bold text-[#F0F6FC]">
+              <div className="rounded-full bg-[#0e1013] px-2.5 py-1 text-xs font-bold text-[#e8e6e1]">
                 {formatAmount(entry.nutrients.caloriesKcal)} kcal
               </div>
             </div>
@@ -1511,39 +1511,39 @@ function FoodEntryCard({
 
           <div className="mt-2.5 grid grid-cols-4 gap-1.5">
             {ENTRY_NUTRIENTS.filter(item => item.key !== 'caloriesKcal').map(item => (
-              <div key={item.key} className="rounded-xl bg-[#0D1117] p-1.5">
-                <div className="text-[13px] font-bold text-[#F0F6FC]">{formatAmount(nutrientValue(entry.nutrients, item.key), item.unit)}</div>
-                <div className="mt-0.5 text-[10px] text-[#8B949E]">{item.label}</div>
+              <div key={item.key} className="rounded-xl bg-[#0e1013] p-1.5">
+                <div className="text-[13px] font-bold text-[#e8e6e1]">{formatAmount(nutrientValue(entry.nutrients, item.key), item.unit)}</div>
+                <div className="mt-0.5 text-[10px] text-[#9b978f]">{item.label}</div>
               </div>
             ))}
           </div>
 
           {expanded && (
             <div className="mt-4 space-y-3">
-              <p className="text-sm text-[#C9D1D9]">{entry.summary}</p>
+              <p className="text-sm text-[#c4c0b8]">{entry.summary}</p>
               <div className="grid grid-cols-2 gap-2">
                 {DETAILED_NUTRIENTS.map(item => {
                   const value = nutrientValue(entry.nutrients, item.key);
                   if (value === undefined) return null;
                   return (
-                    <div key={item.key} className="rounded-xl bg-[#0D1117] px-3 py-2">
-                      <div className="text-xs font-semibold text-[#8B949E]">{item.label}</div>
-                      <div className="mt-0.5 text-sm font-bold text-[#F0F6FC]">{formatAmount(value, item.unit)}</div>
+                    <div key={item.key} className="rounded-xl bg-[#0e1013] px-3 py-2">
+                      <div className="text-xs font-semibold text-[#9b978f]">{item.label}</div>
+                      <div className="mt-0.5 text-sm font-bold text-[#e8e6e1]">{formatAmount(value, item.unit)}</div>
                     </div>
                   );
                 })}
               </div>
               <div className="space-y-2">
                 {entry.components.map(component => (
-                  <div key={component.id} className="rounded-xl bg-[#0D1117] px-3 py-2">
-                    <div className="text-sm font-semibold text-[#F0F6FC]">{component.name}</div>
-                    <div className="mt-0.5 text-xs text-[#8B949E]">{componentDetails(component)}</div>
-                    {component.notes && <div className="mt-1 text-xs text-[#8B949E]">{component.notes}</div>}
+                  <div key={component.id} className="rounded-xl bg-[#0e1013] px-3 py-2">
+                    <div className="text-sm font-semibold text-[#e8e6e1]">{component.name}</div>
+                    <div className="mt-0.5 text-xs text-[#9b978f]">{componentDetails(component)}</div>
+                    {component.notes && <div className="mt-1 text-xs text-[#9b978f]">{component.notes}</div>}
                   </div>
                 ))}
               </div>
               {entry.uncertainties.length > 0 && (
-                <div className="rounded-xl bg-[#0D1117] px-3 py-2 text-xs text-[#8B949E]">
+                <div className="rounded-xl bg-[#0e1013] px-3 py-2 text-xs text-[#9b978f]">
                   {entry.uncertainties.join(' ')}
                 </div>
               )}
@@ -1556,7 +1556,7 @@ function FoodEntryCard({
             <button
               type="button"
               onClick={onDuplicate}
-              className="flex-1 rounded-lg bg-[#30363D] px-2.5 py-1 text-xs font-bold text-[#C9D1D9]"
+              className="flex-1 rounded-lg bg-[#23272d] px-2.5 py-1 text-xs font-bold text-[#c4c0b8]"
             >
               ↺ Ate this again
             </button>
@@ -1564,7 +1564,7 @@ function FoodEntryCard({
               <button
                 type="button"
                 onClick={onDelete}
-                className="flex-1 rounded-lg border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.08)] px-2.5 py-1 text-xs font-bold text-[#F87171]"
+                className="flex-1 rounded-lg border border-[rgba(217,138,124,0.25)] bg-[rgba(217,138,124,0.08)] px-2.5 py-1 text-xs font-bold text-[#d98a7c]"
               >
                 Delete entry
               </button>

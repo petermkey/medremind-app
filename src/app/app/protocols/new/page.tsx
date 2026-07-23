@@ -156,8 +156,8 @@ export default function NewProtocolPage() {
 
   const COLORS = ['blue','green','purple','yellow','red','pink'];
   const COLOR_VALS: Record<string, string> = {
-    blue:'#3B82F6', green:'#10B981', purple:'#8B5CF6',
-    yellow:'#FBBF24', red:'#EF4444', pink:'#EC4899',
+    blue:'#d9a53f', green:'#8fae74', purple:'#a292c9',
+    yellow:'#cf8148', red:'#c96a5a', pink:'#c97c98',
   };
 
   return (
@@ -165,14 +165,14 @@ export default function NewProtocolPage() {
       {/* Header */}
       <div className="px-5 pt-4 pb-3 flex-shrink-0 border-b border-[rgba(255,255,255,0.05)]">
         <div className="flex items-center gap-3">
-          <button onClick={() => step > 1 ? setStep(s => s - 1) : router.back()} className="text-[#8B949E] text-xl">←</button>
-          <h1 className="text-lg font-extrabold text-[#F0F6FC]">New Protocol</h1>
+          <button onClick={() => step > 1 ? setStep(s => s - 1) : router.back()} className="text-[#9b978f] text-xl">←</button>
+          <h1 className="text-lg font-extrabold text-[#e8e6e1]">New Protocol</h1>
         </div>
         {/* Steps */}
         <div className="flex gap-1 mt-3">
           {['Protocol Info', 'Add Items', 'Confirm'].map((label, i) => (
             <div key={label} className="flex items-center gap-1 flex-1">
-              <div className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-[#3B82F6]' : 'bg-[#1C2333]'}`} />
+              <div className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-[#d9a53f]' : 'bg-[#191d22]'}`} />
             </div>
           ))}
         </div>
@@ -185,22 +185,22 @@ export default function NewProtocolPage() {
           <div className="fade-in flex flex-col gap-5">
             <Input label="Protocol name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Morning Stack" />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Description (optional)</label>
+              <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Description (optional)</label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="What is this protocol for?"
                 rows={3}
-                className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6] resize-none"
+                className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f] resize-none"
               />
             </div>
             <Select label="Category" value={category} onChange={e => setCategory(e.target.value as ProtocolCategory)} options={CATEGORIES} />
             <div>
-              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide mb-2 block">Duration</label>
+              <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide mb-2 block">Duration</label>
               <div className="flex gap-2">
                 {(['ongoing', 'fixed'] as const).map(d => (
                   <button key={d} onClick={() => setDuration(d)}
-                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors ${duration === d ? 'bg-[#3B82F6] border-[#3B82F6] text-white' : 'border-[rgba(255,255,255,0.08)] text-[#8B949E]'}`}>
+                    className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors ${duration === d ? 'bg-[#d9a53f] border-[#d9a53f] text-white' : 'border-[rgba(255,255,255,0.08)] text-[#9b978f]'}`}>
                     {d === 'ongoing' ? '∞ Ongoing' : '📅 Fixed'}
                   </button>
                 ))}
@@ -218,24 +218,24 @@ export default function NewProtocolPage() {
         {/* Step 2: Add Items */}
         {step === 2 && (
           <div className="fade-in flex flex-col gap-4">
-            <p className="text-sm text-[#8B949E]">Add medications, analyses, and therapies to this protocol.</p>
+            <p className="text-sm text-[#9b978f]">Add medications, analyses, and therapies to this protocol.</p>
 
             {/* Existing items */}
             {items.map((it, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-xl p-3">
+              <div key={idx} className="flex items-center gap-3 bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-3">
                 <span className="text-xl">{it.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-[#F0F6FC] truncate">{it.name} {it.doseAmount ? `${it.doseAmount}${it.doseUnit}` : ''}</div>
-                  <div className="text-xs text-[#8B949E]">{frequencyLabel(it)} · {it.times.join(', ')}</div>
+                  <div className="text-sm font-semibold text-[#e8e6e1] truncate">{it.name} {it.doseAmount ? `${it.doseAmount}${it.doseUnit}` : ''}</div>
+                  <div className="text-xs text-[#9b978f]">{frequencyLabel(it)} · {it.times.join(', ')}</div>
                 </div>
-                <button onClick={() => { setDraft({ ...it }); setEditingIdx(idx); }} className="text-[#8B949E] hover:text-[#3B82F6] text-sm px-2">✏️</button>
-                <button onClick={() => removeItem(idx)} className="text-[#8B949E] hover:text-[#EF4444] text-sm px-2">✕</button>
+                <button onClick={() => { setDraft({ ...it }); setEditingIdx(idx); }} className="text-[#9b978f] hover:text-[#d9a53f] text-sm px-2">✏️</button>
+                <button onClick={() => removeItem(idx)} className="text-[#9b978f] hover:text-[#c96a5a] text-sm px-2">✕</button>
               </div>
             ))}
 
             {/* Item form */}
-            <div className="bg-[#161B22] border border-[rgba(59,130,246,0.25)] rounded-2xl p-4 flex flex-col gap-3">
-              <div className="text-xs font-bold text-[#3B82F6] uppercase tracking-wide mb-1">
+            <div className="bg-[#14171b] border border-[rgba(217,165,63,0.25)] rounded-2xl p-4 flex flex-col gap-3">
+              <div className="text-xs font-bold text-[#d9a53f] uppercase tracking-wide mb-1">
                 {editingIdx !== null ? 'Edit item' : 'Add item'}
               </div>
 
@@ -330,15 +330,15 @@ export default function NewProtocolPage() {
               )}
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Time</label>
+                <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">Time</label>
                 <input type="time" value={draft.times[0] ?? '08:00'} onChange={e => setDraft(d => ({ ...d, times: [e.target.value] }))}
-                  className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6]"
+                  className="bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f]"
                 />
               </div>
 
               {/* Color picker */}
               <div>
-                <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide mb-2 block">Colour</label>
+                <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide mb-2 block">Colour</label>
                 <div className="flex gap-2">
                   {COLORS.map(c => (
                     <button key={c} onClick={() => setDraft(d => ({ ...d, color: c }))}
@@ -364,27 +364,27 @@ export default function NewProtocolPage() {
         {/* Step 3: Review */}
         {step === 3 && (
           <div className="fade-in flex flex-col gap-5">
-            <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
-              <div className="text-base font-extrabold text-[#F0F6FC] mb-1">{name}</div>
-              {description && <div className="text-sm text-[#8B949E] mb-3">{description}</div>}
-              <div className="flex gap-2 text-xs text-[#8B949E]">
-                <span className="bg-[rgba(59,130,246,0.12)] text-[#3B82F6] px-2 py-1 rounded-full font-semibold">{category}</span>
+            <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
+              <div className="text-base font-extrabold text-[#e8e6e1] mb-1">{name}</div>
+              {description && <div className="text-sm text-[#9b978f] mb-3">{description}</div>}
+              <div className="flex gap-2 text-xs text-[#9b978f]">
+                <span className="bg-[rgba(217,165,63,0.12)] text-[#d9a53f] px-2 py-1 rounded-full font-semibold">{category}</span>
                 <span className="bg-[rgba(255,255,255,0.05)] px-2 py-1 rounded-full">{duration === 'ongoing' ? '∞ Ongoing' : `${durationDays} days`}</span>
                 <span className="bg-[rgba(255,255,255,0.05)] px-2 py-1 rounded-full">{items.length} items</span>
               </div>
             </div>
 
             {items.length === 0 && (
-              <p className="text-xs text-[#FBBF24] bg-[rgba(251,191,36,0.1)] border border-[rgba(251,191,36,0.2)] rounded-xl px-4 py-3">
+              <p className="text-xs text-[#cf8148] bg-[rgba(207,129,72,0.1)] border border-[rgba(207,129,72,0.2)] rounded-xl px-4 py-3">
                 ⚠️ No items added. You can add them later from the protocol detail page.
               </p>
             )}
 
-            <div className="flex items-center gap-3 bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-xl p-4">
-              <input type="checkbox" checked={activateNow} onChange={e => setActivateNow(e.target.checked)} className="w-4 h-4 accent-[#3B82F6]" />
+            <div className="flex items-center gap-3 bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-4">
+              <input type="checkbox" checked={activateNow} onChange={e => setActivateNow(e.target.checked)} className="w-4 h-4 accent-[#d9a53f]" />
               <div>
-                <div className="text-sm font-semibold text-[#F0F6FC]">Activate now</div>
-                <div className="text-xs text-[#8B949E]">Start generating doses from today</div>
+                <div className="text-sm font-semibold text-[#e8e6e1]">Activate now</div>
+                <div className="text-xs text-[#9b978f]">Start generating doses from today</div>
               </div>
             </div>
 
