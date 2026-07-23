@@ -311,7 +311,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         {courseFinishedWithoutClosure && instance && (
           <div className="mt-3 bg-[rgba(207,129,72,0.12)] border border-[rgba(207,129,72,0.35)] rounded-xl p-3">
             <div className="text-xs font-mono font-bold text-[#cf8148] uppercase tracking-wide mb-1">Course finished</div>
-            <div className="text-sm text-[#E6EDF3]">
+            <div className="text-sm text-[#e8e6e1]">
               This course reached its end date. Mark as completed, or keep it active for history context.
             </div>
             {detailReadModel.canComplete && (
