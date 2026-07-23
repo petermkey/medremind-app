@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import type { DoseForm, FrequencyType, ProtocolCategory, ProtocolItem, RouteOfAdmin } from '@/types';
-import { DOSE_FORM_ICONS, ROUTE_ICONS } from '@/lib/icons';
 
 const ROUTE_LABELS: Record<string, string> = {
   oral: 'Oral', subcutaneous: 'Subcut.', intramuscular: 'IM',
@@ -138,7 +137,6 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
   if (!protocol) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
-        <div className="text-4xl">🤷</div>
         <div className="text-sm text-[#9b978f]">Protocol not found</div>
         <Button onClick={() => router.back()} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Go back</Button>
       </div>
@@ -258,6 +256,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         <button onClick={() => router.back()} className="text-[#9b978f] text-xl mb-3 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">← Back</button>
         <div className="flex items-start justify-between gap-3">
           <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">STACK</div>
             <h1 className="text-lg font-extrabold text-[#e8e6e1]">{protocol.name}</h1>
             {protocol.description && <p className="text-xs text-[#9b978f] mt-1">{protocol.description}</p>}
             {detailReadModel.isArchived && <p className="text-[11px] font-mono text-[#cf8148] mt-1 uppercase tracking-wide font-bold">Archived</p>}
@@ -271,16 +270,16 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
 
         <div className="flex gap-2 mt-4">
           {detailReadModel.canActivate && (
-            <Button size="sm" onClick={handleActivate} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">▶ Activate</Button>
+            <Button size="sm" onClick={handleActivate} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Activate</Button>
           )}
           {detailReadModel.canPause && instance && (
-            <Button size="sm" variant="secondary" onClick={() => { pauseProtocol(instance.id); show('Paused', 'warning'); }} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">⏸ Pause</Button>
+            <Button size="sm" variant="secondary" onClick={() => { pauseProtocol(instance.id); show('Paused', 'warning'); }} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Pause</Button>
           )}
           {detailReadModel.canResume && instance && (
-            <Button size="sm" onClick={() => { resumeProtocol(instance.id); show('Resumed'); }} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">▶ Resume</Button>
+            <Button size="sm" onClick={() => { resumeProtocol(instance.id); show('Resumed'); }} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Resume</Button>
           )}
           {detailReadModel.canComplete && instance && (
-            <Button size="sm" variant="danger" onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">✓ Complete</Button>
+            <Button size="sm" variant="danger" onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Complete</Button>
           )}
           {!protocol.isTemplate && (
             <Button
@@ -303,7 +302,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 router.replace('/app/protocols');
               }}
             >
-              🗑 Delete
+              Delete
             </Button>
           )}
         </div>
@@ -322,7 +321,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                   onClick={() => { completeProtocol(instance.id); show('Protocol completed'); }}
                   className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
                 >
-                  ✓ Mark completed
+                  Mark completed
                 </Button>
               </div>
             )}
@@ -419,9 +418,9 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
               }));
             }}
             options={[
-              { value: 'medication', label: '💊 Medication' },
-              { value: 'analysis', label: '🧪 Lab Analysis' },
-              { value: 'therapy', label: '🩺 Therapy' },
+              { value: 'medication', label: 'Medication' },
+              { value: 'analysis', label: 'Lab Analysis' },
+              { value: 'therapy', label: 'Therapy' },
             ]}
           />
 
@@ -448,22 +447,22 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 value={itemDraft.doseForm}
                 onChange={e => setItemDraft(d => ({ ...d, doseForm: e.target.value as DoseForm }))}
                 options={[
-                  { value: 'tablet',      label: `${DOSE_FORM_ICONS.tablet} Tablet` },
-                  { value: 'capsule',     label: `${DOSE_FORM_ICONS.capsule} Capsule` },
-                  { value: 'softgel',     label: `${DOSE_FORM_ICONS.softgel} Soft-gel` },
-                  { value: 'injection',   label: `${DOSE_FORM_ICONS.injection} Injection` },
-                  { value: 'cream',       label: `${DOSE_FORM_ICONS.cream} Cream / Gel` },
-                  { value: 'drops',       label: `${DOSE_FORM_ICONS.drops} Drops` },
-                  { value: 'powder',      label: `${DOSE_FORM_ICONS.powder} Powder` },
-                  { value: 'liquid',      label: `${DOSE_FORM_ICONS.liquid} Liquid / Syrup` },
-                  { value: 'patch',       label: `${DOSE_FORM_ICONS.patch} Patch` },
-                  { value: 'inhaler',     label: `${DOSE_FORM_ICONS.inhaler} Inhaler` },
-                  { value: 'spray',       label: `${DOSE_FORM_ICONS.spray} Spray` },
-                  { value: 'eye_drops',   label: `${DOSE_FORM_ICONS.eye_drops} Eye drops` },
-                  { value: 'nasal_spray', label: `${DOSE_FORM_ICONS.nasal_spray} Nasal spray` },
-                  { value: 'suppository', label: `${DOSE_FORM_ICONS.suppository} Suppository` },
-                  { value: 'lozenge',     label: `${DOSE_FORM_ICONS.lozenge} Lozenge` },
-                  { value: 'other',       label: `${DOSE_FORM_ICONS.other} Other` },
+                  { value: 'tablet',      label: 'Tablet' },
+                  { value: 'capsule',     label: 'Capsule' },
+                  { value: 'softgel',     label: 'Soft-gel' },
+                  { value: 'injection',   label: 'Injection' },
+                  { value: 'cream',       label: 'Cream / Gel' },
+                  { value: 'drops',       label: 'Drops' },
+                  { value: 'powder',      label: 'Powder' },
+                  { value: 'liquid',      label: 'Liquid / Syrup' },
+                  { value: 'patch',       label: 'Patch' },
+                  { value: 'inhaler',     label: 'Inhaler' },
+                  { value: 'spray',       label: 'Spray' },
+                  { value: 'eye_drops',   label: 'Eye drops' },
+                  { value: 'nasal_spray', label: 'Nasal spray' },
+                  { value: 'suppository', label: 'Suppository' },
+                  { value: 'lozenge',     label: 'Lozenge' },
+                  { value: 'other',       label: 'Other' },
                 ]}
               />
               <Select
@@ -471,15 +470,15 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
                 value={itemDraft.route}
                 onChange={e => setItemDraft(d => ({ ...d, route: e.target.value as RouteOfAdmin }))}
                 options={[
-                  { value: 'oral',            label: `${ROUTE_ICONS.oral} Oral` },
-                  { value: 'subcutaneous',    label: `${ROUTE_ICONS.subcutaneous} Subcutaneous` },
-                  { value: 'intramuscular',   label: `${ROUTE_ICONS.intramuscular} Intramuscular` },
-                  { value: 'topical',         label: `${ROUTE_ICONS.topical} Topical` },
-                  { value: 'sublingual',      label: `${ROUTE_ICONS.sublingual} Sublingual` },
-                  { value: 'inhalation',      label: `${ROUTE_ICONS.inhalation} Inhalation` },
-                  { value: 'nasal',           label: `${ROUTE_ICONS.nasal} Nasal` },
-                  { value: 'iv',              label: `${ROUTE_ICONS.iv} IV` },
-                  { value: 'other',           label: `${ROUTE_ICONS.other} Other` },
+                  { value: 'oral',            label: 'Oral' },
+                  { value: 'subcutaneous',    label: 'Subcutaneous' },
+                  { value: 'intramuscular',   label: 'Intramuscular' },
+                  { value: 'topical',         label: 'Topical' },
+                  { value: 'sublingual',      label: 'Sublingual' },
+                  { value: 'inhalation',      label: 'Inhalation' },
+                  { value: 'nasal',           label: 'Nasal' },
+                  { value: 'iv',              label: 'IV' },
+                  { value: 'other',           label: 'Other' },
                 ]}
               />
               <Select
@@ -601,7 +600,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         ))}
 
         <div className="mt-6 text-[11px] text-[#9b978f] bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 leading-relaxed">
-          ⚠️ This protocol is for personal tracking purposes only. MedRemind does not provide medical advice. Always consult your healthcare provider before starting, modifying, or stopping any medication or supplement protocol.
+          This protocol is for personal tracking purposes only. MedRemind does not provide medical advice. Always consult your healthcare provider before starting, modifying, or stopping any medication or supplement protocol.
         </div>
       </div>
     </div>
@@ -661,13 +660,13 @@ function ItemRow({
           onClick={() => { onEdit(); setSwiped(false); }}
           className="px-5 bg-[#d9a53f] text-[#14120b] text-[11px] font-mono font-bold uppercase tracking-wide flex flex-col items-center justify-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
-          ✏️<br />Edit
+          Edit
         </button>
         <button
           onClick={() => { onDelete(); setSwiped(false); }}
           className="px-5 bg-[#c96a5a] text-white text-[11px] font-mono font-bold uppercase tracking-wide flex flex-col items-center justify-center gap-1 rounded-r-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
-          ✕<br />Delete
+          Delete
         </button>
       </div>
     </div>

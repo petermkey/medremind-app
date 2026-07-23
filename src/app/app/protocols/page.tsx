@@ -6,13 +6,8 @@ import { format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import type { Protocol, ProtocolCategory } from '@/types';
+import type { Protocol } from '@/types';
 import { SEED_PROTOCOLS } from '@/lib/data/seed';
-
-const CATEGORY_ICONS: Record<ProtocolCategory, string> = {
-  general: '🌿', cardiovascular: '❤️', metabolic: '⚙️',
-  hormonal: '🔬', neurological: '🧠', immune: '🛡️', custom: '✏️',
-};
 
 const FILTERS = [
   { value: 'active', label: 'Current' },
@@ -145,7 +140,10 @@ export default function ProtocolsPage() {
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-extrabold text-[#e8e6e1]">Protocols</h1>
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">STACKS</div>
+            <h1 className="text-xl font-extrabold text-[#e8e6e1]">Protocols</h1>
+          </div>
           <button
             onClick={() => router.push('/app/protocols/new')}
             className="flex items-center gap-1.5 text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(217,165,63,0.1)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
@@ -181,7 +179,6 @@ export default function ProtocolsPage() {
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {filtered.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-4xl mb-3">📁</div>
             <div className="text-sm font-bold text-[#e8e6e1] mb-1">No protocols found</div>
             <div className="text-xs text-[#9b978f]">Try a different filter or create a custom protocol.</div>
           </div>
@@ -205,9 +202,6 @@ export default function ProtocolsPage() {
               onDelete={() => handleDelete(p)}
             >
               <div className="flex items-start gap-3" data-protocol-name={p.name}>
-                <div className="w-10 h-10 rounded-xl bg-[rgba(217,165,63,0.12)] flex items-center justify-center text-xl flex-shrink-0">
-                  {CATEGORY_ICONS[p.category] ?? '💊'}
-                </div>
                 <div className="flex-1 min-w-0">
                   <span className="block text-sm font-bold text-[#e8e6e1] truncate">{p.name}</span>
                   <div className="mt-1 flex items-center gap-2">
@@ -255,12 +249,12 @@ export default function ProtocolsPage() {
                     else handleActivate(p.id);
                   }}
                   className={[
-                    'text-xs font-semibold px-3 py-2 rounded-xl flex-shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                    'text-xs font-semibold px-3 py-2 rounded-xl border flex-shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                     instance?.status === 'active'
-                      ? 'bg-[rgba(207,129,72,0.15)] text-[#cf8148] hover:bg-[rgba(207,129,72,0.25)]'
+                      ? 'bg-transparent border-[#2e333a] text-[#9b978f] hover:border-[#605d56] hover:text-[#e8e6e1]'
                       : instance?.status === 'paused'
-                      ? 'bg-[rgba(143,174,116,0.15)] text-[#8fae74] hover:bg-[rgba(143,174,116,0.25)]'
-                      : 'bg-[rgba(217,165,63,0.15)] text-[#d9a53f] hover:bg-[rgba(217,165,63,0.25)]',
+                      ? 'bg-[rgba(143,174,116,0.15)] border-transparent text-[#8fae74] hover:bg-[rgba(143,174,116,0.25)]'
+                      : 'bg-[rgba(217,165,63,0.15)] border-transparent text-[#d9a53f] hover:bg-[rgba(217,165,63,0.25)]',
                   ].join(' ')}
                 >
                   {instance?.status === 'active' ? 'Pause' : instance?.status === 'paused' ? 'Resume' : 'Activate'}
@@ -350,7 +344,7 @@ function ProtocolRow({
           }}
           className="px-5 bg-[#d9a53f] text-[#14120b] text-[11px] font-bold flex flex-col items-center justify-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
-          ✏️<br />Edit
+          Edit
         </button>
         <button
           type="button"
@@ -362,7 +356,7 @@ function ProtocolRow({
           }}
           className="px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
-          ✕<br />Delete
+          Delete
         </button>
       </div>
     </div>

@@ -30,6 +30,7 @@ export default function MedsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">MEDS · {myMeds.length} ACTIVE</div>
         <h1 className="text-xl font-extrabold text-[#e8e6e1] mb-4">Medications</h1>
 
         <input
@@ -43,8 +44,8 @@ export default function MedsPage() {
         <div className="flex gap-2">
           {(['mine', 'catalogue'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${tab === t ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] text-[#9b978f]'}`}>
-              {t === 'mine' ? '💊 My Meds' : '📖 Catalogue'}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${tab === t ? 'bg-[#d9a53f] border-[#d9a53f] text-[#14120b]' : 'bg-transparent border-[#2e333a] text-[#9b978f] hover:border-[#605d56] hover:text-[#e8e6e1]'}`}>
+              {t === 'mine' ? 'My Meds' : 'Catalogue'}
             </button>
           ))}
         </div>
@@ -56,7 +57,6 @@ export default function MedsPage() {
             <StackGuardCard />
             {myMeds.length === 0 ? (
               <div className="text-center py-16">
-                <div className="text-4xl mb-3">💊</div>
                 <div className="text-sm font-bold text-[#e8e6e1] mb-1">No active medications</div>
                 <div className="text-xs text-[#9b978f]">Activate a protocol to see your medications here.</div>
               </div>
@@ -64,12 +64,11 @@ export default function MedsPage() {
               myMeds
                 .filter(m => !search || m.name.toLowerCase().includes(search.toLowerCase()))
                 .map((med, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 mb-2.5">
-                    <span className="text-2xl">{med.icon ?? '💊'}</span>
-                    <div className="flex-1">
-                      <div className="text-sm font-bold text-[#e8e6e1]">{med.name} {med.doseAmount ? `${med.doseAmount}${med.doseUnit}` : ''}</div>
-                      <div className="text-xs text-[#9b978f] mt-0.5">{med.protocolName}</div>
+                  <div key={i} className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 mb-2.5">
+                    <div className="text-sm font-bold text-[#e8e6e1]">
+                      {med.name}{med.doseAmount ? <> <span className="font-mono tabular-nums">{med.doseAmount}{med.doseUnit}</span></> : null}
                     </div>
+                    <div className="text-xs text-[#9b978f] mt-0.5">{med.protocolName}</div>
                   </div>
                 ))
             )}
