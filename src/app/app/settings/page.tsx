@@ -389,7 +389,7 @@ export default function SettingsPage() {
       <div className="flex-1 overflow-y-auto px-5 pb-8">
 
         {/* Profile */}
-        <Section title="👤 Profile">
+        <Section title="Profile">
           <Input label="Display name" value={name} onChange={e => setName(e.target.value)} />
           <Select label="Age range" value={ageRange} onChange={e => setAgeRange(e.target.value as '18-30'|'31-50'|'51-70'|'70+')}
             options={['18-30','31-50','51-70','70+'].map(v => ({ value: v, label: v }))} />
@@ -401,7 +401,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Notifications */}
-        <Section title="🔔 Notifications">
+        <Section title="Notifications">
           {pushEnabled && zeroPushSubscriptions && (
             <div className="bg-[rgba(201,106,90,0.08)] border border-[rgba(201,106,90,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
               <p className="text-xs font-semibold text-[#d98a7c]">Push isn&apos;t actually reaching this device</p>
@@ -434,7 +434,7 @@ export default function SettingsPage() {
           <Button size="sm" onClick={saveNotifications}>Save Notifications</Button>
         </Section>
 
-        <Section title="🧭 Integrations">
+        <Section title="Integrations">
           <div className="pb-4 border-b border-[#23272d]">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -499,7 +499,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* About */}
-        <Section title="ℹ️ About">
+        <Section title="About">
           <div className="text-sm text-[#9b978f] leading-relaxed bg-[rgba(217,165,63,0.05)] border border-[rgba(217,165,63,0.15)] rounded-xl p-4">
             <strong className="text-[#e8e6e1]">MedRemind v0.1.0</strong><br /><br />
             This app is a protocol management and adherence tracking tool. It is <strong>not</strong> a medical device and does not provide medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting, modifying, or discontinuing any medication or supplement regimen.
@@ -520,7 +520,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* Account */}
-        <Section title="⚙️ Account">
+        <Section title="Account">
           <Button variant="secondary" fullWidth onClick={handleSignOut} loading={flushing}>Sign Out</Button>
           {!showDeleteConfirm ? (
             <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-[#c96a5a] hover:underline text-center w-full mt-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
@@ -537,7 +537,7 @@ export default function SettingsPage() {
           )}
         </Section>
 
-        <Section title="☁️ Data Recovery">
+        <Section title="Data Recovery">
           <p className="text-xs text-[#9b978f] leading-relaxed font-mono tabular-nums">
             Cloud sync: {outbox.pending > 0 ? `${outbox.pending} pending change(s)` : 'all changes synced'}.
             {outbox.lastSuccessAt ? ` Last success: ${new Date(outbox.lastSuccessAt).toLocaleTimeString()}.` : ''}

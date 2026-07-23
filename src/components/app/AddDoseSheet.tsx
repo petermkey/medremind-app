@@ -12,9 +12,9 @@ import { format } from 'date-fns';
 interface Props { open: boolean; onClose: () => void; }
 
 const ITEM_TYPES: { value: ItemType; label: string }[] = [
-  { value: 'medication', label: '💊 Medication / Supplement' },
-  { value: 'analysis',   label: '🧪 Lab Analysis / Test' },
-  { value: 'therapy',    label: '🩺 Therapy / Procedure' },
+  { value: 'medication', label: 'Medication / Supplement' },
+  { value: 'analysis',   label: 'Lab Analysis / Test' },
+  { value: 'therapy',    label: 'Therapy / Procedure' },
 ];
 
 const DOSE_FORMS: { value: DoseForm; label: string }[] = [

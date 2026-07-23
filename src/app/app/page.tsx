@@ -53,6 +53,7 @@ export default function SchedulePage() {
     selectAppNextDose,
     selectAppSummaryMetrics,
     selectCalendarVisibleDoseDates,
+    getStreak,
     takeDose,
     skipDose,
     snoozeDose,
@@ -145,8 +146,7 @@ export default function SchedulePage() {
       if (!isHistoryDate) return selectAppSummaryMetrics(selectedDate);
       const historyTotal = actionableDoses.length;
       const historyTaken = actionableDoses.filter(d => d.status === 'taken').length;
-      const historyPct = historyTotal ? Math.round((historyTaken / historyTotal) * 100) : 0;
-      return { taken: historyTaken, total: historyTotal, pct: historyPct };
+      return { taken: historyTaken, total: historyTotal };
     },
     [selectedDate, isHistoryDate, scheduledDoses, actionableDoses, selectAppSummaryMetrics],
   );
@@ -272,9 +272,9 @@ export default function SchedulePage() {
           <div className="w-px h-[34px] bg-[#23272d]" />
           <div className="flex-1">
             <div className="font-mono tabular-nums text-[22px] font-semibold leading-none text-[#d9a53f]">
-              {total - taken}
+              {getStreak()}
             </div>
-            <div className="mt-1 text-[11px] text-[#9b978f]">remaining</div>
+            <div className="mt-1 text-[11px] text-[#9b978f]">day streak</div>
           </div>
         </div>
 

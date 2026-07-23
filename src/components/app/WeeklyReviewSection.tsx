@@ -63,7 +63,7 @@ export function WeeklyReviewSection() {
       className="rounded-2xl border border-[rgba(162,146,201,0.3)] bg-[rgba(162,146,201,0.06)] p-4 mt-3 mb-3"
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-bold text-[#e8e6e1]">🧠 Weekly review</div>
+        <div className="text-sm font-bold text-[#e8e6e1]">Weekly review</div>
         <div className="text-[11px] text-[#9b978f]">{formatWeek(selected.weekStart)}</div>
       </div>
 

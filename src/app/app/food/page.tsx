@@ -98,12 +98,6 @@ const BODY_FAT_OPTIONS: { value: NutritionBodyFatRange; label: string }[] = [
   { value: '25%+', label: '25%+' },
 ];
 
-const MACRO_CELLS = [
-  { key: 'proteinG', totalKey: 'proteinG', label: 'Protein', unit: 'g' },
-  { key: 'fatG', totalKey: 'totalFatG', label: 'Fat', unit: 'g' },
-  { key: 'carbsG', totalKey: 'carbsG', label: 'Carbs', unit: 'g' },
-] as const;
-
 const BTN_QUIET =
   'rounded-[10px] border border-[#2e333a] bg-transparent text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2';
 
@@ -964,33 +958,42 @@ export default function FoodPage() {
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-1.5">
-                {MACRO_CELLS.map(cell => (
-                  <MacroCell
-                    key={cell.key}
-                    label={cell.label}
-                    unit={cell.unit}
-                    consumed={Math.round(Number(totals[cell.totalKey] ?? 0))}
-                    target={targetProfile[cell.key]}
-                  />
-                ))}
+                <MacroCell
+                  label="Protein"
+                  unit="g"
+                  consumed={Math.round(Number(totals.proteinG ?? 0))}
+                  target={targetProfile.proteinG}
+                />
+                <MacroCell
+                  label="Fiber"
+                  unit="g"
+                  consumed={Math.round(Number(totals.fiberG ?? 0))}
+                  target={targetProfile.fiberG}
+                />
+                <div className="rounded-xl bg-[#0e1013] px-2 py-1.5">
+                  <div className="font-mono text-xs font-semibold tabular-nums text-[#e8e6e1]">
+                    {waterDisplay(waterTotal)}<span className="text-[#605d56]">/{waterDisplay(targetProfile.waterMl)}</span>
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10.5px] text-[#9b978f]">
+                    <span>Water</span>
+                    {loadingWater && <span className="ml-1 text-[#605d56]">Loading...</span>}
+                  </div>
+                </div>
               </div>
               <div className="mt-1.5 rounded-xl">
                 <div className="grid grid-cols-3 gap-1.5">
                   <MacroCell
-                    label="Fiber"
+                    label="Fat"
                     unit="g"
-                    consumed={Math.round(Number(totals.fiberG ?? 0))}
-                    target={targetProfile.fiberG}
+                    consumed={Math.round(Number(totals.totalFatG ?? 0))}
+                    target={targetProfile.fatG}
                   />
-                  <div className="rounded-xl bg-[#0e1013] px-2 py-1.5">
-                    <div className="font-mono text-xs font-semibold tabular-nums text-[#e8e6e1]">
-                      {waterDisplay(waterTotal)}<span className="text-[#605d56]">/{waterDisplay(targetProfile.waterMl)}</span>
-                    </div>
-                    <div className="mt-0.5 font-mono text-[10.5px] text-[#9b978f]">
-                      <span>Water</span>
-                      {loadingWater && <span className="ml-1 text-[#605d56]">Loading...</span>}
-                    </div>
-                  </div>
+                  <MacroCell
+                    label="Carbs"
+                    unit="g"
+                    consumed={Math.round(Number(totals.carbsG ?? 0))}
+                    target={targetProfile.carbsG}
+                  />
                   <div className="rounded-xl bg-[#0e1013] px-2 py-1.5">
                     <div className="font-mono text-sm font-semibold tabular-nums text-[#e8e6e1]">
                       {progressPercent(Math.round(Number(totals.caloriesKcal ?? 0)), targetProfile.caloriesKcal)}<span className="text-[10px] font-medium text-[#605d56]">%</span>

@@ -111,7 +111,6 @@ export default function InsightsPage() {
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-6 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-4xl mb-3">📊</div>
             <div className="text-sm font-bold text-[#e8e6e1] mb-1">No nutrition data yet</div>
             <div className="text-xs text-[#9b978f]">Log a meal to see your 7-day summary.</div>
           </div>
