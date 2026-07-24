@@ -383,37 +383,38 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
-        <h1 className="text-xl font-extrabold text-[#F0F6FC]">Settings</h1>
+        <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">SETUP</div>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Settings</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-8">
 
         {/* Profile */}
-        <Section title="👤 Profile">
+        <Section title="Profile">
           <Input label="Display name" value={name} onChange={e => setName(e.target.value)} />
           <Select label="Age range" value={ageRange} onChange={e => setAgeRange(e.target.value as '18-30'|'31-50'|'51-70'|'70+')}
             options={['18-30','31-50','51-70','70+'].map(v => ({ value: v, label: v }))} />
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Timezone</label>
-            <p className="text-sm text-[#F0F6FC] bg-[#1C2333] px-4 py-3 rounded-xl border border-[rgba(255,255,255,0.08)]">{timezone}</p>
+            <label className="text-[10px] font-mono font-semibold text-[#9b978f] uppercase tracking-wider">Timezone</label>
+            <p className="text-sm text-[#e8e6e1] bg-[#191d22] px-4 py-3 rounded-xl border border-[#23272d]">{timezone}</p>
           </div>
           <Button size="sm" onClick={handleSaveProfile}>Save Profile</Button>
         </Section>
 
         {/* Notifications */}
-        <Section title="🔔 Notifications">
+        <Section title="Notifications">
           {pushEnabled && zeroPushSubscriptions && (
-            <div className="bg-[rgba(248,81,73,0.08)] border border-[rgba(248,81,73,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
-              <p className="text-xs font-semibold text-[#F85149]">Push isn&apos;t actually reaching this device</p>
-              <p className="text-xs text-[#8B949E] leading-relaxed">
+            <div className="bg-[rgba(201,106,90,0.08)] border border-[rgba(201,106,90,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+              <p className="text-xs font-semibold text-[#d98a7c]">Push isn&apos;t actually reaching this device</p>
+              <p className="text-xs text-[#9b978f] leading-relaxed">
                 Push notifications are turned on, but no subscription is on file for your account. Toggle push off and back on to re-subscribe.
               </p>
             </div>
           )}
           {installState === 'browser' && (
-            <div className="bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
-              <p className="text-xs font-semibold text-[#FBB924]">Add to Home Screen for push notifications</p>
-              <p className="text-xs text-[#8B949E] leading-relaxed">
+            <div className="bg-[rgba(207,129,72,0.08)] border border-[rgba(207,129,72,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+              <p className="text-xs font-semibold text-[#cf8148]">Add to Home Screen for push notifications</p>
+              <p className="text-xs text-[#9b978f] leading-relaxed">
                 Push notifications only work when MedRemind is installed on your Home Screen. In Safari, tap the share icon and select &ldquo;Add to Home Screen&rdquo;.
               </p>
             </div>
@@ -434,12 +435,12 @@ export default function SettingsPage() {
           <Button size="sm" onClick={saveNotifications}>Save Notifications</Button>
         </Section>
 
-        <Section title="🧭 Integrations">
-          <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
+        <Section title="Integrations">
+          <div className="pb-4 border-b border-[#23272d]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-[#F0F6FC]">Oura</div>
-                <div className="mt-1 text-xs text-[#8B949E]">
+                <div className="text-sm font-semibold text-[#e8e6e1]">Oura</div>
+                <div className="mt-1 text-xs text-[#9b978f] font-mono tabular-nums">
                   {ouraStatus?.connected ? 'Connected' : 'Not connected'}
                   {ouraStatus?.lastSyncAt ? ` · Last sync: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : ''}
                   {ouraStatus?.battery
@@ -453,37 +454,37 @@ export default function SettingsPage() {
                     type="button"
                     onClick={handleOuraDisconnect}
                     disabled={disconnectingOura}
-                    className="text-xs font-semibold text-[#FCA5A5] hover:underline disabled:opacity-50"
+                    className="text-xs font-semibold text-[#e2a89d] hover:underline disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
                   >
                     Disconnect
                   </button>
                 ) : (
-                  <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+                  <a href="/api/integrations/oura/connect" className="text-xs font-semibold text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                     Connect
                   </a>
                 )}
               </div>
             </div>
             {ouraStatus?.connected && (ouraStatus.missingScopes?.length ?? 0) > 0 && (
-              <div className="mt-3 rounded-xl border border-[rgba(251,191,36,0.25)] bg-[rgba(251,191,36,0.08)] px-4 py-3 flex flex-col gap-1">
-                <p className="text-xs font-semibold text-[#FBB924]">Missing permissions — reconnect Oura</p>
-                <p className="text-xs text-[#8B949E] leading-relaxed">
+              <div className="mt-3 rounded-xl border border-[rgba(207,129,72,0.25)] bg-[rgba(207,129,72,0.08)] px-4 py-3 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-[#cf8148]">Missing permissions — reconnect Oura</p>
+                <p className="text-xs text-[#9b978f] leading-relaxed">
                   Your Oura connection is missing: {ouraStatus.missingScopes!.join(', ')}. Some data won&apos;t sync until you reconnect.
                 </p>
-                <a href="/api/integrations/oura/connect" className="mt-1 text-xs font-semibold text-[#FBB924] hover:underline">
+                <a href="/api/integrations/oura/connect" className="mt-1 text-xs font-semibold text-[#cf8148] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                   Reconnect Oura →
                 </a>
               </div>
             )}
-            <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#8B949E] hover:text-[#F0F6FC]">
+            <a href="https://cloud.ouraring.com/user/apps" className="mt-3 block text-xs font-semibold text-[#9b978f] hover:text-[#e8e6e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Manage Oura app access
             </a>
           </div>
-          <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
+          <div>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-[#F0F6FC]">Health sync</div>
-                <div className="mt-1 text-xs text-[#8B949E]">
+                <div className="text-sm font-semibold text-[#e8e6e1]">Health sync</div>
+                <div className="mt-1 text-xs text-[#9b978f] font-mono tabular-nums">
                   {healthSyncStatus || (ouraStatus?.lastSyncAt ? `Last run: ${new Date(ouraStatus.lastSyncAt).toLocaleString()}` : 'No health sync run shown yet.')}
                   {ringBatteryLow ? ' · Ring battery is low — data may stop arriving.' : ''}
                 </div>
@@ -492,43 +493,43 @@ export default function SettingsPage() {
                 Sync
               </Button>
             </div>
-            <a href="/app/progress" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+            <a href="/app/progress" className="text-xs font-semibold text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Open Progress analytics
             </a>
           </div>
         </Section>
 
         {/* About */}
-        <Section title="ℹ️ About">
-          <div className="text-sm text-[#8B949E] leading-relaxed bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.15)] rounded-xl p-4">
-            <strong className="text-[#F0F6FC]">MedRemind v0.1.0</strong><br /><br />
+        <Section title="About">
+          <div className="text-sm text-[#9b978f] leading-relaxed bg-[rgba(217,165,63,0.05)] border border-[rgba(217,165,63,0.15)] rounded-xl p-4">
+            <strong className="text-[#e8e6e1]">MedRemind v0.1.0</strong><br /><br />
             This app is a protocol management and adherence tracking tool. It is <strong>not</strong> a medical device and does not provide medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting, modifying, or discontinuing any medication or supplement regimen.
             {buildInfo && (
               <>
                 <br /><br />
                 <span className="text-xs">
-                  Build: <code>{buildInfo.sha.slice(0, 7)}</code> · Env: <code>{buildInfo.environment}</code>
+                  Build: <code className="font-mono tabular-nums">{buildInfo.sha.slice(0, 7)}</code> · Env: <code className="font-mono tabular-nums">{buildInfo.environment}</code>
                 </span>
               </>
             )}
           </div>
           <div className="flex gap-2 text-xs">
-            <a href="#" className="text-[#3B82F6] hover:underline">Privacy Policy</a>
-            <span className="text-[#8B949E]">·</span>
-            <a href="#" className="text-[#3B82F6] hover:underline">Terms of Service</a>
+            <a href="#" className="text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Privacy Policy</a>
+            <span className="text-[#9b978f]">·</span>
+            <a href="#" className="text-[#d9a53f] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Terms of Service</a>
           </div>
         </Section>
 
         {/* Account */}
-        <Section title="⚙️ Account">
+        <Section title="Account">
           <Button variant="secondary" fullWidth onClick={handleSignOut} loading={flushing}>Sign Out</Button>
           {!showDeleteConfirm ? (
-            <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-[#EF4444] hover:underline text-center w-full mt-1">
+            <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-[#c96a5a] hover:underline text-center w-full mt-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Delete account and all data
             </button>
           ) : (
-            <div className="bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] rounded-xl p-4 flex flex-col gap-3">
-              <p className="text-sm text-[#EF4444] font-semibold">This will permanently delete all your data.</p>
+            <div className="bg-[rgba(201,106,90,0.1)] border border-[rgba(201,106,90,0.3)] rounded-xl p-4 flex flex-col gap-3">
+              <p className="text-sm text-[#c96a5a] font-semibold">This will permanently delete all your data.</p>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
                 <Button variant="danger" size="sm" onClick={handleDeleteAccount}>Delete Everything</Button>
@@ -537,14 +538,14 @@ export default function SettingsPage() {
           )}
         </Section>
 
-        <Section title="☁️ Data Recovery">
-          <p className="text-xs text-[#8B949E] leading-relaxed">
+        <Section title="Data Recovery">
+          <p className="text-xs text-[#9b978f] leading-relaxed font-mono tabular-nums">
             Cloud sync: {outbox.pending > 0 ? `${outbox.pending} pending change(s)` : 'all changes synced'}.
             {outbox.lastSuccessAt ? ` Last success: ${new Date(outbox.lastSuccessAt).toLocaleTimeString()}.` : ''}
           </p>
           {outbox.lastError && (
-            <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
-              <p className="text-xs text-[#FCA5A5]">Sync error: {outbox.lastError}</p>
+            <div className="bg-[rgba(201,106,90,0.08)] border border-[rgba(201,106,90,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
+              <p className="text-xs text-[#e2a89d]">Sync error: {outbox.lastError}</p>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={handleRetrySync}>Retry now</Button>
                 <Button variant="danger" size="sm" onClick={handleClearOutbox}>Clear outbox</Button>
@@ -552,8 +553,8 @@ export default function SettingsPage() {
             </div>
           )}
           {outbox.deadLettered > 0 && (
-            <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
-              <p className="text-xs text-[#FCA5A5]">
+            <div className="bg-[rgba(201,106,90,0.08)] border border-[rgba(201,106,90,0.25)] rounded-xl px-3 py-2 flex flex-col gap-2">
+              <p className="text-xs text-[#e2a89d] font-mono tabular-nums">
                 {outbox.deadLettered} change(s) failed permanently after repeated retries and will not sync.
               </p>
               <div className="flex gap-2">
@@ -561,7 +562,7 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
-          <p className="text-xs text-[#8B949E] leading-relaxed">
+          <p className="text-xs text-[#9b978f] leading-relaxed">
             Import old `medremind-store` snapshot into Supabase for the current signed-in account.
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -587,7 +588,7 @@ export default function SettingsPage() {
             </Button>
           </div>
           {syncStatus && (
-            <p className="text-xs text-[#8B949E] bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)] rounded-xl px-3 py-2">
+            <p className="text-xs text-[#9b978f] bg-[rgba(143,174,116,0.08)] border border-[rgba(143,174,116,0.2)] rounded-xl px-3 py-2">
               {syncStatus}
             </p>
           )}
@@ -596,10 +597,10 @@ export default function SettingsPage() {
             onChange={e => setImportPayload(e.target.value)}
             placeholder="Paste medremind-store JSON here"
             rows={7}
-            className="w-full bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#F0F6FC] text-xs font-mono outline-none focus:border-[#3B82F6]"
+            className="w-full bg-[#191d22] border border-[#23272d] rounded-xl px-4 py-3 text-[#e8e6e1] text-xs font-mono outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
           />
           {importStatus && (
-            <p className="text-xs text-[#8B949E] bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.15)] rounded-xl px-3 py-2">
+            <p className="text-xs text-[#9b978f] bg-[rgba(217,165,63,0.06)] border border-[rgba(217,165,63,0.15)] rounded-xl px-3 py-2">
               {importStatus}
             </p>
           )}
@@ -613,8 +614,8 @@ export default function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-3">{title}</div>
-      <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 flex flex-col gap-4">
+      <div className="text-[10px] font-mono font-semibold text-[#9b978f] uppercase tracking-wider mb-3">{title}</div>
+      <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 flex flex-col gap-4">
         {children}
       </div>
     </div>
@@ -625,15 +626,15 @@ function Toggle({ label, sub, checked, onChange }: { label: string; sub: string;
   return (
     <div className="flex items-center justify-between gap-3">
       <div>
-        <div className="text-sm font-semibold text-[#F0F6FC]">{label}</div>
-        <div className="text-xs text-[#8B949E]">{sub}</div>
+        <div className="text-sm font-semibold text-[#e8e6e1]">{label}</div>
+        <div className="text-xs text-[#9b978f]">{sub}</div>
       </div>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         aria-label={label}
         aria-pressed={checked}
-        className={`w-12 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 ${checked ? 'bg-[#3B82F6]' : 'bg-[#1C2333]'}`}
+        className={`w-12 h-6 rounded-full transition-colors duration-200 relative flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 ${checked ? 'bg-[#d9a53f]' : 'bg-[#2e333a]'}`}
       >
         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all duration-200 ${checked ? 'left-6' : 'left-0.5'}`} />
       </button>

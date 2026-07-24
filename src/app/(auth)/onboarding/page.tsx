@@ -10,13 +10,13 @@ import { Input, Select } from '@/components/ui/Input';
 import type { AgeRange, ProtocolCategory } from '@/types';
 
 const CATEGORY_LABELS: Record<ProtocolCategory, string> = {
-  general: '🌿 General Health',
-  cardiovascular: '❤️ Cardiovascular',
-  metabolic: '⚙️ Metabolic',
-  hormonal: '🔬 Hormonal',
-  neurological: '🧠 Neurological',
-  immune: '🛡️ Immune',
-  custom: '✏️ Custom',
+  general: 'General Health',
+  cardiovascular: 'Cardiovascular',
+  metabolic: 'Metabolic',
+  hormonal: 'Hormonal',
+  neurological: 'Neurological',
+  immune: 'Immune',
+  custom: 'Custom',
 };
 
 export default function OnboardingPage() {
@@ -94,12 +94,12 @@ export default function OnboardingPage() {
   const stepLabels = ['Profile', 'Protocol', 'Reminders'];
 
   return (
-    <div className="min-h-screen bg-[#0D1117] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#0e1013] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="w-10 h-10 rounded-xl bg-[#3B82F6] flex items-center justify-center text-xl">💊</div>
-          <span className="text-xl font-bold text-[#F0F6FC]">MedRemind</span>
+          <div className="w-10 h-10 rounded-xl bg-[#14171b] border border-[#23272d] flex items-center justify-center text-xl">💊</div>
+          <span className="text-xl font-bold text-[#e8e6e1] tracking-tight">MedRemind</span>
         </div>
 
         {/* Step indicator */}
@@ -107,13 +107,13 @@ export default function OnboardingPage() {
           {stepLabels.map((label, i) => (
             <div key={label} className="flex items-center gap-2 flex-1">
               <div className={[
-                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                i + 1 < step ? 'bg-[#10B981] text-white' : i + 1 === step ? 'bg-[#3B82F6] text-white' : 'bg-[#1C2333] text-[#8B949E]',
+                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold tabular-nums flex-shrink-0 border',
+                i + 1 < step ? 'bg-[#8fae74] border-[#8fae74] text-[#14120b]' : i + 1 === step ? 'bg-[#d9a53f] border-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] border-[#23272d] text-[#9b978f]',
               ].join(' ')}>
                 {i + 1 < step ? '✓' : i + 1}
               </div>
-              <span className={`text-xs font-semibold whitespace-nowrap ${i + 1 === step ? 'text-[#F0F6FC]' : 'text-[#8B949E]'}`}>{label}</span>
-              {i < 2 && <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />}
+              <span className={`text-[10px] font-mono uppercase tracking-wider whitespace-nowrap ${i + 1 === step ? 'text-[#e8e6e1]' : 'text-[#9b978f]'}`}>{label}</span>
+              {i < 2 && <div className="flex-1 h-px bg-[#23272d]" />}
             </div>
           ))}
         </div>
@@ -122,10 +122,10 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="fade-in flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#F0F6FC] mb-1">Tell us about yourself</h2>
-              <p className="text-sm text-[#8B949E]">This personalises your experience.</p>
+              <h2 className="text-2xl font-extrabold text-[#e8e6e1] mb-1">Tell us about yourself</h2>
+              <p className="text-sm text-[#9b978f]">This personalises your experience.</p>
             </div>
-            <Input label="Your name" value={name} onChange={e => setName(e.target.value)} placeholder="Peter" />
+            <Input label="Your name" value={name} onChange={e => setName(e.target.value)} placeholder="Peter" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
             <Select
               label="Age range"
               value={ageRange}
@@ -136,15 +136,16 @@ export default function OnboardingPage() {
                 { value: '51-70', label: '51 – 70' },
                 { value: '70+',   label: '70+' },
               ]}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#8B949E] uppercase tracking-wide">Timezone</label>
-              <p className="text-sm text-[#F0F6FC] bg-[#1C2333] px-4 py-3 rounded-xl border border-[rgba(255,255,255,0.08)]">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Timezone</label>
+              <p className="text-sm text-[#e8e6e1] bg-[#191d22] px-4 py-3 rounded-xl border border-[#23272d] font-mono tabular-nums">
                 {timezone}
               </p>
-              <p className="text-xs text-[#8B949E]">Auto-detected. Change in settings later.</p>
+              <p className="text-xs text-[#9b978f]">Auto-detected. Change in settings later.</p>
             </div>
-            <Button fullWidth size="lg" onClick={handleStep1} disabled={!name.trim()}>
+            <Button fullWidth size="lg" onClick={handleStep1} disabled={!name.trim()} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Continue →
             </Button>
           </div>
@@ -154,8 +155,8 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="fade-in flex flex-col gap-5">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#F0F6FC] mb-1">Choose a starter protocol</h2>
-              <p className="text-sm text-[#8B949E]">Pick one to get started, or skip and build your own.</p>
+              <h2 className="text-2xl font-extrabold text-[#e8e6e1] mb-1">Choose a starter protocol</h2>
+              <p className="text-sm text-[#9b978f]">Pick one to get started, or skip and build your own.</p>
             </div>
 
             <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
@@ -165,21 +166,22 @@ export default function OnboardingPage() {
                   onClick={() => setSelectedProtocolId(prev => prev === p.id ? null : p.id)}
                   className={[
                     'text-left p-4 rounded-2xl border transition-all duration-200',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                     selectedProtocolId === p.id
-                      ? 'border-[#3B82F6] bg-[rgba(59,130,246,0.1)]'
-                      : 'border-[rgba(255,255,255,0.08)] bg-[#161B22] hover:border-[rgba(255,255,255,0.2)]',
+                      ? 'border-[#d9a53f] bg-[rgba(217,165,63,0.1)]'
+                      : 'border-[#23272d] bg-[#14171b] hover:border-[#2e333a]',
                   ].join(' ')}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-sm font-bold text-[#F0F6FC]">{p.name}</div>
-                      <div className="text-xs text-[#8B949E] mt-1 leading-relaxed">{p.description}</div>
+                      <div className="text-sm font-bold text-[#e8e6e1]">{p.name}</div>
+                      <div className="text-xs text-[#9b978f] mt-1 leading-relaxed">{p.description}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[#3B82F6] bg-[rgba(59,130,246,0.15)] px-2 py-1 rounded-full">
+                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[#d9a53f] bg-[rgba(217,165,63,0.15)] px-2 py-1 rounded-full">
                         {CATEGORY_LABELS[p.category]}
                       </span>
-                      <span className="text-[10px] text-[#8B949E]">{p.items.length} items</span>
+                      <span className="text-[10px] font-mono tabular-nums text-[#9b978f]">{p.items.length} items</span>
                     </div>
                   </div>
                 </button>
@@ -187,10 +189,10 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex gap-3">
-              <Button variant="secondary" fullWidth onClick={() => handleStep2(true)}>
+              <Button variant="secondary" fullWidth onClick={() => handleStep2(true)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                 Skip for now
               </Button>
-              <Button fullWidth onClick={() => handleStep2(false)}>
+              <Button fullWidth onClick={() => handleStep2(false)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
                 {selectedProtocolId ? 'Use this protocol →' : 'Continue →'}
               </Button>
             </div>
@@ -201,42 +203,42 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="fade-in flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#F0F6FC] mb-1">Set your reminder times</h2>
-              <p className="text-sm text-[#8B949E]">These are defaults. You can adjust per-protocol later.</p>
+              <h2 className="text-2xl font-extrabold text-[#e8e6e1] mb-1">Set your reminder times</h2>
+              <p className="text-sm text-[#9b978f]">These are defaults. You can adjust per-protocol later.</p>
             </div>
 
             <div className="flex flex-col gap-4">
               {[
-                { label: '🌅 Morning', value: morningTime, onChange: setMorningTime },
-                { label: '☀️ Afternoon', value: afternoonTime, onChange: setAfternoonTime },
-                { label: '🌙 Evening', value: eveningTime, onChange: setEveningTime },
+                { label: 'Morning', value: morningTime, onChange: setMorningTime },
+                { label: 'Afternoon', value: afternoonTime, onChange: setAfternoonTime },
+                { label: 'Evening', value: eveningTime, onChange: setEveningTime },
               ].map(({ label, value, onChange }) => (
-                <div key={label} className="flex items-center justify-between bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl px-4 py-4">
-                  <span className="text-sm font-semibold text-[#F0F6FC]">{label}</span>
+                <div key={label} className="flex items-center justify-between bg-[#14171b] border border-[#23272d] rounded-2xl px-4 py-4">
+                  <span className="text-sm font-semibold text-[#e8e6e1]">{label}</span>
                   <input
                     type="time"
                     value={value}
                     onChange={e => onChange(e.target.value)}
-                    className="bg-[#1C2333] border border-[rgba(255,255,255,0.08)] rounded-xl px-3 py-2 text-[#F0F6FC] text-sm outline-none focus:border-[#3B82F6]"
+                    className="bg-[#191d22] border border-[#23272d] rounded-xl px-3 py-2 text-[#e8e6e1] text-sm font-mono tabular-nums outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
                   />
                 </div>
               ))}
             </div>
 
             {installState === 'browser' ? (
-              <div className="bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
-                <p className="text-xs font-semibold text-[#FBB924]">Add to Home Screen for push reminders</p>
-                <p className="text-xs text-[#8B949E] leading-relaxed">
+              <div className="bg-[rgba(207,129,72,0.08)] border border-[rgba(207,129,72,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-[#cf8148]">Add to Home Screen for push reminders</p>
+                <p className="text-xs text-[#9b978f] leading-relaxed">
                   Tap the share icon in Safari, then &ldquo;Add to Home Screen&rdquo;. Push notifications only work from the installed app.
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-[#8B949E] leading-relaxed bg-[rgba(16,185,129,0.06)] border border-[rgba(16,185,129,0.2)] rounded-xl px-4 py-3">
+              <p className="text-xs text-[#9b978f] leading-relaxed bg-[rgba(143,174,116,0.06)] border border-[rgba(143,174,116,0.2)] rounded-xl px-4 py-3">
                 Push reminders will be requested when you tap Get started.
               </p>
             )}
 
-            <Button fullWidth size="lg" onClick={handleFinish}>
+            <Button fullWidth size="lg" onClick={handleFinish} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
               Get started →
             </Button>
           </div>

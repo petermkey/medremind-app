@@ -3,30 +3,21 @@ import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ScheduledDose } from '@/types';
 
-const COLOR_MAP: Record<string, { bg: string; text: string }> = {
-  red:    { bg: 'rgba(239,68,68,0.15)',   text: '#EF4444' },
-  blue:   { bg: 'rgba(59,130,246,0.15)',  text: '#3B82F6' },
-  green:  { bg: 'rgba(16,185,129,0.15)',  text: '#10B981' },
-  yellow: { bg: 'rgba(251,191,36,0.15)',  text: '#FBBF24' },
-  purple: { bg: 'rgba(139,92,246,0.15)',  text: '#8B5CF6' },
-  pink:   { bg: 'rgba(236,72,153,0.15)',  text: '#EC4899' },
-};
-
 const STATUS_COLOR: Record<string, string> = {
-  taken:     '#10B981',
-  upcoming:  '#3B82F6',
-  overdue:   '#EF4444',
-  skipped:   '#8B949E',
-  snoozed:   '#FBBF24',
-  pending:   '#3B82F6',
+  taken:     '#8fae74',
+  upcoming:  '#d9a53f',
+  overdue:   '#c96a5a',
+  skipped:   '#9b978f',
+  snoozed:   '#cf8148',
+  pending:   '#d9a53f',
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  taken:    '✓ Taken',
+  taken:    'Taken',
   upcoming: 'Upcoming',
-  overdue:  '⚠ Overdue',
-  skipped:  '— Skipped',
-  snoozed:  '⏰ Snoozed',
+  overdue:  'Overdue',
+  skipped:  'Skipped',
+  snoozed:  'Snoozed',
   pending:  'Scheduled',
 };
 
@@ -39,6 +30,7 @@ interface Props {
   actionsDisabled?: boolean;
   takenAt?: string; // ISO timestamp of actual intake
   smartAdjustedTime?: string | null; // W4-A: today's push was shifted to this HH:MM
+  isNext?: boolean; // presentational only: emphasized panel for the next upcoming dose
 }
 
 function fmt(t: string) {
@@ -56,11 +48,11 @@ function deriveDisplayStatus(dose: ScheduledDose): string {
   return isPast ? 'overdue' : 'pending';
 }
 
-export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt, smartAdjustedTime }: Props) {
+export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisabled = false, takenAt, smartAdjustedTime, isNext = false }: Props) {
   const item = dose.protocolItem;
-  const color = COLOR_MAP[item.color ?? 'blue'] ?? COLOR_MAP.blue;
   const displayStatus = deriveDisplayStatus(dose);
-  const statusColor = STATUS_COLOR[displayStatus] ?? '#8B949E';
+  const settled = displayStatus === 'taken' || displayStatus === 'skipped';
+  const statusColor = STATUS_COLOR[displayStatus] ?? '#9b978f';
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const gesture = useRef<{
     pointerId: number | null;
@@ -135,7 +127,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
   if (item.route === 'subcutaneous') tags.push('Subcut.');
   if (item.route === 'intramuscular') tags.push('IM');
   if (item.itemType === 'analysis') tags.push('Lab test');
-  if (smartAdjustedTime) tags.push(`⏱ ${fmt(smartAdjustedTime)} · adjusted`);
+  if (smartAdjustedTime) tags.push(`${fmt(smartAdjustedTime)} · adjusted`);
 
   const cardTranslate =
     swipeDir === 'left'  ? '-translate-x-[90px]' :
@@ -143,7 +135,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
 
   return (
     <div
-      className="relative overflow-hidden rounded-[18px] mb-2.5"
+      className={`relative overflow-hidden rounded-[14px] ${settled ? 'mb-1' : isNext ? 'mb-2.5' : 'mb-1.5'}`}
       data-dose-id={dose.id}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -166,11 +158,12 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#FBBF24] text-black text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-l-[18px]',
+            'px-5 bg-[#cf8148] text-[#14120b] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-l-[14px]',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
-          ⏰<br />Snooze
+          Snooze
         </button>
         <button
           type="button"
@@ -181,53 +174,53 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#EF4444] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1',
+            'px-5 bg-[#c96a5a] text-white font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
-          ✕<br />Skip
+          Skip
         </button>
       </div>
 
-      {/* Card */}
+      {/* Card: only the next dose gets a panel with visible actions; everything else is a quiet text row (Night Shift) */}
       <div
         className={[
-          'bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-[18px] px-4 py-4',
-          'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
+          isNext && !settled
+            ? 'bg-[#14171b] border border-[#2e333a] rounded-[14px] px-4 py-3.5'
+            : 'rounded-[14px] px-3 py-2',
+          'transition-all duration-200 relative overflow-hidden',
           cardTranslate,
-          actionsDisabled ? 'opacity-70' : displayStatus === 'taken' ? 'opacity-60' : '',
+          actionsDisabled ? 'opacity-70' : '',
         ].join(' ')}
       >
-        {/* Status stripe */}
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-sm" style={{ background: statusColor }} />
-
-        {/* Icon */}
-        <div
-          className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px] flex-shrink-0"
-          style={{ background: color.bg }}
-        >
-          {item.icon ?? '💊'}
-        </div>
-
+       <div className="flex items-center gap-3.5">
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-[#F0F6FC] truncate">
-            {item.name} {item.doseAmount ? `${item.doseAmount}${item.doseUnit}` : ''}
+          <div className={['truncate', settled ? 'text-sm font-medium text-[#9b978f]' : isNext ? 'text-[15px] font-semibold text-[#e8e6e1]' : 'text-sm font-medium text-[#e8e6e1]'].join(' ')}>
+            {item.name}{' '}
+            {item.doseAmount ? (
+              <span className="font-mono tabular-nums text-xs text-[#9b978f]">{item.doseAmount}{item.doseUnit}</span>
+            ) : null}
           </div>
-          <div className="text-xs mt-0.5" style={{ color: statusColor }}>
+          <div
+            className="font-mono tabular-nums text-[10.5px] mt-0.5"
+            style={{ color: settled ? '#605d56' : statusColor }}
+          >
             {displayStatus === 'taken' && takenAt
               ? (() => {
                   const d = new Date(takenAt);
                   const hh = String(d.getHours()).padStart(2, '0');
                   const mm = String(d.getMinutes()).padStart(2, '0');
-                  return `✓ Taken at ${fmt(`${hh}:${mm}`)}`;
+                  return `taken ${fmt(`${hh}:${mm}`)}`;
                 })()
-              : `${STATUS_LABEL[displayStatus] ?? STATUS_LABEL[dose.status]} · ${fmt(dose.scheduledTime)}`}
+              : `${(STATUS_LABEL[displayStatus] ?? STATUS_LABEL[dose.status]).toLowerCase()} · ${fmt(dose.scheduledTime)}`}
+            {settled && tags.length > 0 ? ` · ${tags.join(' · ').toLowerCase()}` : ''}
           </div>
-          {tags.length > 0 && (
+          {!settled && tags.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {tags.map(tag => (
-                <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#8B949E]">
+                <span key={tag} className="font-mono text-[9.5px] uppercase tracking-wide px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#9b978f]">
                   {tag}
                 </span>
               ))}
@@ -235,27 +228,80 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           )}
         </div>
 
-        {/* Check button */}
-        <button
-          type="button"
-          aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
-          onClick={e => {
-            e.stopPropagation();
-            if (dose.status !== 'taken') onTake();
-          }}
-          aria-disabled={actionsDisabled}
-          className={[
-            'w-9 h-9 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 text-base',
-            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
-            displayStatus === 'taken'
-              ? 'bg-[#10B981] border-[#10B981] text-white cursor-default'
-              : displayStatus === 'overdue'
-              ? 'border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white'
-              : 'border-[rgba(255,255,255,0.15)] text-[#8B949E] hover:border-[#10B981] hover:text-[#10B981]',
-          ].join(' ')}
-        >
-          {displayStatus === 'taken' ? '✓' : ''}
-        </button>
+        {/* Check button — hidden on the next-dose panel, which has visible action buttons instead */}
+        {!(isNext && !settled) && (
+          <button
+            type="button"
+            aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
+            onClick={e => {
+              e.stopPropagation();
+              if (dose.status !== 'taken') onTake();
+            }}
+            aria-disabled={actionsDisabled}
+            className={[
+              'rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+              settled ? 'w-7 h-7 border text-xs' : 'w-9 h-9 border-[1.5px] text-base',
+              actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              displayStatus === 'taken'
+                ? 'bg-transparent border-[#8fae74] text-[#8fae74] cursor-default'
+                : displayStatus === 'skipped'
+                ? 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]'
+                : displayStatus === 'overdue'
+                ? 'border-[#c96a5a] text-[#c96a5a] hover:bg-[#c96a5a] hover:text-white'
+                : 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]',
+            ].join(' ')}
+          >
+            {displayStatus === 'taken' ? '✓' : ''}
+          </button>
+        )}
+       </div>
+
+        {/* Next-dose panel actions (mockup: Take / Snooze / Skip) — same handlers as circle/swipe */}
+        {isNext && !settled && (
+          <div className="flex gap-2 mt-3">
+            <button
+              type="button"
+              aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
+              aria-disabled={actionsDisabled}
+              onClick={e => {
+                e.stopPropagation();
+                if (dose.status !== 'taken') onTake();
+              }}
+              className={[
+                'flex-1 rounded-[10px] bg-[#d9a53f] px-4 py-2.5 text-[13px] font-semibold text-[#14120b] transition-colors hover:bg-[#e6b654]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
+            >
+              Take
+            </button>
+            <button
+              type="button"
+              aria-disabled={actionsDisabled}
+              onClick={() => onSnooze()}
+              className={[
+                'rounded-[10px] border border-[#2e333a] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
+            >
+              Snooze
+            </button>
+            <button
+              type="button"
+              aria-disabled={actionsDisabled}
+              onClick={() => onSkip()}
+              className={[
+                'rounded-[10px] border border-[#2e333a] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
+            >
+              Skip
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Delete panel — right side, revealed by swipe LEFT */}
@@ -272,9 +318,9 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             onDelete();
             setSwipeDir(null);
           }}
-          className="px-5 bg-[#7F1D1D] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-[18px]"
+          className="px-5 bg-[#4a2620] text-[#e2a89d] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-r-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
         >
-          🗑<br />Delete
+          Delete
         </button>
       </div>
     </div>

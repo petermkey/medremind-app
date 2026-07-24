@@ -1,22 +1,24 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @import "tailwindcss";
 
 :root {
-  --bg:        #0D1117;
-  --bg-alt:    #111827;
-  --surface:   #161B22;
-  --surface2:  #1C2333;
-  --blue:      #3B82F6;
-  --blue-dk:   #2563EB;
-  --blue-glow: rgba(59,130,246,0.15);
-  --green:     #10B981;
-  --yellow:    #FBBF24;
-  --red:       #EF4444;
-  --purple:    #8B5CF6;
-  --text:      #F0F6FC;
-  --muted:     #8B949E;
-  --border:    rgba(255,255,255,0.08);
+  --bg:        #0e1013;
+  --bg-alt:    #111419;
+  --surface:   #14171b;
+  --surface2:  #191d22;
+  --blue:      #d9a53f;
+  --blue-dk:   #a67c2a;
+  --blue-glow: rgba(217,165,63,0.1);
+  --green:     #8fae74;
+  --yellow:    #cf8148;
+  --red:       #c96a5a;
+  --purple:    #a292c9;
+  --text:      #e8e6e1;
+  --muted:     #9b978f;
+  --faint:     #605d56;
+  --border:    #23272d;
+  --border-strong: #2e333a;
   --nav-h:     72px;
 }
 
@@ -25,10 +27,12 @@
 html, body {
   height: 100%;
   background: var(--bg);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
+
+.font-mono, .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
 
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }

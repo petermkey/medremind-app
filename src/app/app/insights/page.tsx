@@ -12,10 +12,10 @@ function progressPercent(consumed: number, target: number): number {
 }
 
 function pctToColor(pct: number) {
-  if (pct === 0) return '#1C2333';
-  if (pct < 50) return '#EF4444';
-  if (pct < 80) return '#FBBF24';
-  return '#10B981';
+  if (pct === 0) return '#191d22';
+  if (pct < 50) return '#c96a5a';
+  if (pct < 80) return '#cf8148';
+  return '#8fae74';
 }
 
 function formatAmount(value?: number): string {
@@ -107,13 +107,12 @@ export default function InsightsPage() {
     return (
       <div className="flex flex-col h-full">
         <div className="px-5 pt-4 pb-2 flex-shrink-0">
-          <h1 className="text-xl font-extrabold text-[#F0F6FC]">Insights</h1>
+          <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Insights</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-6 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-4xl mb-3">📊</div>
-            <div className="text-sm font-bold text-[#F0F6FC] mb-1">No nutrition data yet</div>
-            <div className="text-xs text-[#8B949E]">Log a meal to see your 7-day summary.</div>
+            <div className="text-sm font-bold text-[#e8e6e1] mb-1">No nutrition data yet</div>
+            <div className="text-xs text-[#9b978f]">Log a meal to see your 7-day summary.</div>
           </div>
         </div>
       </div>
@@ -128,24 +127,24 @@ export default function InsightsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
-        <h1 className="text-xl font-extrabold text-[#F0F6FC]">Insights</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Insights</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {/* 7-Day Nutrition Summary Card */}
-        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4 mt-3">
-          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">7-Day Average</div>
+        <div className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4 mt-3">
+          <div className="text-xs font-bold text-[#9b978f] uppercase tracking-widest mb-4">7-Day Average</div>
 
           <div className="space-y-4">
             {/* Calories */}
             <div>
               <div className="flex justify-between mb-1.5">
-                <span className="text-sm font-semibold text-[#F0F6FC]">Calories</span>
+                <span className="text-sm font-semibold text-[#e8e6e1]">Calories</span>
                 <span className="text-sm font-bold" style={{ color: pctToColor(kcalPercent) }}>
                   {formatAmount(sevenDayData.avgKcal)} / {targetProfile.caloriesKcal} kcal
                 </span>
               </div>
-              <div className="h-2 bg-[#1C2333] rounded-full overflow-hidden">
+              <div className="h-2 bg-[#191d22] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${kcalPercent}%`, background: pctToColor(kcalPercent) }}
@@ -156,12 +155,12 @@ export default function InsightsPage() {
             {/* Protein */}
             <div>
               <div className="flex justify-between mb-1.5">
-                <span className="text-sm font-semibold text-[#F0F6FC]">Protein</span>
+                <span className="text-sm font-semibold text-[#e8e6e1]">Protein</span>
                 <span className="text-sm font-bold" style={{ color: pctToColor(proteinPercent) }}>
                   {formatAmount(sevenDayData.avgProtein)} / {targetProfile.proteinG} g
                 </span>
               </div>
-              <div className="h-2 bg-[#1C2333] rounded-full overflow-hidden">
+              <div className="h-2 bg-[#191d22] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${proteinPercent}%`, background: pctToColor(proteinPercent) }}
@@ -172,12 +171,12 @@ export default function InsightsPage() {
             {/* Fiber */}
             <div>
               <div className="flex justify-between mb-1.5">
-                <span className="text-sm font-semibold text-[#F0F6FC]">Fiber</span>
+                <span className="text-sm font-semibold text-[#e8e6e1]">Fiber</span>
                 <span className="text-sm font-bold" style={{ color: pctToColor(fiberPercent) }}>
                   {formatAmount(sevenDayData.avgFiber)} / {targetProfile.fiberG} g
                 </span>
               </div>
-              <div className="h-2 bg-[#1C2333] rounded-full overflow-hidden">
+              <div className="h-2 bg-[#191d22] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${fiberPercent}%`, background: pctToColor(fiberPercent) }}
@@ -188,12 +187,12 @@ export default function InsightsPage() {
             {/* Water */}
             <div>
               <div className="flex justify-between mb-1.5">
-                <span className="text-sm font-semibold text-[#F0F6FC]">Water</span>
+                <span className="text-sm font-semibold text-[#e8e6e1]">Water</span>
                 <span className="text-sm font-bold" style={{ color: pctToColor(waterPercent) }}>
                   {waterDisplay(sevenDayData.avgWater)} / {waterDisplay(targetProfile.waterMl)}
                 </span>
               </div>
-              <div className="h-2 bg-[#1C2333] rounded-full overflow-hidden">
+              <div className="h-2 bg-[#191d22] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${waterPercent}%`, background: pctToColor(waterPercent) }}
@@ -202,7 +201,7 @@ export default function InsightsPage() {
             </div>
           </div>
 
-          <div className="text-[11px] text-[#8B949E] mt-4">
+          <div className="text-[11px] text-[#9b978f] mt-4">
             Based on logged entries from the last 7 days
           </div>
         </div>

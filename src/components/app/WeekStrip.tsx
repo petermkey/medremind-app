@@ -37,16 +37,15 @@ export function WeekStrip({ selectedDate, onSelectDate, doseDateSet }: Props) {
             ref={isSelected ? selectedRef : null}
             onClick={() => onSelectDate(dateStr)}
             className={[
-              'flex flex-col items-center min-w-[44px] px-1 py-2 rounded-2xl border transition-all duration-200 flex-shrink-0',
-              isSelected && isToday  ? 'bg-[#3B82F6] border-transparent text-white' :
-              isSelected             ? 'bg-[#1C2333] border-[rgba(255,255,255,0.15)] text-[#F0F6FC]' :
-              isToday                ? 'border-[#3B82F6] text-[#3B82F6]' :
-              'border-transparent text-[#8B949E] hover:text-[#F0F6FC]',
+              'flex flex-col items-center min-w-[44px] px-1 pt-2 pb-1 border-b-2 transition-all duration-200 flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+              isSelected             ? 'border-[#d9a53f] text-[#d9a53f]' :
+              isToday                ? 'border-transparent text-[#e8e6e1]' :
+              'border-transparent text-[#605d56] hover:text-[#9b978f]',
             ].join(' ')}
           >
-            <span className="text-[10px] font-bold uppercase tracking-wide">{DAY_NAMES[d.getDay()]}</span>
-            <span className="text-[16px] font-bold mt-1">{d.getDate()}</span>
-            <div className={`w-1 h-1 rounded-full mt-1.5 ${hasDoses ? (isSelected && isToday ? 'bg-white/60' : 'bg-[#3B82F6]') : 'bg-transparent'}`} />
+            <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{DAY_NAMES[d.getDay()]}</span>
+            <span className={`font-mono tabular-nums text-[14px] mt-1 ${isSelected ? 'font-semibold' : 'font-medium'}`}>{d.getDate()}</span>
+            <div className={`w-1 h-1 rounded-full mt-1 mb-0.5 ${hasDoses ? 'bg-[#d9a53f]' : 'bg-transparent'}`} />
           </button>
         );
       })}

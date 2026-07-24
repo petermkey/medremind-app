@@ -19,10 +19,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const bgMap: Record<ToastType, string> = {
-    success: 'bg-[#10B981]',
-    warning: 'bg-[#FBBF24] text-black',
-    error:   'bg-[#EF4444]',
-    info:    'bg-[#3B82F6]',
+    success: 'bg-[#8fae74]',
+    warning: 'bg-[#cf8148] text-black',
+    error:   'bg-[#c96a5a]',
+    info:    'bg-[#d9a53f]',
   };
 
   return (

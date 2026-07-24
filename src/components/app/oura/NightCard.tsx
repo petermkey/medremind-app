@@ -29,10 +29,10 @@ function dateLabel(localDate: string): string {
 }
 
 function toneClass(tone: string): string {
-  if (tone === 'positive') return 'text-[#10B981] bg-[rgba(16,185,129,0.12)]';
-  if (tone === 'negative') return 'text-[#F87171] bg-[rgba(248,113,113,0.12)]';
-  if (tone === 'warning') return 'text-[#FBBF24] bg-[rgba(251,191,36,0.12)]';
-  return 'text-[#8B949E] bg-[#1C2333]';
+  if (tone === 'positive') return 'text-[#8fae74]';
+  if (tone === 'negative') return 'text-[#c96a5a]';
+  if (tone === 'warning') return 'text-[#cf8148]';
+  return 'text-[#9b978f]';
 }
 
 function DeltaChip({ day, index, metric, transform }: {
@@ -51,40 +51,9 @@ function DeltaChip({ day, index, metric, transform }: {
   if (delta.delta === null) return null;
   const sign = delta.delta > 0 ? '+' : '';
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${toneClass(delta.tone)}`}>
+    <span className={`font-mono text-[12.5px] font-semibold tabular-nums ${toneClass(delta.tone)}`}>
       {sign}{fmt(delta.delta)}
     </span>
-  );
-}
-
-function HeroTile({
-  label,
-  value,
-  suffix,
-  metric,
-  day,
-  index,
-  formatter = fmt,
-}: {
-  label: string;
-  value: number | null | undefined;
-  suffix?: string;
-  metric: OuraMetricKey;
-  day: OuraStatsDay;
-  index: number;
-  formatter?: (value: number | null | undefined, suffix?: string) => string;
-}) {
-  const delta = classifyDelta(metric, typeof value === 'number' ? value : null, medianOfPreviousDays((day as OuraStatsDay & { __allDays?: OuraStatsDay[] }).__allDays ?? [], index, metric));
-  return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0D1117] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#8B949E]">{label}</div>
-      <div className="mt-2 text-2xl font-extrabold text-[#F0F6FC]">{formatter(value, suffix)}</div>
-      {delta.delta !== null && (
-        <div className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${toneClass(delta.tone)}`}>
-          {delta.delta > 0 ? '+' : ''}{fmt(delta.delta)} vs norm
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -100,13 +69,13 @@ function DetailRow({ label, value, suffix, metric, day, index, hint, formatter =
   transform?: (value: number | null | undefined) => number | null;
 }) {
   return (
-    <div className="border-b border-[rgba(255,255,255,0.06)] py-2 last:border-b-0">
+    <div className="border-b border-[#23272d] py-2 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-[#C9D1D9]">{label}</span>
-        <span className="ml-auto text-sm font-bold text-[#F0F6FC]">{formatter(value, suffix)}</span>
+        <span className="font-mono text-[12.5px] text-[#9b978f]">{label}</span>
+        <span className="ml-auto font-mono text-[12.5px] font-semibold tabular-nums text-[#e8e6e1]">{formatter(value, suffix)}</span>
         <DeltaChip day={day} index={index} metric={metric} transform={transform} />
       </div>
-      {hint && <p className="mt-0.5 text-[11px] leading-snug text-[#8B949E]">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[10.5px] leading-snug text-[#605d56]">{hint}</p>}
     </div>
   );
 }
@@ -115,36 +84,30 @@ export function NightCard({ days }: { days: OuraStatsDay[] }) {
   const display = pickDisplayNight(days);
   if (!display.day) {
     return (
-      <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
-        <div className="text-sm font-bold text-[#F0F6FC]">No sleep data yet</div>
-        <p className="mt-1 text-sm text-[#8B949E]">Run a sync from Settings to fill in your latest night.</p>
+      <section className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4">
+        <div className="text-sm font-bold text-[#e8e6e1]">No sleep data yet</div>
+        <p className="mt-1 text-sm text-[#9b978f]">Run a sync from Settings to fill in your latest night.</p>
       </section>
     );
   }
 
   const day = { ...display.day, __allDays: days };
   return (
-    <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-widest text-[#8B949E]">Last night</div>
-          <h2 className="mt-1 text-lg font-extrabold text-[#F0F6FC]">Recovery snapshot</h2>
-        </div>
+    <section className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-xs text-[#9b978f]">Last night · Oura</div>
         {display.isFallback && (
-          <span className="rounded-full bg-[#1C2333] px-3 py-1 text-xs font-bold text-[#FBBF24]">
-            Night of {dateLabel(day.localDate)}
+          <span className="font-mono text-[10px] tabular-nums text-[#605d56]">
+            night of {dateLabel(day.localDate)}
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <HeroTile label="Sleep" value={day.sleepScore} metric="sleepScore" day={day} index={display.index} />
-        <HeroTile label="Readiness" value={day.readinessScore} metric="readinessScore" day={day} index={display.index} />
-        <HeroTile label="Night HRV" value={day.sleepAvgHrv} suffix=" ms" metric="sleepAvgHrv" day={day} index={display.index} />
-        <HeroTile label="Temperature" value={day.temperatureDeviation} suffix=" °C" metric="temperatureDeviation" day={day} index={display.index} formatter={fmtSignedDecimal} />
-      </div>
-
-      <div className="mt-4 rounded-xl bg-[#0D1117] px-3">
+      <div>
+        <DetailRow label="Sleep" value={day.sleepScore} metric="sleepScore" day={day} index={display.index} />
+        <DetailRow label="Readiness" value={day.readinessScore} metric="readinessScore" day={day} index={display.index} />
+        <DetailRow label="Night HRV" value={day.sleepAvgHrv} suffix=" ms" metric="sleepAvgHrv" day={day} index={display.index} />
+        <DetailRow label="Temperature" value={day.temperatureDeviation} suffix=" °C" metric="temperatureDeviation" day={day} index={display.index} formatter={fmtSignedDecimal} />
         <DetailRow label="Deep sleep" value={day.deepSleepMinutes} suffix=" min" metric="deepSleepMinutes" day={day} index={display.index} />
         <DetailRow label="REM" value={day.remSleepMinutes} suffix=" min" metric="remSleepMinutes" day={day} index={display.index} />
         <DetailRow

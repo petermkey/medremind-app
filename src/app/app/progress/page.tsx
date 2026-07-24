@@ -55,13 +55,13 @@ const DEFAULT_CONSENT: Consent = {
 };
 
 function pctToColor(pct: number) {
-  if (pct === 0) return '#1C2333';
-  if (pct < 50) return '#EF4444';
-  if (pct < 80) return '#FBBF24';
-  return '#10B981';
+  if (pct === 0) return '#191d22';
+  if (pct < 50) return '#c96a5a';
+  if (pct < 80) return '#cf8148';
+  return '#8fae74';
 }
 
-const RING_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#EF4444'];
+const RING_COLORS = ['#d9a53f', '#8fae74', '#cf8148', '#c97c98', '#a292c9', '#c96a5a'];
 
 type RingDatum = {
   key: string;
@@ -137,42 +137,42 @@ function getAdherenceStatus(pct: number, hasData: boolean): {
 } {
   if (!hasData) return {
     label: 'No data yet',
-    color: '#8B949E',
-    borderColor: 'rgba(139,92,246,0.12)',
-    bgColor: 'rgba(139,92,246,0.05)',
+    color: '#9b978f',
+    borderColor: 'rgba(162,146,201,0.12)',
+    bgColor: 'rgba(162,146,201,0.05)',
   };
   if (pct >= 80) return {
     label: 'On track',
-    color: '#10B981',
-    borderColor: 'rgba(16,185,129,0.22)',
-    bgColor: 'rgba(16,185,129,0.08)',
+    color: '#8fae74',
+    borderColor: 'rgba(143,174,116,0.22)',
+    bgColor: 'rgba(143,174,116,0.08)',
   };
   if (pct >= 50) return {
     label: 'Needs attention',
-    color: '#FBBF24',
-    borderColor: 'rgba(251,191,36,0.22)',
-    bgColor: 'rgba(251,191,36,0.08)',
+    color: '#cf8148',
+    borderColor: 'rgba(207,129,72,0.22)',
+    bgColor: 'rgba(207,129,72,0.08)',
   };
   return {
     label: 'Off track',
-    color: '#EF4444',
-    borderColor: 'rgba(239,68,68,0.22)',
-    bgColor: 'rgba(239,68,68,0.08)',
+    color: '#c96a5a',
+    borderColor: 'rgba(201,106,90,0.22)',
+    bgColor: 'rgba(201,106,90,0.08)',
   };
 }
 
 function heatmapCellBg(pct: number, total: number, isFuture: boolean): string {
   if (isFuture || total === 0) return 'transparent';
-  if (pct >= 80) return 'rgba(16,185,129,0.18)';
-  if (pct >= 50) return 'rgba(251,191,36,0.18)';
-  return 'rgba(239,68,68,0.18)';
+  if (pct >= 80) return 'rgba(143,174,116,0.18)';
+  if (pct >= 50) return 'rgba(207,129,72,0.18)';
+  return 'rgba(201,106,90,0.18)';
 }
 
 function heatmapCellBorder(pct: number, total: number, isFuture: boolean): string {
   if (isFuture || total === 0) return 'rgba(255,255,255,0.04)';
-  if (pct >= 80) return 'rgba(16,185,129,0.32)';
-  if (pct >= 50) return 'rgba(251,191,36,0.32)';
-  return 'rgba(239,68,68,0.32)';
+  if (pct >= 80) return 'rgba(143,174,116,0.32)';
+  if (pct >= 50) return 'rgba(207,129,72,0.32)';
+  return 'rgba(201,106,90,0.32)';
 }
 
 export default function ProgressPage() {
@@ -326,12 +326,12 @@ export default function ProgressPage() {
         const total = protocolWeights[ap.id] ?? 0;
         const seedColor = ap.protocol.items.find(i => i.color)?.color;
         const color =
-          seedColor === 'blue' ? '#3B82F6' :
-          seedColor === 'green' ? '#10B981' :
-          seedColor === 'yellow' ? '#F59E0B' :
-          seedColor === 'pink' ? '#EC4899' :
-          seedColor === 'purple' ? '#8B5CF6' :
-          seedColor === 'red' ? '#EF4444' :
+          seedColor === 'blue' ? '#d9a53f' :
+          seedColor === 'green' ? '#8fae74' :
+          seedColor === 'yellow' ? '#cf8148' :
+          seedColor === 'pink' ? '#c97c98' :
+          seedColor === 'purple' ? '#a292c9' :
+          seedColor === 'red' ? '#c96a5a' :
           RING_COLORS[idx % RING_COLORS.length];
         return { id: ap.id, name: ap.protocol.name, color, weight: total };
       })
@@ -368,6 +368,22 @@ export default function ProgressPage() {
   const weekStats = useMemo(() => {
     return selectProgressSummaryForDates(weeklyData.map(d => d.date));
   }, [weeklyData, selectProgressSummaryForDates]);
+
+  // Per-day adherence for the 7-day bar chart (same selector/data the weekly section uses)
+  const weekBars = useMemo(() => {
+    const bars = weeklyData.map(({ date, label }) => {
+      const dayStats = selectProgressDayProtocolStats(date);
+      let total = 0;
+      let taken = 0;
+      for (const s of Object.values(dayStats)) {
+        total += s.total;
+        taken += s.taken;
+      }
+      return { date, letter: label.charAt(0), total, pct: total ? Math.round((taken / total) * 100) : 0 };
+    });
+    const best = Math.max(...bars.map(b => b.pct), 0);
+    return bars.map(b => ({ ...b, isBest: b.pct > 0 && b.pct === best }));
+  }, [weeklyData, selectProgressDayProtocolStats]);
 
   const prev7DateStrings = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => format(subDays(today, 13 - i), 'yyyy-MM-dd'));
@@ -443,8 +459,11 @@ export default function ProgressPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
-        <h1 className="text-xl font-extrabold text-[#F0F6FC]">Progress</h1>
-        <div className="mt-3 grid grid-cols-2 rounded-xl bg-[#0D1117] p-1">
+        <div className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#605d56] mb-1">
+          Data · {calendarRange} d window
+        </div>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Signals</h1>
+        <div className="mt-3 grid grid-cols-2 rounded-xl border border-[#23272d] bg-[#0e1013] p-1">
           {([
             ['correlations', 'Correlations'],
             ['oura', 'Oura'],
@@ -454,8 +473,9 @@ export default function ProgressPage() {
               type="button"
               onClick={() => setActiveTab(value)}
               className={[
-                'rounded-lg px-3 py-2 text-sm font-bold transition-colors',
-                activeTab === value ? 'bg-[#3B82F6] text-white' : 'text-[#8B949E] hover:text-[#F0F6FC]',
+                'rounded-lg px-3 py-2 text-[10px] font-mono uppercase tracking-wider transition-colors',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                activeTab === value ? 'bg-[#d9a53f] text-[#14120b]' : 'text-[#9b978f] hover:text-[#e8e6e1]',
               ].join(' ')}
             >
               {label}
@@ -472,27 +492,46 @@ export default function ProgressPage() {
         <WeeklyReviewSection />
 
         {/* ── 1. PRIMARY ADHERENCE STATUS + TREND ── */}
-        <div
-          className="rounded-2xl border p-4 mt-3 mb-3"
-          style={{ background: adherenceStatus.bgColor, borderColor: adherenceStatus.borderColor }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xl font-extrabold" style={{ color: adherenceStatus.color }}>
-              {adherenceStatus.label}
+        <div className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4 mt-3 mb-3">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-[#9b978f]">
+              Adherence
+              {' · '}
+              <span style={{ color: adherenceStatus.color }}>{adherenceStatus.label}</span>
             </span>
-            <span className="text-2xl font-extrabold" style={{ color: adherenceStatus.color }}>
+            <span className="text-[20px] font-semibold font-mono tabular-nums text-[#e8e6e1]">
               {weekStats.total > 0 ? `${weekStats.pct}%` : '—'}
             </span>
           </div>
-          <div className="text-[11px] text-[#8B949E]">
+          <div className="flex gap-[3px] items-end h-[44px]">
+            {weekBars.map(bar => (
+              <div
+                key={bar.date}
+                className="flex-1 rounded-[2px]"
+                style={{
+                  height: `${Math.max(bar.pct, 3)}%`,
+                  background: bar.isBest ? '#d9a53f' : '#a67c2a',
+                  opacity: bar.isBest ? 1 : 0.5 + (bar.pct / 100) * 0.3,
+                }}
+              />
+            ))}
+          </div>
+          <div className="flex gap-[3px] mt-1.5">
+            {weekBars.map(bar => (
+              <span key={bar.date} className="flex-1 text-center font-mono text-[9px] uppercase text-[#605d56]">
+                {bar.letter}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 text-[11px] font-mono tabular-nums text-[#9b978f]">
             {weekStats.total > 0
               ? `${weekStats.taken} of ${weekStats.total} doses taken this week`
               : 'No dose data for the last 7 days'}
           </div>
           {trendDelta !== null && (
             <div
-              className="text-[11px] mt-1 font-semibold"
-              style={{ color: trendDelta > 3 ? '#10B981' : trendDelta < -3 ? '#EF4444' : '#8B949E' }}
+              className="text-[11px] mt-1 font-mono tabular-nums font-semibold"
+              style={{ color: trendDelta > 3 ? '#8fae74' : trendDelta < -3 ? '#c96a5a' : '#9b978f' }}
             >
               {trendDelta > 3
                 ? `↑ +${trendDelta} pts vs last week`
@@ -506,19 +545,19 @@ export default function ProgressPage() {
         {/* ── 2. TODAY SUMMARY ── */}
         {(todayStatus.taken + todayStatus.remaining + todayStatus.skipped) > 0 && (
           <div className="mb-4">
-          <div className="text-[10px] font-bold text-[#8B949E] uppercase tracking-widest mb-1.5">Today</div>
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1.5">Today</div>
           <div className="flex gap-2">
-            <div className="flex-1 bg-[#161B22] border border-[rgba(255,255,255,0.06)] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold text-[#10B981] flex-shrink-0">✓ {todayStatus.taken}</span>
-              <span className="text-[10px] text-[#8B949E] truncate">taken</span>
+            <div className="flex-1 bg-[#14171b] border border-[#23272d] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-[#8fae74] flex-shrink-0">✓ {todayStatus.taken}</span>
+              <span className="text-[10px] text-[#9b978f] truncate">taken</span>
             </div>
-            <div className="flex-1 bg-[#161B22] border border-[rgba(255,255,255,0.06)] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold text-[#3B82F6] flex-shrink-0">→ {todayStatus.remaining}</span>
-              <span className="text-[10px] text-[#8B949E] truncate">left</span>
+            <div className="flex-1 bg-[#14171b] border border-[#23272d] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-[#d9a53f] flex-shrink-0">→ {todayStatus.remaining}</span>
+              <span className="text-[10px] text-[#9b978f] truncate">left</span>
             </div>
-            <div className="flex-1 bg-[#161B22] border border-[rgba(255,255,255,0.06)] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold text-[#8B949E] flex-shrink-0">— {todayStatus.skipped}</span>
-              <span className="text-[10px] text-[#8B949E] truncate">skipped</span>
+            <div className="flex-1 bg-[#14171b] border border-[#23272d] rounded-xl px-3 py-2.5 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-mono tabular-nums font-bold text-[#9b978f] flex-shrink-0">— {todayStatus.skipped}</span>
+              <span className="text-[10px] text-[#9b978f] truncate">skipped</span>
             </div>
           </div>
           </div>
@@ -527,43 +566,46 @@ export default function ProgressPage() {
         {/* ── 3. SUMMARY METRICS (time-scoped labels) ── */}
         <div className="grid grid-cols-2 gap-3 mb-5">
           {[
-            { label: 'Adherence', value: `${stats.pct}%`,    color: '#3B82F6', sub: `last ${calendarRange}d` },
-            { label: 'Streak',    value: `${streak}`,         color: '#10B981', sub: 'days in a row' },
-            { label: 'Active',    value: `${activeCount}`,    color: '#8B5CF6', sub: 'protocols' },
-            { label: 'Taken',     value: `${stats.taken}`,    color: '#10B981', sub: `of ${stats.total} (${calendarRange}d)` },
+            { label: 'Adherence', value: `${stats.pct}%`,    color: '#d9a53f', sub: `last ${calendarRange}d` },
+            { label: 'Streak',    value: `${streak}`,         color: '#8fae74', sub: 'days in a row' },
+            { label: 'Active',    value: `${activeCount}`,    color: '#a292c9', sub: 'protocols' },
+            { label: 'Taken',     value: `${stats.taken}`,    color: '#8fae74', sub: `of ${stats.total} (${calendarRange}d)` },
           ].map(({ label, value, color, sub }) => (
-            <div key={label} className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
-              <div className="text-2xl font-extrabold" style={{ color }}>{value}</div>
-              <div className="text-xs font-semibold text-[#F0F6FC] mt-0.5">{label}</div>
-              <div className="text-[11px] text-[#8B949E]">{sub}</div>
+            <div key={label} className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4">
+              <div className="text-2xl font-extrabold font-mono tabular-nums" style={{ color }}>{value}</div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mt-1">{label}</div>
+              <div className="text-[11px] font-mono tabular-nums text-[#9b978f]">{sub}</div>
             </div>
           ))}
         </div>
 
         {/* ── 4. HEALTH AND MEDICATION PATTERNS ── */}
-        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
+        <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 mb-4">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
-              <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest">Health & Medication Patterns</div>
-              <div className="mt-1 text-xs leading-relaxed text-[#8B949E]">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Health & Medication Patterns</div>
+              <div className="mt-1 text-xs leading-relaxed text-[#9b978f]">
                 Oura connection and health sync are managed in Settings.
               </div>
             </div>
-            <a href="/app/settings" className="text-xs font-semibold text-[#3B82F6] hover:underline">
+            <a
+              href="/app/settings"
+              className="text-xs font-semibold text-[#d9a53f] hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            >
               Settings
             </a>
           </div>
 
           {analyticsLoading ? (
-            <p className="text-sm text-[#8B949E]">Loading analytics...</p>
+            <p className="text-sm text-[#9b978f]">Loading analytics...</p>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#0D1117] p-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#23272d] bg-[#0e1013] p-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[#F0F6FC]">
-                    {medicationStatus?.counts?.mapItems ?? 0} medication map item(s)
+                  <div className="text-sm font-semibold text-[#e8e6e1]">
+                    <span className="font-mono tabular-nums">{medicationStatus?.counts?.mapItems ?? 0}</span> medication map item(s)
                   </div>
-                  <div className="mt-1 text-xs text-[#8B949E]">
+                  <div className="mt-1 text-xs font-mono tabular-nums text-[#9b978f]">
                     {medicationStatus?.counts?.rules ?? 0} rule card(s), {medicationStatus?.counts?.clinicianReviewFlags ?? 0} clinician-review flag(s)
                   </div>
                 </div>
@@ -572,7 +614,7 @@ export default function ProgressPage() {
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-xl bg-[#0D1117] p-3">
+              <div className="flex flex-col gap-3 rounded-xl border border-[#23272d] bg-[#0e1013] p-3">
                 <ConsentToggle
                   label="Medication pattern analysis"
                   checked={correlations.consent.enabled && correlations.consent.includesMedicationPatterns}
@@ -605,24 +647,25 @@ export default function ProgressPage() {
                 </Button>
               </div>
 
-              {analyticsMessage && <p className="text-xs text-[#8B949E]">{analyticsMessage}</p>}
-              {medicationStatus?.error && <p className="text-xs text-[#FCA5A5]">{medicationStatus.error}</p>}
-              {correlations.error && <p className="text-xs text-[#FCA5A5]">{correlations.error}</p>}
+              {analyticsMessage && <p className="text-xs text-[#9b978f]">{analyticsMessage}</p>}
+              {medicationStatus?.error && <p className="text-xs text-[#e2a89d]">{medicationStatus.error}</p>}
+              {correlations.error && <p className="text-xs text-[#e2a89d]">{correlations.error}</p>}
 
               {correlations.cards.length === 0 ? (
-                <p className="text-sm leading-relaxed text-[#8B949E]">
+                <p className="text-sm leading-relaxed text-[#9b978f]">
                   No pattern cards yet. Enable consent and refresh after medication context, food, hydration, and health summaries are available.
                 </p>
               ) : correlations.cards.map((card) => (
-                <article key={`${card.title}-${card.generatedAt}`} className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0D1117] p-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-bold text-[#F0F6FC]">{card.title}</h2>
-                    <span className="rounded-full bg-[rgba(59,130,246,0.12)] px-2 py-1 text-[10px] font-bold uppercase text-[#93C5FD]">
-                      {card.strength}
-                    </span>
+                <article
+                  key={`${card.title}-${card.generatedAt}`}
+                  className="rounded-xl border border-[#23272d] border-l-2 border-l-[#d9a53f] bg-[#0e1013] p-4"
+                >
+                  <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-[0.08em] tabular-nums text-[#d9a53f]">
+                    Pattern · {card.strength} · R {card.r.toFixed(2)} · N {card.n}
                   </div>
-                  <p className="text-sm leading-relaxed text-[#C9D1D9]">{card.body}</p>
-                  <p className="mt-3 text-xs text-[#8B949E]">
+                  <h2 className="text-[13.5px] font-bold text-[#e8e6e1]">{card.title}</h2>
+                  <p className="mt-1 text-[13.5px] leading-relaxed text-[#c4c0b8]">{card.body}</p>
+                  <p className="mt-3 text-[10.5px] font-mono tabular-nums text-[#605d56]">
                     Direction: {card.direction} · r {card.r.toFixed(2)} · paired days {card.n}
                   </p>
                 </article>
@@ -634,19 +677,19 @@ export default function ProgressPage() {
         <NutrientBalanceCard />
 
         {/* ── 5. LAST 7 DAYS (weekly rings — unchanged) ── */}
-        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
-          <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">Last 7 Days</div>
+        <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 mb-4">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-4">Last 7 Days</div>
           <div className="grid grid-cols-7 gap-2">
             {weeklyData.map(({ date, label, day }) => (
               <div key={date} className="flex flex-col items-center gap-1.5">
                 <DayRings rings={buildRingsForDate(date)} size={weeklyRingSize} stroke={weeklyRingStroke} />
-                <span className="text-[10px] text-[#8B949E]">{label}</span>
-                <span className="text-[10px] text-[#F0F6FC] font-semibold">{day}</span>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">{label}</span>
+                <span className="text-[10px] font-mono tabular-nums text-[#e8e6e1] font-semibold">{day}</span>
               </div>
             ))}
           </div>
           {protocolTracks.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[11px] text-[#8B949E]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[11px] text-[#9b978f]">
               {protocolTracks.map(track => (
                 <span key={track.id} className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full inline-block" style={{ background: track.color }} />
@@ -658,17 +701,18 @@ export default function ProgressPage() {
         </div>
 
         {/* ── 6. MONTHLY PATTERN (heatmap cells) ── */}
-        <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
+        <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest">Monthly Pattern</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Monthly Pattern</div>
             <div className="flex items-center gap-1">
               {([30, 60, 90] as const).map(value => (
                 <button
                   key={value}
                   onClick={() => setCalendarRange(value)}
                   className={[
-                    'px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors',
-                    calendarRange === value ? 'bg-[#3B82F6] text-white' : 'bg-[#1C2333] text-[#8B949E] hover:text-[#F0F6FC]',
+                    'px-2 py-1 rounded-lg text-[10px] font-mono tabular-nums font-semibold transition-colors',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                    calendarRange === value ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
                   ].join(' ')}
                 >
                   {value}d
@@ -676,23 +720,23 @@ export default function ProgressPage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3 mb-3 text-[10px] text-[#8B949E]">
+          <div className="flex items-center gap-3 mb-3 text-[10px] font-mono tabular-nums text-[#9b978f]">
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(16,185,129,0.18)', border: '1px solid rgba(16,185,129,0.32)' }} />
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(143,174,116,0.18)', border: '1px solid rgba(143,174,116,0.32)' }} />
               ≥80%
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(251,191,36,0.18)', border: '1px solid rgba(251,191,36,0.32)' }} />
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(207,129,72,0.18)', border: '1px solid rgba(207,129,72,0.32)' }} />
               50–79%
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.32)' }} />
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: 'rgba(201,106,90,0.18)', border: '1px solid rgba(201,106,90,0.32)' }} />
               &lt;50%
             </span>
           </div>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-              <div key={d} className="text-[10px] text-[#8B949E] text-center font-semibold">{d}</div>
+              <div key={d} className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] text-center">{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -717,14 +761,14 @@ export default function ProgressPage() {
                   }}
                   className="flex items-center justify-center"
                 >
-                  <span className={`text-[10px] leading-none ${isToday ? 'text-[#F0F6FC] font-bold' : 'text-[#8B949E]'}`}>
+                  <span className={`text-[10px] font-mono tabular-nums leading-none ${isToday ? 'text-[#e8e6e1] font-bold' : 'text-[#9b978f]'}`}>
                     {format(d, 'd')}
                   </span>
                 </div>
               );
             })}
           </div>
-          <div className="flex items-center justify-between mt-2 text-[11px] text-[#8B949E]">
+          <div className="flex items-center justify-between mt-2 text-[11px] font-mono tabular-nums text-[#9b978f]">
             <span>{format(calendarDays[0], 'MMM d')}</span>
             <span>{format(calendarDays[calendarDays.length - 1], 'MMM d')}</span>
           </div>
@@ -732,8 +776,8 @@ export default function ProgressPage() {
 
         {/* ── 7. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
         {sortedActiveProtocols.length > 0 && (
-          <div className="bg-[#161B22] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
-            <div className="text-xs font-bold text-[#8B949E] uppercase tracking-widest mb-4">By Protocol</div>
+          <div className="bg-[#14171b] border border-[#23272d] rounded-2xl p-4">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-4">By Protocol</div>
             {sortedActiveProtocols.map(ap => {
               const protocolStats = protocolBreakdownStats[ap.id] ?? { total: 0, taken: 0 };
               const pct = protocolStats.total ? Math.round(protocolStats.taken / protocolStats.total * 100) : 0;
@@ -741,13 +785,13 @@ export default function ProgressPage() {
               return (
                 <div key={ap.id} className="mb-4 last:mb-0">
                   <div className="flex justify-between mb-1.5">
-                    <span className="text-sm font-semibold text-[#F0F6FC]">{ap.protocol.name}</span>
-                    <span className="text-sm font-bold" style={{ color: barColor }}>{pct}%</span>
+                    <span className="text-sm font-semibold text-[#e8e6e1]">{ap.protocol.name}</span>
+                    <span className="text-sm font-mono tabular-nums font-bold" style={{ color: barColor }}>{pct}%</span>
                   </div>
-                  <div className="h-2 bg-[#1C2333] rounded-full overflow-hidden">
+                  <div className="h-2 bg-[#191d22] rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
                   </div>
-                  <div className="text-[11px] text-[#8B949E] mt-1">{protocolStats.taken} of {protocolStats.total} doses · {ap.status}</div>
+                  <div className="text-[11px] font-mono tabular-nums text-[#9b978f] mt-1">{protocolStats.taken} of {protocolStats.total} doses · {ap.status}</div>
                 </div>
               );
             })}
@@ -756,9 +800,8 @@ export default function ProgressPage() {
 
         {stats.total === 0 && (
           <div className="text-center py-10">
-            <div className="text-4xl mb-3">📊</div>
-            <div className="text-sm font-bold text-[#F0F6FC] mb-1">No data yet</div>
-            <div className="text-xs text-[#8B949E]">Activate a protocol to start tracking your adherence.</div>
+            <div className="text-sm font-bold text-[#e8e6e1] mb-1">No data yet</div>
+            <div className="text-xs text-[#9b978f]">Activate a protocol to start tracking your adherence.</div>
           </div>
         )}
         </>
@@ -773,10 +816,10 @@ function ConsentToggle({ label, checked, onChange }: { label: string; checked: b
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex items-center justify-between gap-3 text-left"
+      className="flex items-center justify-between gap-3 text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
     >
-      <span className="text-sm font-semibold leading-relaxed text-[#F0F6FC]">{label}</span>
-      <span className={`relative h-6 w-12 flex-shrink-0 rounded-full transition-colors ${checked ? 'bg-[#3B82F6]' : 'bg-[#1C2333]'}`}>
+      <span className="text-sm font-semibold leading-relaxed text-[#e8e6e1]">{label}</span>
+      <span className={`relative h-6 w-12 flex-shrink-0 rounded-full transition-colors ${checked ? 'bg-[#d9a53f]' : 'bg-[#191d22]'}`}>
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${checked ? 'left-6' : 'left-0.5'}`} />
       </span>
     </button>

@@ -16,10 +16,10 @@ type PulseDayResponse = {
 };
 
 const LEGEND: Array<{ color: string; label: string }> = [
-  { color: '#F59E0B', label: 'Caffeine' },
-  { color: '#8B5CF6', label: 'Alcohol' },
-  { color: '#F97316', label: 'Sauna' },
-  { color: '#3B82F6', label: 'Dose taken' },
+  { color: '#cf8148', label: 'Caffeine' },
+  { color: '#a292c9', label: 'Alcohol' },
+  { color: '#c96a3a', label: 'Sauna' },
+  { color: '#d9a53f', label: 'Dose taken' },
 ];
 
 function todayLocalDate(): string {
@@ -63,18 +63,18 @@ export function PulseDayCard() {
   const today = todayLocalDate();
 
   return (
-    <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#161B22] p-4">
+    <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold uppercase tracking-widest text-[#8B949E]">Intraday heart rate</div>
-          <h2 className="mt-1 text-lg font-extrabold text-[#F0F6FC]">Pulse day</h2>
+          <div className="text-xs font-bold uppercase tracking-widest text-[#9b978f]">Intraday heart rate</div>
+          <h2 className="mt-1 text-lg font-extrabold text-[#e8e6e1]">Pulse day</h2>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             aria-label="Previous day"
             onClick={() => setDate(current => shiftDate(current, -1))}
-            className="rounded-lg bg-[#0D1117] px-2.5 py-1.5 text-sm font-bold text-[#8B949E] hover:text-[#F0F6FC]"
+            className="rounded-lg bg-[#0e1013] px-2.5 py-1.5 text-sm font-bold text-[#9b978f] hover:text-[#e8e6e1]"
           >
             ‹
           </button>
@@ -86,14 +86,14 @@ export function PulseDayCard() {
             onChange={(event) => {
               if (event.target.value) setDate(event.target.value);
             }}
-            className="rounded-lg bg-[#0D1117] px-2 py-1.5 text-xs font-semibold text-[#F0F6FC] [color-scheme:dark]"
+            className="rounded-lg bg-[#0e1013] px-2 py-1.5 text-xs font-semibold text-[#e8e6e1] [color-scheme:dark]"
           />
           <button
             type="button"
             aria-label="Next day"
             disabled={date >= today}
             onClick={() => setDate(current => shiftDate(current, 1))}
-            className="rounded-lg bg-[#0D1117] px-2.5 py-1.5 text-sm font-bold text-[#8B949E] hover:text-[#F0F6FC] disabled:opacity-40"
+            className="rounded-lg bg-[#0e1013] px-2.5 py-1.5 text-sm font-bold text-[#9b978f] hover:text-[#e8e6e1] disabled:opacity-40"
           >
             ›
           </button>
@@ -102,17 +102,17 @@ export function PulseDayCard() {
 
       <div className="mb-2 flex flex-wrap items-center gap-3">
         {LEGEND.map(item => (
-          <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[#8B949E]">
+          <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[#9b978f]">
             <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
             {item.label}
           </span>
         ))}
       </div>
 
-      {loading && <p className="text-sm text-[#8B949E]">Loading heart-rate samples...</p>}
+      {loading && <p className="text-sm text-[#9b978f]">Loading heart-rate samples...</p>}
       {!loading && error && (
         <div>
-          <p className="text-sm text-[#FCA5A5]">{error}</p>
+          <p className="text-sm text-[#e2a89d]">{error}</p>
           <Button className="mt-3" size="sm" onClick={() => load(date)}>Retry</Button>
         </div>
       )}

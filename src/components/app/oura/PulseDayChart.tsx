@@ -8,10 +8,10 @@ export type PulseTag = { ts: string; kind: PulseTagKind; tagType: string | null;
 export type PulseDose = { ts: string; label: string };
 
 const TAG_COLORS: Record<PulseTagKind, string> = {
-  caffeine: '#F59E0B',
-  alcohol: '#8B5CF6',
-  sauna: '#F97316',
-  other: '#8B949E',
+  caffeine: '#cf8148',
+  alcohol: '#a292c9',
+  sauna: '#c96a3a',
+  other: '#9b978f',
 };
 
 const TAG_LABELS: Record<PulseTagKind, string> = {
@@ -21,7 +21,7 @@ const TAG_LABELS: Record<PulseTagKind, string> = {
   other: 'Tag',
 };
 
-const DOSE_COLOR = '#3B82F6';
+const DOSE_COLOR = '#d9a53f';
 
 type Marker = { ts: string; color: string; label: string };
 
@@ -82,7 +82,7 @@ export function PulseDayChart({
   }, [tags, doses, startMs, endMs]);
 
   if (points.length === 0 && markers.length === 0) {
-    return <p className="text-sm text-[#8B949E]">No heart-rate samples for this day yet.</p>;
+    return <p className="text-sm text-[#9b978f]">No heart-rate samples for this day yet.</p>;
   }
 
   const linePath = points
@@ -91,7 +91,7 @@ export function PulseDayChart({
 
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold text-[#8B949E]">
+      <div className="mb-1 text-[10px] font-semibold text-[#9b978f]">
         {tooltip ?? (bpmValues.length
           ? `${Math.min(...bpmValues)}-${Math.max(...bpmValues)} bpm · tap a marker for details`
           : 'No samples · tap a marker for details')}
@@ -108,7 +108,7 @@ export function PulseDayChart({
       >
         <line x1={padX} x2={width - padX} y1={plotBottom} y2={plotBottom} stroke="rgba(255,255,255,0.15)" />
         {points.length > 0 && (
-          <path d={linePath} fill="none" stroke="#F87171" strokeWidth="1.5" strokeLinejoin="round" pointerEvents="none" />
+          <path d={linePath} fill="none" stroke="#d98a7c" strokeWidth="1.5" strokeLinejoin="round" pointerEvents="none" />
         )}
         {markers.map((marker, index) => (
           <circle
@@ -122,7 +122,7 @@ export function PulseDayChart({
           />
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-[#8B949E]">
+      <div className="mt-1 flex justify-between text-[10px] text-[#9b978f]">
         <span>{timeLabel(startIso)}</span>
         <span>{timeLabel(endIso)}</span>
       </div>

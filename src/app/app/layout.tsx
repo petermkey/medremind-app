@@ -117,16 +117,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 
   if (checking) return (
-    <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-[#3B82F6] border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-[#0e1013] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[#d9a53f] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   if (!profile?.onboarded) return (
-    <div className="min-h-screen bg-[#0D1117] flex items-center justify-center p-6 text-center">
-      <div className="max-w-xs text-[#8B949E] text-sm">
+    <div className="min-h-screen bg-[#0e1013] flex items-center justify-center p-6 text-center">
+      <div className="max-w-xs text-[#9b978f] text-sm">
         <p>Unable to establish session. Redirecting to login…</p>
-        <button onClick={() => router.replace('/login')} className="mt-3 text-[#3B82F6] hover:underline">
+        <button onClick={() => router.replace('/login')} className="mt-3 text-[#d9a53f] hover:underline">
           Go to login
         </button>
       </div>
@@ -135,9 +135,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-[#070A10] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0e1013] flex items-center justify-center">
         <div className="
-          flex flex-col bg-[#0D1117] w-full h-screen
+          flex flex-col bg-[#0e1013] w-full h-screen
           sm:w-[430px] sm:h-[900px] sm:rounded-[44px] sm:border sm:border-[rgba(255,255,255,0.08)]
           sm:shadow-[0_40px_80px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.04)]
           overflow-hidden relative

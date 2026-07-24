@@ -21,11 +21,11 @@ type SummaryDay = {
 
 const DISMISS_KEY = 'medremind-briefing-dismissed-v1';
 
-const SEVERITY_STYLE: Record<Briefing['severity'], { border: string; bg: string; icon: string }> = {
-  good: { border: 'rgba(16,185,129,0.35)', bg: 'rgba(16,185,129,0.08)', icon: '🌤' },
-  info: { border: 'rgba(59,130,246,0.3)', bg: 'rgba(59,130,246,0.08)', icon: '☀️' },
-  caution: { border: 'rgba(251,191,36,0.35)', bg: 'rgba(251,191,36,0.08)', icon: '🌥' },
-  warning: { border: 'rgba(248,81,73,0.35)', bg: 'rgba(248,81,73,0.08)', icon: '🌡' },
+const SEVERITY_STYLE: Record<Briefing['severity'], { border: string; bg: string; dot: string }> = {
+  good: { border: 'rgba(143,174,116,0.35)', bg: 'rgba(143,174,116,0.08)', dot: '#8fae74' },
+  info: { border: 'rgba(217,165,63,0.3)', bg: 'rgba(217,165,63,0.08)', dot: '#d9a53f' },
+  caution: { border: 'rgba(207,129,72,0.35)', bg: 'rgba(207,129,72,0.08)', dot: '#cf8148' },
+  warning: { border: 'rgba(201,106,90,0.35)', bg: 'rgba(201,106,90,0.08)', dot: '#c96a5a' },
 };
 
 export function MorningBriefingCard({ todayStr, doseCount }: { todayStr: string; doseCount: number }) {
@@ -80,10 +80,10 @@ export function MorningBriefingCard({ todayStr, doseCount }: { todayStr: string;
       style={{ borderColor: style.border, background: style.bg }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-2xl">{style.icon}</span>
+        <span className="mt-1.5 w-2 h-2 rounded-full flex-shrink-0" style={{ background: style.dot }} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-[#F0F6FC]">{briefing.title}</div>
-          <div className="text-xs text-[#8B949E] mt-1 leading-relaxed">{briefing.body}</div>
+          <div className="text-sm font-bold text-[#e8e6e1]">{briefing.title}</div>
+          <div className="text-xs text-[#9b978f] mt-1 leading-relaxed">{briefing.body}</div>
         </div>
         <button
           type="button"
@@ -92,7 +92,7 @@ export function MorningBriefingCard({ todayStr, doseCount }: { todayStr: string;
             localStorage.setItem(DISMISS_KEY, todayStr);
             setDismissed(true);
           }}
-          className="text-[#8B949E] hover:text-[#F0F6FC] text-lg leading-none px-1"
+          className="text-[#9b978f] hover:text-[#e8e6e1] text-lg leading-none px-1"
         >
           ✕
         </button>

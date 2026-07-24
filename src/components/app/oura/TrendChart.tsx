@@ -38,12 +38,12 @@ function rangeLabel(values: Array<number | null>, suffix: string): string | null
 
 const LEGENDS: Record<string, Array<{ color: string; label: string }>> = {
   diverging: [
-    { color: '#F97316', label: 'Warmer' },
-    { color: '#38BDF8', label: 'Cooler' },
+    { color: '#c96a3a', label: 'Warmer' },
+    { color: '#7fa6bf', label: 'Cooler' },
   ],
   paired: [
-    { color: '#F97316', label: 'Stress' },
-    { color: '#10B981', label: 'Recovery' },
+    { color: '#c96a3a', label: 'Stress' },
+    { color: '#8fae74', label: 'Recovery' },
   ],
 };
 
@@ -89,17 +89,17 @@ export function TrendChart({
   const range = rangeLabel(mode === 'paired' ? [...values, ...(secondaryValues ?? [])] : values, valueSuffix);
 
   return (
-    <div className="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0D1117] p-3">
+    <div className="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0e1013] p-3">
       <div className="mb-1 flex items-center justify-between gap-3">
-        <div className="text-xs font-bold text-[#F0F6FC]">{title}</div>
-        <div className="text-[10px] font-semibold text-[#8B949E]">
+        <div className="text-xs font-bold text-[#e8e6e1]">{title}</div>
+        <div className="text-[10px] font-semibold text-[#9b978f]">
           {tooltip ? `${tooltip.label} · ${tooltip.value}` : range}
         </div>
       </div>
       {legend && (
         <div className="mb-2 flex items-center gap-3">
           {legend.map(item => (
-            <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[#8B949E]">
+            <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[#9b978f]">
               <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
               {item.label}
             </span>
@@ -150,13 +150,13 @@ export function TrendChart({
           const isLatest = index === bars.length - 1;
           let y = padY + bar.y * plotHeight;
           let h = Math.max(1, bar.height * plotHeight);
-          let fill = isLatest ? '#60A5FA' : '#3B82F6';
+          let fill = isLatest ? '#e6b654' : '#d9a53f';
 
           if (mode === 'diverging') {
             const magnitude = Math.min(1, Math.abs(bar.value) / 1);
             h = Math.max(1, magnitude * (plotHeight / 2));
             y = bar.value >= 0 ? zeroY - h : zeroY;
-            fill = bar.value >= 0 ? '#F97316' : '#38BDF8';
+            fill = bar.value >= 0 ? '#c96a3a' : '#7fa6bf';
           }
 
           if (mode === 'paired') {
@@ -170,7 +170,7 @@ export function TrendChart({
                   width={pairWidth}
                   height={h}
                   rx="1.5"
-                  fill="#F97316"
+                  fill="#c96a3a"
                   opacity={bar.opacity}
                   onClick={() => setTooltip({ index, label: dates[index] ?? '', value: `${fmt(bar.value, valueSuffix)} stress` })}
                 />
@@ -181,7 +181,7 @@ export function TrendChart({
                     width={pairWidth}
                     height={Math.max(1, second.height * plotHeight)}
                     rx="1.5"
-                    fill="#10B981"
+                    fill="#8fae74"
                     opacity={second.opacity}
                     onClick={() => setTooltip({ index, label: dates[index] ?? '', value: `${fmt(second.value, valueSuffix)} recovery` })}
                   />
@@ -211,7 +211,7 @@ export function TrendChart({
           </g>
         )}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-[#8B949E]">
+      <div className="mt-1 flex justify-between text-[10px] text-[#9b978f]">
         <span>{dates[0] ?? ''}</span>
         <span>{dates[dates.length - 1] ?? ''}</span>
       </div>
