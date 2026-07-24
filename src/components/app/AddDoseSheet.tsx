@@ -156,11 +156,11 @@ export function AddDoseSheet({ open, onClose }: Props) {
 
       {/* Sheet */}
       <div
-        className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-[#14171b] rounded-t-[24px] z-[51] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-[var(--surface)] rounded-t-[24px] z-[51] transition-transform duration-300 ${open ? 'translate-y-0' : 'translate-y-full'}`}
       >
-        <div className="w-9 h-1 bg-[rgba(255,255,255,0.12)] rounded-full mx-auto mt-3 mb-5" />
+        <div className="w-9 h-1 bg-[rgba(var(--overlay-rgb),0.12)] rounded-full mx-auto mt-3 mb-5" />
         <div className="px-5 pb-8 overflow-y-auto max-h-[85vh]">
-          <h2 className="text-lg font-extrabold text-[#e8e6e1] mb-5">Add to Schedule</h2>
+          <h2 className="text-lg font-extrabold text-[var(--text)] mb-5">Add to Schedule</h2>
 
           <div className="flex flex-col gap-4">
             <Select label="Type" value={itemType} onChange={e => setItemType(e.target.value as ItemType)} options={ITEM_TYPES} />
@@ -200,10 +200,10 @@ export function AddDoseSheet({ open, onClose }: Props) {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">First dose time</label>
+              <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">First dose time</label>
               <input
                 type="time" value={time} onChange={e => setTime(e.target.value)}
-                className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-[#e8e6e1] text-sm outline-none focus:border-[#d9a53f]"
+                className="w-full bg-[var(--surface2)] border border-[rgba(var(--overlay-rgb),0.08)] rounded-xl px-4 py-3 text-[var(--text)] text-sm outline-none focus:border-[var(--blue)]"
               />
             </div>
 
