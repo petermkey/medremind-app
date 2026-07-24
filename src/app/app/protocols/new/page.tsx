@@ -166,7 +166,7 @@ export default function NewProtocolPage() {
         <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">NEW STACK</div>
         <div className="flex items-center gap-3">
           <button onClick={() => step > 1 ? setStep(s => s - 1) : router.back()} className="text-[#9b978f] text-xl rounded-[8px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">←</button>
-          <h1 className="text-lg font-extrabold text-[#e8e6e1]">New Protocol</h1>
+          <h1 className="text-lg font-semibold tracking-[-0.02em] text-[#e8e6e1]">New Protocol</h1>
         </div>
         {/* Steps */}
         <div className="flex gap-1 mt-3">

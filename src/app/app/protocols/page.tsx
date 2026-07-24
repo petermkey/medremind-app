@@ -142,7 +142,7 @@ export default function ProtocolsPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">STACKS</div>
-            <h1 className="text-xl font-extrabold text-[#e8e6e1]">Protocols</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Protocols</h1>
           </div>
           <button
             onClick={() => router.push('/app/protocols/new')}

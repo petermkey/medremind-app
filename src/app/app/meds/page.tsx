@@ -31,7 +31,7 @@ export default function MedsPage() {
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
         <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">MEDS · {myMeds.length} ACTIVE</div>
-        <h1 className="text-xl font-extrabold text-[#e8e6e1] mb-4">Medications</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1] mb-4">Medications</h1>
 
         <input
           type="text"

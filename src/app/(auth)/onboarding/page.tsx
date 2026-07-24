@@ -10,13 +10,13 @@ import { Input, Select } from '@/components/ui/Input';
 import type { AgeRange, ProtocolCategory } from '@/types';
 
 const CATEGORY_LABELS: Record<ProtocolCategory, string> = {
-  general: '🌿 General Health',
-  cardiovascular: '❤️ Cardiovascular',
-  metabolic: '⚙️ Metabolic',
-  hormonal: '🔬 Hormonal',
-  neurological: '🧠 Neurological',
-  immune: '🛡️ Immune',
-  custom: '✏️ Custom',
+  general: 'General Health',
+  cardiovascular: 'Cardiovascular',
+  metabolic: 'Metabolic',
+  hormonal: 'Hormonal',
+  neurological: 'Neurological',
+  immune: 'Immune',
+  custom: 'Custom',
 };
 
 export default function OnboardingPage() {
@@ -209,9 +209,9 @@ export default function OnboardingPage() {
 
             <div className="flex flex-col gap-4">
               {[
-                { label: '🌅 Morning', value: morningTime, onChange: setMorningTime },
-                { label: '☀️ Afternoon', value: afternoonTime, onChange: setAfternoonTime },
-                { label: '🌙 Evening', value: eveningTime, onChange: setEveningTime },
+                { label: 'Morning', value: morningTime, onChange: setMorningTime },
+                { label: 'Afternoon', value: afternoonTime, onChange: setAfternoonTime },
+                { label: 'Evening', value: eveningTime, onChange: setEveningTime },
               ].map(({ label, value, onChange }) => (
                 <div key={label} className="flex items-center justify-between bg-[#14171b] border border-[#23272d] rounded-2xl px-4 py-4">
                   <span className="text-sm font-semibold text-[#e8e6e1]">{label}</span>

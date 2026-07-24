@@ -135,7 +135,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[14px] ${settled ? 'mb-1' : 'mb-2.5'}`}
+      className={`relative overflow-hidden rounded-[14px] ${settled ? 'mb-1' : isNext ? 'mb-2.5' : 'mb-1.5'}`}
       data-dose-id={dose.id}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -183,19 +183,18 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
         </button>
       </div>
 
-      {/* Card: settled doses render as quiet text rows, active ones as hairline panels (Night Shift) */}
+      {/* Card: only the next dose gets a panel with visible actions; everything else is a quiet text row (Night Shift) */}
       <div
         className={[
-          settled
-            ? 'rounded-[14px] px-3 py-2'
-            : isNext
+          isNext && !settled
             ? 'bg-[#14171b] border border-[#2e333a] rounded-[14px] px-4 py-3.5'
-            : 'bg-[#14171b] border border-[#23272d] rounded-[14px] px-4 py-3',
-          'flex items-center gap-3.5 transition-all duration-200 relative overflow-hidden',
+            : 'rounded-[14px] px-3 py-2',
+          'transition-all duration-200 relative overflow-hidden',
           cardTranslate,
           actionsDisabled ? 'opacity-70' : '',
         ].join(' ')}
       >
+       <div className="flex items-center gap-3.5">
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className={['truncate', settled ? 'text-sm font-medium text-[#9b978f]' : isNext ? 'text-[15px] font-semibold text-[#e8e6e1]' : 'text-sm font-medium text-[#e8e6e1]'].join(' ')}>
@@ -229,33 +228,80 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           )}
         </div>
 
-        {/* Check button */}
-        <button
-          type="button"
-          aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
-          onClick={e => {
-            e.stopPropagation();
-            if (dose.status !== 'taken') onTake();
-          }}
-          aria-disabled={actionsDisabled}
-          className={[
-            'rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200',
-            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
-            settled ? 'w-7 h-7 border text-xs' : 'w-9 h-9 border-[1.5px] text-base',
-            actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
-            displayStatus === 'taken'
-              ? 'bg-transparent border-[#8fae74] text-[#8fae74] cursor-default'
-              : displayStatus === 'skipped'
-              ? 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]'
-              : displayStatus === 'overdue'
-              ? 'border-[#c96a5a] text-[#c96a5a] hover:bg-[#c96a5a] hover:text-white'
-              : isNext
-              ? 'border-[#d9a53f] text-[#d9a53f] hover:bg-[#d9a53f] hover:text-[#14120b]'
-              : 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]',
-          ].join(' ')}
-        >
-          {displayStatus === 'taken' ? '✓' : ''}
-        </button>
+        {/* Check button — hidden on the next-dose panel, which has visible action buttons instead */}
+        {!(isNext && !settled) && (
+          <button
+            type="button"
+            aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
+            onClick={e => {
+              e.stopPropagation();
+              if (dose.status !== 'taken') onTake();
+            }}
+            aria-disabled={actionsDisabled}
+            className={[
+              'rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+              settled ? 'w-7 h-7 border text-xs' : 'w-9 h-9 border-[1.5px] text-base',
+              actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              displayStatus === 'taken'
+                ? 'bg-transparent border-[#8fae74] text-[#8fae74] cursor-default'
+                : displayStatus === 'skipped'
+                ? 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]'
+                : displayStatus === 'overdue'
+                ? 'border-[#c96a5a] text-[#c96a5a] hover:bg-[#c96a5a] hover:text-white'
+                : 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]',
+            ].join(' ')}
+          >
+            {displayStatus === 'taken' ? '✓' : ''}
+          </button>
+        )}
+       </div>
+
+        {/* Next-dose panel actions (mockup: Take / Snooze / Skip) — same handlers as circle/swipe */}
+        {isNext && !settled && (
+          <div className="flex gap-2 mt-3">
+            <button
+              type="button"
+              aria-label={displayStatus === 'taken' ? 'Already marked as taken' : 'Mark as taken'}
+              aria-disabled={actionsDisabled}
+              onClick={e => {
+                e.stopPropagation();
+                if (dose.status !== 'taken') onTake();
+              }}
+              className={[
+                'flex-1 rounded-[10px] bg-[#d9a53f] px-4 py-2.5 text-[13px] font-semibold text-[#14120b] transition-colors hover:bg-[#e6b654]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
+            >
+              Take
+            </button>
+            <button
+              type="button"
+              aria-disabled={actionsDisabled}
+              onClick={() => onSnooze()}
+              className={[
+                'rounded-[10px] border border-[#2e333a] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
+            >
+              Snooze
+            </button>
+            <button
+              type="button"
+              aria-disabled={actionsDisabled}
+              onClick={() => onSkip()}
+              className={[
+                'rounded-[10px] border border-[#2e333a] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
+            >
+              Skip
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Delete panel — right side, revealed by swipe LEFT */}

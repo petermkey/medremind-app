@@ -912,14 +912,14 @@ export default function FoodPage() {
               type="button"
               onClick={() => setSelectedDate(date)}
               className={[
-                'min-w-[58px] rounded-[10px] border px-3 py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                'min-w-[58px] border-b-2 px-3 pt-2 pb-1.5 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
                 date === activeDate
-                  ? 'border-[#d9a53f] bg-[rgba(217,165,63,0.1)] text-[#e8e6e1]'
-                  : 'border-[#23272d] bg-transparent text-[#9b978f]',
+                  ? 'border-[#d9a53f] text-[#d9a53f]'
+                  : 'border-transparent text-[#605d56] hover:text-[#9b978f]',
               ].join(' ')}
             >
-              <div className="font-mono text-[10px] font-bold uppercase tracking-wider">{date === today ? 'Today' : format(new Date(`${date}T12:00:00`), 'EEE')}</div>
-              <div className="mt-0.5 font-mono text-sm font-extrabold tabular-nums">{format(new Date(`${date}T12:00:00`), 'd')}</div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.08em]">{date === today ? 'Today' : format(new Date(`${date}T12:00:00`), 'EEE')}</div>
+              <div className={`mt-0.5 font-mono text-sm tabular-nums ${date === activeDate ? 'font-semibold' : 'font-medium'}`}>{format(new Date(`${date}T12:00:00`), 'd')}</div>
             </button>
           ))}
           {activeDate !== today && (

@@ -257,7 +257,7 @@ export default function ProtocolDetailPage({ params }: { params: Promise<{ id: s
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">STACK</div>
-            <h1 className="text-lg font-extrabold text-[#e8e6e1]">{protocol.name}</h1>
+            <h1 className="text-lg font-semibold tracking-[-0.02em] text-[#e8e6e1]">{protocol.name}</h1>
             {protocol.description && <p className="text-xs text-[#9b978f] mt-1">{protocol.description}</p>}
             {detailReadModel.isArchived && <p className="text-[11px] font-mono text-[#cf8148] mt-1 uppercase tracking-wide font-bold">Archived</p>}
           </div>

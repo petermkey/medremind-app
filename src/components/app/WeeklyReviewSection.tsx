@@ -128,7 +128,7 @@ export function WeeklyReviewSection() {
       )}
 
       <p className="mt-3 text-[10px] text-[#9b978f] leading-relaxed">
-        ⚠️ This is not medical advice. Do not change your medications or supplements without consulting your healthcare provider.
+        This is not medical advice. Do not change your medications or supplements without consulting your healthcare provider.
       </p>
     </div>
   );

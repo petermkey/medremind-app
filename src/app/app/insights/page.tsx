@@ -107,7 +107,7 @@ export default function InsightsPage() {
     return (
       <div className="flex flex-col h-full">
         <div className="px-5 pt-4 pb-2 flex-shrink-0">
-          <h1 className="text-xl font-extrabold text-[#e8e6e1]">Insights</h1>
+          <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Insights</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-6 flex items-center justify-center">
           <div className="text-center">
@@ -127,7 +127,7 @@ export default function InsightsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
-        <h1 className="text-xl font-extrabold text-[#e8e6e1]">Insights</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Insights</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">

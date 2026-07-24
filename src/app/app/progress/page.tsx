@@ -462,7 +462,7 @@ export default function ProgressPage() {
         <div className="text-[10px] font-mono uppercase tracking-[0.08em] text-[#605d56] mb-1">
           Data · {calendarRange} d window
         </div>
-        <h1 className="text-xl font-extrabold text-[#e8e6e1]">Signals</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Signals</h1>
         <div className="mt-3 grid grid-cols-2 rounded-xl border border-[#23272d] bg-[#0e1013] p-1">
           {([
             ['correlations', 'Correlations'],
