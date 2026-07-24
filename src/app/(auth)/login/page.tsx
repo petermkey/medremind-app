@@ -99,14 +99,14 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0e1013] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 justify-center mb-10">
-          <div className="w-10 h-10 rounded-xl bg-[#14171b] border border-[#23272d] flex items-center justify-center text-xl">💊</div>
-          <span className="text-xl font-bold text-[#e8e6e1] tracking-tight">MedRemind</span>
+          <div className="w-10 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-xl">💊</div>
+          <span className="text-xl font-bold text-[var(--text)] tracking-tight">MedRemind</span>
         </div>
-        <h1 className="text-2xl font-extrabold text-[#e8e6e1] mb-2">Welcome back</h1>
-        <p className="text-sm text-[#9b978f] mb-8">Sign in to your account</p>
+        <h1 className="text-2xl font-extrabold text-[var(--text)] mb-2">Welcome back</h1>
+        <p className="text-sm text-[var(--muted)] mb-8">Sign in to your account</p>
 
         {/* OAuth providers */}
         <div className="flex flex-col gap-3 mb-6">
@@ -114,7 +114,7 @@ function LoginForm() {
             type="button"
             onClick={() => handleOAuth('google')}
             disabled={oauthLoading !== null}
-            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-[#23272d] bg-[#14171b] text-[#c4c0b8] text-sm font-medium hover:bg-[#16191e] disabled:opacity-60 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--chip-text)] text-sm font-medium hover:bg-[var(--surface3)] disabled:opacity-60 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
@@ -128,24 +128,24 @@ function LoginForm() {
         </div>
 
         <div className="flex items-center gap-3 mb-2">
-          <div className="flex-1 h-px bg-[#23272d]" />
-          <span className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">or sign in with email</span>
-          <div className="flex-1 h-px bg-[#23272d]" />
+          <div className="flex-1 h-px bg-[var(--border)]" />
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">or sign in with email</span>
+          <div className="flex-1 h-px bg-[var(--border)]" />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
-          <Input label="Password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
-          {error && <p className="text-sm text-[#c96a5a] bg-[rgba(201,106,90,0.1)] border border-[rgba(201,106,90,0.25)] px-4 py-3 rounded-xl">{error}</p>}
+          <Input label="Email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2" />
+          <Input label="Password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2" />
+          {error && <p className="text-sm text-[var(--red)] bg-[rgba(var(--red-rgb),0.1)] border border-[rgba(var(--red-rgb),0.25)] px-4 py-3 rounded-xl">{error}</p>}
           {emailUnconfirmed && (
-            <div className="text-sm bg-[rgba(207,129,72,0.1)] border border-[rgba(207,129,72,0.3)] text-[#cf8148] px-4 py-3 rounded-xl">
+            <div className="text-sm bg-[rgba(var(--yellow-rgb),0.1)] border border-[rgba(var(--yellow-rgb),0.3)] text-[var(--yellow)] px-4 py-3 rounded-xl">
               <p className="font-semibold">Email confirmation required.</p>
-              <p className="text-xs text-[#9b978f] mt-1">Please confirm your email from your inbox before signing in.</p>
+              <p className="text-xs text-[var(--muted)] mt-1">Please confirm your email from your inbox before signing in.</p>
               <button
                 type="button"
                 onClick={handleResendConfirmation}
                 disabled={resendLoading || resendCooldownLeft > 0}
-                className="mt-2 text-xs font-semibold text-[#e8e6e1] underline decoration-[#3a372f] underline-offset-2 tabular-nums hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm disabled:opacity-60 disabled:no-underline"
+                className="mt-2 text-xs font-semibold text-[var(--text)] underline decoration-[var(--chip-bg)] underline-offset-2 tabular-nums hover:text-[var(--blue-text)] hover:decoration-[var(--blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2 rounded-sm disabled:opacity-60 disabled:no-underline"
               >
                 {resendLoading
                   ? 'Sending…'
@@ -154,17 +154,17 @@ function LoginForm() {
                   : 'Resend confirmation email'}
               </button>
               {resendMessage && (
-                <p className={`text-xs mt-2 ${resendError ? 'text-[#c96a5a]' : 'text-[#9b978f]'}`}>{resendMessage}</p>
+                <p className={`text-xs mt-2 ${resendError ? 'text-[var(--red)]' : 'text-[var(--muted)]'}`}>{resendMessage}</p>
               )}
             </div>
           )}
-          <Button type="submit" size="lg" fullWidth loading={loading} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">Sign in</Button>
+          <Button type="submit" size="lg" fullWidth loading={loading} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2">Sign in</Button>
         </form>
-        <p className="text-center text-sm text-[#9b978f] mt-6">
+        <p className="text-center text-sm text-[var(--muted)] mt-6">
           No account?{' '}
-          <Link href="/register" className="text-[#e8e6e1] font-semibold underline decoration-[#3a372f] underline-offset-2 hover:text-[#d9a53f] hover:decoration-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 rounded-sm">Create one free</Link>
+          <Link href="/register" className="text-[var(--text)] font-semibold underline decoration-[var(--chip-bg)] underline-offset-2 hover:text-[var(--blue-text)] hover:decoration-[var(--blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2 rounded-sm">Create one free</Link>
         </p>
-        <p className="text-center text-xs text-[#605d56] mt-8 leading-relaxed">
+        <p className="text-center text-xs text-[var(--faint)] mt-8 leading-relaxed">
           MedRemind is not a substitute for medical advice.<br />Always consult your healthcare provider.
         </p>
       </div>
@@ -174,7 +174,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0e1013] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#d9a53f] border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[var(--bg)] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[var(--blue)] border-t-transparent rounded-full animate-spin" /></div>}>
       <LoginForm />
     </Suspense>
   );

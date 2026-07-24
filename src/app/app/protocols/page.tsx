@@ -141,12 +141,12 @@ export default function ProtocolsPage() {
       <div className="px-5 pt-4 pb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f] mb-1">STACKS</div>
-            <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#e8e6e1]">Protocols</h1>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-1">STACKS</div>
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-[var(--text)]">Protocols</h1>
           </div>
           <button
             onClick={() => router.push('/app/protocols/new')}
-            className="flex items-center gap-1.5 text-sm font-semibold text-[#d9a53f] border border-[rgba(217,165,63,0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(217,165,63,0.1)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+            className="flex items-center gap-1.5 text-sm font-semibold text-[var(--blue-text)] border border-[rgba(var(--blue-rgb),0.3)] px-3 py-2 rounded-xl hover:bg-[rgba(var(--blue-rgb),0.1)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
           >
             ＋ New
           </button>
@@ -157,7 +157,7 @@ export default function ProtocolsPage() {
           placeholder="Search protocols…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-2.5 text-sm text-[#e8e6e1] placeholder:text-[#9b978f] outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 mb-3"
+          className="w-full bg-[var(--surface2)] border border-[rgba(var(--overlay-rgb),0.08)] rounded-xl px-4 py-2.5 text-sm text-[var(--text)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2 mb-3"
         />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -166,8 +166,8 @@ export default function ProtocolsPage() {
               key={f.value}
               onClick={() => setFilter(f.value)}
               className={[
-                'px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
-                filter === f.value ? 'bg-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
+                'px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
+                filter === f.value ? 'bg-[var(--blue)] text-[var(--blue-on)]' : 'bg-[var(--surface2)] text-[var(--muted)] hover:text-[var(--text)]',
               ].join(' ')}
             >
               {f.label}
@@ -179,8 +179,8 @@ export default function ProtocolsPage() {
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {filtered.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-sm font-bold text-[#e8e6e1] mb-1">No protocols found</div>
-            <div className="text-xs text-[#9b978f]">Try a different filter or create a custom protocol.</div>
+            <div className="text-sm font-bold text-[var(--text)] mb-1">No protocols found</div>
+            <div className="text-xs text-[var(--muted)]">Try a different filter or create a custom protocol.</div>
           </div>
         )}
 
@@ -189,10 +189,17 @@ export default function ProtocolsPage() {
           const statusColor = !instance
             ? 'transparent'
             : instance.status === 'active'
-            ? '#8fae74'
+            ? 'var(--green)'
             : instance.status === 'paused'
-            ? '#cf8148'
-            : '#9b978f';
+            ? 'var(--yellow)'
+            : 'var(--muted)';
+          const statusBg = !instance
+            ? 'transparent'
+            : instance.status === 'active'
+            ? 'rgba(var(--green-rgb),0.125)'
+            : instance.status === 'paused'
+            ? 'rgba(var(--yellow-rgb),0.125)'
+            : 'rgba(var(--muted-rgb),0.125)';
 
           return (
             <ProtocolRow
@@ -203,33 +210,33 @@ export default function ProtocolsPage() {
             >
               <div className="flex items-start gap-3" data-protocol-name={p.name}>
                 <div className="flex-1 min-w-0">
-                  <span className="block text-sm font-bold text-[#e8e6e1] truncate">{p.name}</span>
+                  <span className="block text-sm font-bold text-[var(--text)] truncate">{p.name}</span>
                   <div className="mt-1 flex items-center gap-2">
                     {p.isArchived ? (
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#9b978f] flex-shrink-0">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[rgba(var(--purple-rgb),0.15)] text-[var(--muted)] flex-shrink-0">
                         archived
                       </span>
                     ) : instance ? (
                       <span
                         className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: `${statusColor}20`, color: statusColor }}
+                        style={{ background: statusBg, color: statusColor }}
                       >
                         {getStatusLabel(instance.status)}
                       </span>
                     ) : null}
                     {p.isTemplate && !instance && (
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[rgba(162,146,201,0.15)] text-[#a292c9] flex-shrink-0">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[rgba(var(--purple-rgb),0.15)] text-[var(--purple)] flex-shrink-0">
                         template
                       </span>
                     )}
                   </div>
                   {p.description && (
-                    <div className="text-xs text-[#9b978f] mt-0.5 line-clamp-2">{p.description}</div>
+                    <div className="text-xs text-[var(--muted)] mt-0.5 line-clamp-2">{p.description}</div>
                   )}
                   <div className="flex items-center gap-3 mt-2">
-                    <span className="text-[11px] font-mono tabular-nums text-[#9b978f]">{p.items.length} items</span>
+                    <span className="text-[11px] font-mono tabular-nums text-[var(--muted)]">{p.items.length} items</span>
                     {instance?.startDate && (
-                      <span className="text-[11px] font-mono tabular-nums text-[#9b978f]">Started {instance.startDate}</span>
+                      <span className="text-[11px] font-mono tabular-nums text-[var(--muted)]">Started {instance.startDate}</span>
                     )}
                   </div>
                 </div>
@@ -249,12 +256,12 @@ export default function ProtocolsPage() {
                     else handleActivate(p.id);
                   }}
                   className={[
-                    'text-xs font-semibold px-3 py-2 rounded-xl border flex-shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                    'text-xs font-semibold px-3 py-2 rounded-xl border flex-shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
                     instance?.status === 'active'
-                      ? 'bg-transparent border-[#2e333a] text-[#9b978f] hover:border-[#605d56] hover:text-[#e8e6e1]'
+                      ? 'bg-transparent border-[var(--border-strong)] text-[var(--muted)] hover:border-[var(--faint)] hover:text-[var(--text)]'
                       : instance?.status === 'paused'
-                      ? 'bg-[rgba(143,174,116,0.15)] border-transparent text-[#8fae74] hover:bg-[rgba(143,174,116,0.25)]'
-                      : 'bg-[rgba(217,165,63,0.15)] border-transparent text-[#d9a53f] hover:bg-[rgba(217,165,63,0.25)]',
+                      ? 'bg-[rgba(var(--green-rgb),0.15)] border-transparent text-[var(--green)] hover:bg-[rgba(var(--green-rgb),0.25)]'
+                      : 'bg-[rgba(var(--blue-rgb),0.15)] border-transparent text-[var(--blue-text)] hover:bg-[rgba(var(--blue-rgb),0.25)]',
                   ].join(' ')}
                 >
                   {instance?.status === 'active' ? 'Pause' : instance?.status === 'paused' ? 'Resume' : 'Activate'}
@@ -318,7 +325,7 @@ function ProtocolRow({
         tabIndex={0}
         onKeyDown={handleCardKeyDown}
         className={[
-          'bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(255,255,255,0.18)] transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+          'bg-[var(--surface)] border border-[rgba(var(--overlay-rgb),0.08)] rounded-2xl p-4 cursor-pointer hover:border-[rgba(var(--overlay-rgb),0.18)] transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
           swiped ? '-translate-x-[132px]' : '',
         ].join(' ')}
         onClick={() => {
@@ -342,7 +349,7 @@ function ProtocolRow({
             onEdit();
             setSwiped(false);
           }}
-          className="px-5 bg-[#d9a53f] text-[#14120b] text-[11px] font-bold flex flex-col items-center justify-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
+          className="px-5 bg-[var(--blue)] text-[var(--blue-on)] text-[11px] font-bold flex flex-col items-center justify-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text)] focus-visible:outline-offset-[-2px]"
         >
           Edit
         </button>
@@ -354,7 +361,7 @@ function ProtocolRow({
             onDelete();
             setSwiped(false);
           }}
-          className="px-5 bg-[#c96a5a] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
+          className="px-5 bg-[var(--red)] text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 rounded-r-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text)] focus-visible:outline-offset-[-2px]"
         >
           Delete
         </button>

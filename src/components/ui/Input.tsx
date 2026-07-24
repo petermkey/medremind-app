@@ -13,7 +13,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">
+          <label htmlFor={inputId} className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
             {label}
           </label>
         )}
@@ -21,17 +21,17 @@ export const Input = forwardRef<HTMLInputElement, Props>(
           ref={ref}
           id={inputId}
           className={[
-            'w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-[12px]',
-            'px-4 py-3 text-[#e8e6e1] text-sm outline-none',
-            'placeholder:text-[#9b978f]',
-            'focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 transition-colors duration-200',
-            error ? 'border-[#c96a5a]' : '',
+            'w-full bg-[var(--surface2)] border border-[rgba(var(--overlay-rgb),0.08)] rounded-[12px]',
+            'px-4 py-3 text-[var(--text)] text-sm outline-none',
+            'placeholder:text-[var(--muted)]',
+            'focus:border-[var(--blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2 transition-colors duration-200',
+            error ? 'border-[var(--red)]' : '',
             className,
           ].join(' ')}
           {...rest}
         />
-        {error && <p className="text-xs text-[#c96a5a]">{error}</p>}
-        {hint && !error && <p className="text-xs text-[#9b978f]">{hint}</p>}
+        {error && <p className="text-xs text-[var(--red)]">{error}</p>}
+        {hint && !error && <p className="text-xs text-[var(--muted)]">{hint}</p>}
       </div>
     );
   }
@@ -51,7 +51,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-xs font-semibold text-[#9b978f] uppercase tracking-wide">
+          <label htmlFor={inputId} className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
             {label}
           </label>
         )}
@@ -59,21 +59,21 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={inputId}
           className={[
-            'w-full bg-[#191d22] border border-[rgba(255,255,255,0.08)] rounded-[12px]',
-            'px-4 py-3 text-[#e8e6e1] text-sm outline-none',
-            'focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2 transition-colors duration-200',
-            error ? 'border-[#c96a5a]' : '',
+            'w-full bg-[var(--surface2)] border border-[rgba(var(--overlay-rgb),0.08)] rounded-[12px]',
+            'px-4 py-3 text-[var(--text)] text-sm outline-none',
+            'focus:border-[var(--blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2 transition-colors duration-200',
+            error ? 'border-[var(--red)]' : '',
             className,
           ].join(' ')}
           {...rest}
         >
           {options.map(o => (
-            <option key={o.value} value={o.value} style={{ background: '#191d22' }}>
+            <option key={o.value} value={o.value} style={{ background: 'var(--surface2)' }}>
               {o.label}
             </option>
           ))}
         </select>
-        {error && <p className="text-xs text-[#c96a5a]">{error}</p>}
+        {error && <p className="text-xs text-[var(--red)]">{error}</p>}
       </div>
     );
   }

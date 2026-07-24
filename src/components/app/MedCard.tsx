@@ -4,12 +4,12 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ScheduledDose } from '@/types';
 
 const STATUS_COLOR: Record<string, string> = {
-  taken:     '#8fae74',
-  upcoming:  '#d9a53f',
-  overdue:   '#c96a5a',
-  skipped:   '#9b978f',
-  snoozed:   '#cf8148',
-  pending:   '#d9a53f',
+  taken:     'var(--green)',
+  upcoming:  'var(--blue-text)',
+  overdue:   'var(--red)',
+  skipped:   'var(--muted)',
+  snoozed:   'var(--yellow)',
+  pending:   'var(--blue-text)',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -52,7 +52,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
   const item = dose.protocolItem;
   const displayStatus = deriveDisplayStatus(dose);
   const settled = displayStatus === 'taken' || displayStatus === 'skipped';
-  const statusColor = STATUS_COLOR[displayStatus] ?? '#9b978f';
+  const statusColor = STATUS_COLOR[displayStatus] ?? 'var(--muted)';
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const gesture = useRef<{
     pointerId: number | null;
@@ -158,8 +158,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#cf8148] text-[#14120b] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-l-[14px]',
-            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]',
+            'px-5 bg-[var(--yellow)] text-[var(--blue-on)] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-l-[14px]',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text)] focus-visible:outline-offset-[-2px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
@@ -174,8 +174,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             setSwipeDir(null);
           }}
           className={[
-            'px-5 bg-[#c96a5a] text-white font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center',
-            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]',
+            'px-5 bg-[var(--red)] text-white font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text)] focus-visible:outline-offset-[-2px]',
             actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
           ].join(' ')}
         >
@@ -187,7 +187,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
       <div
         className={[
           isNext && !settled
-            ? 'bg-[#14171b] border border-[#2e333a] rounded-[14px] px-4 py-3.5'
+            ? 'bg-[var(--surface)] border border-[var(--border-strong)] rounded-[14px] px-4 py-3.5'
             : 'rounded-[14px] px-3 py-2',
           'transition-all duration-200 relative overflow-hidden',
           cardTranslate,
@@ -197,15 +197,15 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
        <div className="flex items-center gap-3.5">
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className={['truncate', settled ? 'text-sm font-medium text-[#9b978f]' : isNext ? 'text-[15px] font-semibold text-[#e8e6e1]' : 'text-sm font-medium text-[#e8e6e1]'].join(' ')}>
+          <div className={['truncate', settled ? 'text-sm font-medium text-[var(--muted)]' : isNext ? 'text-[15px] font-semibold text-[var(--text)]' : 'text-sm font-medium text-[var(--text)]'].join(' ')}>
             {item.name}{' '}
             {item.doseAmount ? (
-              <span className="font-mono tabular-nums text-xs text-[#9b978f]">{item.doseAmount}{item.doseUnit}</span>
+              <span className="font-mono tabular-nums text-xs text-[var(--muted)]">{item.doseAmount}{item.doseUnit}</span>
             ) : null}
           </div>
           <div
             className="font-mono tabular-nums text-[10.5px] mt-0.5"
-            style={{ color: settled ? '#605d56' : statusColor }}
+            style={{ color: settled ? 'var(--faint)' : statusColor }}
           >
             {displayStatus === 'taken' && takenAt
               ? (() => {
@@ -220,7 +220,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
           {!settled && tags.length > 0 && (
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {tags.map(tag => (
-                <span key={tag} className="font-mono text-[9.5px] uppercase tracking-wide px-2 py-0.5 rounded-[6px] bg-[rgba(255,255,255,0.06)] text-[#9b978f]">
+                <span key={tag} className="font-mono text-[9.5px] uppercase tracking-wide px-2 py-0.5 rounded-[6px] bg-[rgba(var(--overlay-rgb),0.06)] text-[var(--muted)]">
                   {tag}
                 </span>
               ))}
@@ -240,16 +240,16 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             aria-disabled={actionsDisabled}
             className={[
               'rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200',
-              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
               settled ? 'w-7 h-7 border text-xs' : 'w-9 h-9 border-[1.5px] text-base',
               actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
               displayStatus === 'taken'
-                ? 'bg-transparent border-[#8fae74] text-[#8fae74] cursor-default'
+                ? 'bg-transparent border-[var(--green)] text-[var(--green)] cursor-default'
                 : displayStatus === 'skipped'
-                ? 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]'
+                ? 'border-[var(--border-strong)] text-[var(--faint)] hover:border-[var(--green)] hover:text-[var(--green)]'
                 : displayStatus === 'overdue'
-                ? 'border-[#c96a5a] text-[#c96a5a] hover:bg-[#c96a5a] hover:text-white'
-                : 'border-[#2e333a] text-[#605d56] hover:border-[#8fae74] hover:text-[#8fae74]',
+                ? 'border-[var(--red)] text-[var(--red)] hover:bg-[var(--red)] hover:text-white'
+                : 'border-[var(--border-strong)] text-[var(--faint)] hover:border-[var(--green)] hover:text-[var(--green)]',
             ].join(' ')}
           >
             {displayStatus === 'taken' ? '✓' : ''}
@@ -269,8 +269,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
                 if (dose.status !== 'taken') onTake();
               }}
               className={[
-                'flex-1 rounded-[10px] bg-[#d9a53f] px-4 py-2.5 text-[13px] font-semibold text-[#14120b] transition-colors hover:bg-[#e6b654]',
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                'flex-1 rounded-[10px] bg-[var(--blue)] px-4 py-2.5 text-[13px] font-semibold text-[var(--blue-on)] transition-colors hover:bg-[var(--blue-hover)]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
                 actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
               ].join(' ')}
             >
@@ -281,8 +281,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
               aria-disabled={actionsDisabled}
               onClick={() => onSnooze()}
               className={[
-                'rounded-[10px] border border-[#2e333a] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1]',
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                'rounded-[10px] border border-[var(--border-strong)] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[var(--muted)] transition-colors hover:border-[var(--faint)] hover:text-[var(--text)]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
                 actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
               ].join(' ')}
             >
@@ -293,8 +293,8 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
               aria-disabled={actionsDisabled}
               onClick={() => onSkip()}
               className={[
-                'rounded-[10px] border border-[#2e333a] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[#9b978f] transition-colors hover:border-[#605d56] hover:text-[#e8e6e1]',
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                'rounded-[10px] border border-[var(--border-strong)] bg-transparent px-4 py-2.5 text-[13px] font-semibold text-[var(--muted)] transition-colors hover:border-[var(--faint)] hover:text-[var(--text)]',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
                 actionsDisabled ? 'opacity-50 cursor-not-allowed' : '',
               ].join(' ')}
             >
@@ -318,7 +318,7 @@ export function MedCard({ dose, onTake, onSkip, onSnooze, onDelete, actionsDisab
             onDelete();
             setSwipeDir(null);
           }}
-          className="px-5 bg-[#4a2620] text-[#e2a89d] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-r-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#e8e6e1] focus-visible:outline-offset-[-2px]"
+          className="px-5 bg-[var(--red-bg-soft)] text-[var(--red-text-soft)] font-mono text-[10px] font-bold uppercase tracking-wider flex items-center justify-center rounded-r-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text)] focus-visible:outline-offset-[-2px]"
         >
           Delete
         </button>
