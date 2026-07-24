@@ -42,17 +42,17 @@ export function StackGuardCard() {
   const infos = report.findings.length - cautions;
 
   return (
-    <div data-testid="stack-guard-card" className="bg-[#14171b] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4 mb-4">
+    <div data-testid="stack-guard-card" className="bg-[var(--surface)] border border-[rgba(var(--overlay-rgb),0.08)] rounded-2xl p-4 mb-4">
       <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="text-sm font-bold text-[#e8e6e1]">Stack Guard</div>
+        <div className="text-sm font-bold text-[var(--text)]">Stack Guard</div>
         <div className="flex gap-1.5">
           {cautions > 0 && (
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-[rgba(207,129,72,0.12)] text-[#cf8148]">
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-[rgba(var(--yellow-rgb),0.12)] text-[var(--yellow)]">
               {cautions}
             </span>
           )}
           {infos > 0 && (
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-[rgba(217,165,63,0.12)] text-[#d9a53f]">
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-[rgba(var(--blue-rgb),0.12)] text-[var(--blue-text)]">
               {infos}
             </span>
           )}
@@ -60,7 +60,7 @@ export function StackGuardCard() {
       </div>
 
       {report.pendingFactsUsed && (
-        <div className="text-[10px] font-semibold text-[#cf8148] mb-2">
+        <div className="text-[10px] font-semibold text-[var(--yellow)] mb-2">
           Some composition data is still unconfirmed, so findings may change.
         </div>
       )}
@@ -68,32 +68,32 @@ export function StackGuardCard() {
       {report.findings.map((finding) => {
         const open = openRuleId === finding.ruleId;
         return (
-          <div key={finding.ruleId} className="border-t border-[rgba(255,255,255,0.05)] py-2.5">
+          <div key={finding.ruleId} className="border-t border-[rgba(var(--overlay-rgb),0.05)] py-2.5">
             <button
               type="button"
               aria-expanded={open}
               onClick={() => setOpenRuleId(open ? null : finding.ruleId)}
               className="w-full flex items-center gap-2 text-left"
             >
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${finding.severity === 'caution' ? 'bg-[#cf8148]' : 'bg-[#9b978f]'}`} />
-              <span className="flex-1 text-xs font-semibold text-[#e8e6e1]">{finding.title}</span>
-              <span className="text-[#9b978f] text-xs">{open ? '▴' : '▾'}</span>
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${finding.severity === 'caution' ? 'bg-[var(--yellow)]' : 'bg-[var(--muted)]'}`} />
+              <span className="flex-1 text-xs font-semibold text-[var(--text)]">{finding.title}</span>
+              <span className="text-[var(--muted)] text-xs">{open ? '▴' : '▾'}</span>
             </button>
             {open && (
               <div className="mt-2 pl-6 flex flex-col gap-1.5">
-                <div className="text-xs text-[#9b978f] leading-relaxed">{finding.explanation}</div>
-                <div className="text-xs text-[#e8e6e1] leading-relaxed">{finding.suggestion}</div>
-                <div className="text-[10px] text-[#9b978f]">
+                <div className="text-xs text-[var(--muted)] leading-relaxed">{finding.explanation}</div>
+                <div className="text-xs text-[var(--text)] leading-relaxed">{finding.suggestion}</div>
+                <div className="text-[10px] text-[var(--muted)]">
                   Affected: {finding.itemsInvolved.map((item) => item.name).join(' · ')}
                 </div>
-                <div className="text-[10px] text-[#9b978f] break-words">Source: {finding.source}</div>
+                <div className="text-[10px] text-[var(--muted)] break-words">Source: {finding.source}</div>
               </div>
             )}
           </div>
         );
       })}
 
-      <p className="mt-3 text-[10px] text-[#9b978f] leading-relaxed border-t border-[rgba(255,255,255,0.05)] pt-2.5">
+      <p className="mt-3 text-[10px] text-[var(--muted)] leading-relaxed border-t border-[rgba(var(--overlay-rgb),0.05)] pt-2.5">
         {DISCLAIMER}
       </p>
     </div>

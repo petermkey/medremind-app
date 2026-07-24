@@ -21,10 +21,10 @@ function dateLabel(localDate: string): string {
 }
 
 function toneClass(tone: string): string {
-  if (tone === 'positive') return 'text-[#8fae74] bg-[rgba(143,174,116,0.12)]';
-  if (tone === 'negative') return 'text-[#d98a7c] bg-[rgba(217,138,124,0.12)]';
-  if (tone === 'warning') return 'text-[#cf8148] bg-[rgba(207,129,72,0.12)]';
-  return 'text-[#9b978f] bg-[#191d22]';
+  if (tone === 'positive') return 'text-[var(--green)] bg-[rgba(var(--green-rgb),0.12)]';
+  if (tone === 'negative') return 'text-[var(--red-border-soft)] bg-[rgba(var(--red-border-soft-rgb),0.12)]';
+  if (tone === 'warning') return 'text-[var(--yellow)] bg-[rgba(var(--yellow-rgb),0.12)]';
+  return 'text-[var(--muted)] bg-[var(--surface2)]';
 }
 
 function DayTile({ label, value, suffix, metric, days, index, hint }: {
@@ -39,15 +39,15 @@ function DayTile({ label, value, suffix, metric, days, index, hint }: {
   const numericValue = typeof value === 'number' ? value : null;
   const delta = classifyDelta(metric, numericValue, medianOfPreviousDays(days, index, metric));
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0e1013] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#9b978f]">{label}</div>
-      <div className="mt-2 text-2xl font-extrabold text-[#e8e6e1]">{fmt(value, suffix)}</div>
+    <div className="rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[var(--bg)] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">{label}</div>
+      <div className="mt-2 text-2xl font-extrabold text-[var(--text)]">{fmt(value, suffix)}</div>
       {delta.delta !== null && (
         <div className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${toneClass(delta.tone)}`}>
           {delta.delta > 0 ? '+' : ''}{fmt(delta.delta)} vs norm
         </div>
       )}
-      <p className="mt-2 text-[11px] leading-snug text-[#9b978f]">{hint}</p>
+      <p className="mt-2 text-[11px] leading-snug text-[var(--muted)]">{hint}</p>
     </div>
   );
 }
@@ -59,14 +59,14 @@ export function DayCard({ days }: { days: OuraStatsDay[] }) {
   const workoutCount = typeof day.workoutCount === 'number' ? day.workoutCount : null;
 
   return (
-    <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
+    <section className="rounded-2xl border border-[rgba(var(--overlay-rgb),0.08)] bg-[var(--surface)] p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold uppercase tracking-widest text-[#9b978f]">Daily strain</div>
-          <h2 className="mt-1 text-lg font-extrabold text-[#e8e6e1]">Day recap</h2>
+          <div className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Daily strain</div>
+          <h2 className="mt-1 text-lg font-extrabold text-[var(--text)]">Day recap</h2>
         </div>
         {display.isFallback && (
-          <span className="rounded-full bg-[#191d22] px-3 py-1 text-xs font-bold text-[#cf8148]">
+          <span className="rounded-full bg-[var(--surface2)] px-3 py-1 text-xs font-bold text-[var(--yellow)]">
             {dateLabel(day.localDate)}
           </span>
         )}
@@ -80,12 +80,12 @@ export function DayCard({ days }: { days: OuraStatsDay[] }) {
       </div>
 
       {day.hrvBalance && (
-        <div className="mt-3 rounded-xl bg-[#0e1013] p-3">
+        <div className="mt-3 rounded-xl bg-[var(--bg)] p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-[#c4c0b8]">HRV balance</span>
-            <span className="text-sm font-bold capitalize text-[#e8e6e1]">{day.hrvBalance}</span>
+            <span className="text-sm text-[var(--chip-text)]">HRV balance</span>
+            <span className="text-sm font-bold capitalize text-[var(--text)]">{day.hrvBalance}</span>
           </div>
-          <p className="mt-0.5 text-[11px] leading-snug text-[#9b978f]">{OURA_METRIC_EXPLAINERS.hrvBalance}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">{OURA_METRIC_EXPLAINERS.hrvBalance}</p>
         </div>
       )}
     </section>

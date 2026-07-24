@@ -94,12 +94,12 @@ export default function OnboardingPage() {
   const stepLabels = ['Profile', 'Protocol', 'Reminders'];
 
   return (
-    <div className="min-h-screen bg-[#0e1013] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="w-10 h-10 rounded-xl bg-[#14171b] border border-[#23272d] flex items-center justify-center text-xl">💊</div>
-          <span className="text-xl font-bold text-[#e8e6e1] tracking-tight">MedRemind</span>
+          <div className="w-10 h-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-xl">💊</div>
+          <span className="text-xl font-bold text-[var(--text)] tracking-tight">MedRemind</span>
         </div>
 
         {/* Step indicator */}
@@ -108,12 +108,12 @@ export default function OnboardingPage() {
             <div key={label} className="flex items-center gap-2 flex-1">
               <div className={[
                 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold tabular-nums flex-shrink-0 border',
-                i + 1 < step ? 'bg-[#8fae74] border-[#8fae74] text-[#14120b]' : i + 1 === step ? 'bg-[#d9a53f] border-[#d9a53f] text-[#14120b]' : 'bg-[#191d22] border-[#23272d] text-[#9b978f]',
+                i + 1 < step ? 'bg-[var(--green)] border-[var(--green)] text-[var(--blue-on)]' : i + 1 === step ? 'bg-[var(--blue)] border-[var(--blue)] text-[var(--blue-on)]' : 'bg-[var(--surface2)] border-[var(--border)] text-[var(--muted)]',
               ].join(' ')}>
                 {i + 1 < step ? '✓' : i + 1}
               </div>
-              <span className={`text-[10px] font-mono uppercase tracking-wider whitespace-nowrap ${i + 1 === step ? 'text-[#e8e6e1]' : 'text-[#9b978f]'}`}>{label}</span>
-              {i < 2 && <div className="flex-1 h-px bg-[#23272d]" />}
+              <span className={`text-[10px] font-mono uppercase tracking-wider whitespace-nowrap ${i + 1 === step ? 'text-[var(--text)]' : 'text-[var(--muted)]'}`}>{label}</span>
+              {i < 2 && <div className="flex-1 h-px bg-[var(--border)]" />}
             </div>
           ))}
         </div>
@@ -122,10 +122,10 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="fade-in flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#e8e6e1] mb-1">Tell us about yourself</h2>
-              <p className="text-sm text-[#9b978f]">This personalises your experience.</p>
+              <h2 className="text-2xl font-extrabold text-[var(--text)] mb-1">Tell us about yourself</h2>
+              <p className="text-sm text-[var(--muted)]">This personalises your experience.</p>
             </div>
-            <Input label="Your name" value={name} onChange={e => setName(e.target.value)} placeholder="Peter" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2" />
+            <Input label="Your name" value={name} onChange={e => setName(e.target.value)} placeholder="Peter" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2" />
             <Select
               label="Age range"
               value={ageRange}
@@ -136,16 +136,16 @@ export default function OnboardingPage() {
                 { value: '51-70', label: '51 – 70' },
                 { value: '70+',   label: '70+' },
               ]}
-              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-[#9b978f]">Timezone</label>
-              <p className="text-sm text-[#e8e6e1] bg-[#191d22] px-4 py-3 rounded-xl border border-[#23272d] font-mono tabular-nums">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">Timezone</label>
+              <p className="text-sm text-[var(--text)] bg-[var(--surface2)] px-4 py-3 rounded-xl border border-[var(--border)] font-mono tabular-nums">
                 {timezone}
               </p>
-              <p className="text-xs text-[#9b978f]">Auto-detected. Change in settings later.</p>
+              <p className="text-xs text-[var(--muted)]">Auto-detected. Change in settings later.</p>
             </div>
-            <Button fullWidth size="lg" onClick={handleStep1} disabled={!name.trim()} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+            <Button fullWidth size="lg" onClick={handleStep1} disabled={!name.trim()} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2">
               Continue →
             </Button>
           </div>
@@ -155,8 +155,8 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="fade-in flex flex-col gap-5">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#e8e6e1] mb-1">Choose a starter protocol</h2>
-              <p className="text-sm text-[#9b978f]">Pick one to get started, or skip and build your own.</p>
+              <h2 className="text-2xl font-extrabold text-[var(--text)] mb-1">Choose a starter protocol</h2>
+              <p className="text-sm text-[var(--muted)]">Pick one to get started, or skip and build your own.</p>
             </div>
 
             <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
@@ -166,22 +166,22 @@ export default function OnboardingPage() {
                   onClick={() => setSelectedProtocolId(prev => prev === p.id ? null : p.id)}
                   className={[
                     'text-left p-4 rounded-2xl border transition-all duration-200',
-                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
                     selectedProtocolId === p.id
-                      ? 'border-[#d9a53f] bg-[rgba(217,165,63,0.1)]'
-                      : 'border-[#23272d] bg-[#14171b] hover:border-[#2e333a]',
+                      ? 'border-[var(--blue)] bg-[rgba(var(--blue-rgb),0.1)]'
+                      : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]',
                   ].join(' ')}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-sm font-bold text-[#e8e6e1]">{p.name}</div>
-                      <div className="text-xs text-[#9b978f] mt-1 leading-relaxed">{p.description}</div>
+                      <div className="text-sm font-bold text-[var(--text)]">{p.name}</div>
+                      <div className="text-xs text-[var(--muted)] mt-1 leading-relaxed">{p.description}</div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[#d9a53f] bg-[rgba(217,165,63,0.15)] px-2 py-1 rounded-full">
+                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--blue-text)] bg-[rgba(var(--blue-rgb),0.15)] px-2 py-1 rounded-full">
                         {CATEGORY_LABELS[p.category]}
                       </span>
-                      <span className="text-[10px] font-mono tabular-nums text-[#9b978f]">{p.items.length} items</span>
+                      <span className="text-[10px] font-mono tabular-nums text-[var(--muted)]">{p.items.length} items</span>
                     </div>
                   </div>
                 </button>
@@ -189,10 +189,10 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex gap-3">
-              <Button variant="secondary" fullWidth onClick={() => handleStep2(true)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+              <Button variant="secondary" fullWidth onClick={() => handleStep2(true)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2">
                 Skip for now
               </Button>
-              <Button fullWidth onClick={() => handleStep2(false)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+              <Button fullWidth onClick={() => handleStep2(false)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2">
                 {selectedProtocolId ? 'Use this protocol →' : 'Continue →'}
               </Button>
             </div>
@@ -203,8 +203,8 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="fade-in flex flex-col gap-6">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#e8e6e1] mb-1">Set your reminder times</h2>
-              <p className="text-sm text-[#9b978f]">These are defaults. You can adjust per-protocol later.</p>
+              <h2 className="text-2xl font-extrabold text-[var(--text)] mb-1">Set your reminder times</h2>
+              <p className="text-sm text-[var(--muted)]">These are defaults. You can adjust per-protocol later.</p>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -213,32 +213,32 @@ export default function OnboardingPage() {
                 { label: 'Afternoon', value: afternoonTime, onChange: setAfternoonTime },
                 { label: 'Evening', value: eveningTime, onChange: setEveningTime },
               ].map(({ label, value, onChange }) => (
-                <div key={label} className="flex items-center justify-between bg-[#14171b] border border-[#23272d] rounded-2xl px-4 py-4">
-                  <span className="text-sm font-semibold text-[#e8e6e1]">{label}</span>
+                <div key={label} className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-4">
+                  <span className="text-sm font-semibold text-[var(--text)]">{label}</span>
                   <input
                     type="time"
                     value={value}
                     onChange={e => onChange(e.target.value)}
-                    className="bg-[#191d22] border border-[#23272d] rounded-xl px-3 py-2 text-[#e8e6e1] text-sm font-mono tabular-nums outline-none focus:border-[#d9a53f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2"
+                    className="bg-[var(--surface2)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-mono tabular-nums outline-none focus:border-[var(--blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
                   />
                 </div>
               ))}
             </div>
 
             {installState === 'browser' ? (
-              <div className="bg-[rgba(207,129,72,0.08)] border border-[rgba(207,129,72,0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
-                <p className="text-xs font-semibold text-[#cf8148]">Add to Home Screen for push reminders</p>
-                <p className="text-xs text-[#9b978f] leading-relaxed">
+              <div className="bg-[rgba(var(--yellow-rgb),0.08)] border border-[rgba(var(--yellow-rgb),0.25)] rounded-xl px-4 py-3 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-[var(--yellow)]">Add to Home Screen for push reminders</p>
+                <p className="text-xs text-[var(--muted)] leading-relaxed">
                   Tap the share icon in Safari, then &ldquo;Add to Home Screen&rdquo;. Push notifications only work from the installed app.
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-[#9b978f] leading-relaxed bg-[rgba(143,174,116,0.06)] border border-[rgba(143,174,116,0.2)] rounded-xl px-4 py-3">
+              <p className="text-xs text-[var(--muted)] leading-relaxed bg-[rgba(var(--green-rgb),0.06)] border border-[rgba(var(--green-rgb),0.2)] rounded-xl px-4 py-3">
                 Push reminders will be requested when you tap Get started.
               </p>
             )}
 
-            <Button fullWidth size="lg" onClick={handleFinish} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2">
+            <Button fullWidth size="lg" onClick={handleFinish} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2">
               Get started →
             </Button>
           </div>

@@ -37,15 +37,15 @@ export function WeekStrip({ selectedDate, onSelectDate, doseDateSet }: Props) {
             ref={isSelected ? selectedRef : null}
             onClick={() => onSelectDate(dateStr)}
             className={[
-              'flex flex-col items-center min-w-[44px] px-1 pt-2 pb-1 border-b-2 transition-all duration-200 flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d9a53f] focus-visible:outline-offset-2',
-              isSelected             ? 'border-[#d9a53f] text-[#d9a53f]' :
-              isToday                ? 'border-transparent text-[#e8e6e1]' :
-              'border-transparent text-[#605d56] hover:text-[#9b978f]',
+              'flex flex-col items-center min-w-[44px] px-1 pt-2 pb-1 border-b-2 transition-all duration-200 flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2',
+              isSelected             ? 'border-[var(--blue)] text-[var(--blue-text)]' :
+              isToday                ? 'border-transparent text-[var(--text)]' :
+              'border-transparent text-[var(--faint)] hover:text-[var(--muted)]',
             ].join(' ')}
           >
             <span className="font-mono text-[9px] uppercase tracking-[0.08em]">{DAY_NAMES[d.getDay()]}</span>
             <span className={`font-mono tabular-nums text-[14px] mt-1 ${isSelected ? 'font-semibold' : 'font-medium'}`}>{d.getDate()}</span>
-            <div className={`w-1 h-1 rounded-full mt-1 mb-0.5 ${hasDoses ? 'bg-[#d9a53f]' : 'bg-transparent'}`} />
+            <div className={`w-1 h-1 rounded-full mt-1 mb-0.5 ${hasDoses ? 'bg-[var(--blue)]' : 'bg-transparent'}`} />
           </button>
         );
       })}

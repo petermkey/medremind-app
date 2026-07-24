@@ -56,18 +56,18 @@ export function LongMetricTile({
   const span = domainMax - domainMin || 1;
 
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0e1013] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#9b978f]">{title}</div>
-      <div className="mt-2 text-2xl font-extrabold text-[#e8e6e1]">{fmt(latest, suffix)}</div>
-      {prior !== null && <div className="mt-1 text-xs text-[#9b978f]">was {fmt(prior, suffix)} in the prior {period}d</div>}
+    <div className="rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[var(--bg)] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">{title}</div>
+      <div className="mt-2 text-2xl font-extrabold text-[var(--text)]">{fmt(latest, suffix)}</div>
+      {prior !== null && <div className="mt-1 text-xs text-[var(--muted)]">was {fmt(prior, suffix)} in the prior {period}d</div>}
       {finiteAverages.length > 1 && (
-        <div className="mt-1 text-[10px] text-[#9b978f]">weekly range {fmt(domainMin, suffix)}–{fmt(domainMax, suffix)}</div>
+        <div className="mt-1 text-[10px] text-[var(--muted)]">weekly range {fmt(domainMin, suffix)}–{fmt(domainMax, suffix)}</div>
       )}
       <div className="mt-3 flex h-9 items-end gap-1">
         {buckets.map(bucket => (
           <div
             key={bucket.startDate}
-            className="flex-1 rounded-sm bg-[#d9a53f]"
+            className="flex-1 rounded-sm bg-[var(--blue)]"
             style={{
               height: bucket.average === null ? '4px' : `${8 + ((bucket.average - domainMin) / span) * 28}px`,
               opacity: bucket.average === null ? 0.15 : 0.8,
@@ -93,15 +93,15 @@ export function ResilienceTile({ days, period }: { days: OuraStatsDay[]; period:
   ).slice(-Math.ceil(period / 7));
 
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[#0e1013] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#9b978f]">Resilience</div>
-      <div className="mt-2 text-2xl font-extrabold capitalize text-[#e8e6e1]">{latest}</div>
-      <div className="mt-1 text-xs text-[#9b978f]">weekly average strip</div>
+    <div className="rounded-xl border border-[rgba(var(--overlay-rgb),0.07)] bg-[var(--bg)] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">Resilience</div>
+      <div className="mt-2 text-2xl font-extrabold capitalize text-[var(--text)]">{latest}</div>
+      <div className="mt-1 text-xs text-[var(--muted)]">weekly average strip</div>
       <div className="mt-3 flex h-9 items-end gap-1">
         {buckets.map(bucket => (
           <div
             key={bucket.startDate}
-            className="flex-1 rounded-sm bg-[#8fae74]"
+            className="flex-1 rounded-sm bg-[var(--green)]"
             style={{ height: `${Math.max(12, ((bucket.average ?? 0) / 5) * 36)}px`, opacity: 0.75 }}
             title={`${bucket.startDate}: ${fmt(bucket.average)}`}
           />

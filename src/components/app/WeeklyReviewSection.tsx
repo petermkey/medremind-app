@@ -26,7 +26,7 @@ function formatWeek(weekStart: string): string {
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-3">
-      <div className="text-[10px] font-bold text-[#9b978f] uppercase tracking-widest mb-1.5">{title}</div>
+      <div className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-widest mb-1.5">{title}</div>
       {children}
     </div>
   );
@@ -60,17 +60,17 @@ export function WeeklyReviewSection() {
   return (
     <div
       data-testid="weekly-review-section"
-      className="rounded-2xl border border-[rgba(162,146,201,0.3)] bg-[rgba(162,146,201,0.06)] p-4 mt-3 mb-3"
+      className="rounded-2xl border border-[rgba(var(--purple-rgb),0.3)] bg-[rgba(var(--purple-rgb),0.06)] p-4 mt-3 mb-3"
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-bold text-[#e8e6e1]">Weekly review</div>
-        <div className="text-[11px] text-[#9b978f]">{formatWeek(selected.weekStart)}</div>
+        <div className="text-sm font-bold text-[var(--text)]">Weekly review</div>
+        <div className="text-[11px] text-[var(--muted)]">{formatWeek(selected.weekStart)}</div>
       </div>
 
       <Block title="Week highlights">
         <ul className="flex flex-col gap-1">
           {payload.highlights.map((highlight) => (
-            <li key={highlight} className="text-xs text-[#e8e6e1] leading-relaxed">• {highlight}</li>
+            <li key={highlight} className="text-xs text-[var(--text)] leading-relaxed">• {highlight}</li>
           ))}
         </ul>
       </Block>
@@ -78,21 +78,21 @@ export function WeeklyReviewSection() {
       <Block title="Nutrition">
         {payload.eatingPatterns.map((pattern) => (
           <div key={pattern.title} className="mb-1.5">
-            <span className="text-xs font-semibold text-[#e8e6e1]">{pattern.title}: </span>
-            <span className="text-xs text-[#9b978f]">{pattern.detail}</span>
+            <span className="text-xs font-semibold text-[var(--text)]">{pattern.title}: </span>
+            <span className="text-xs text-[var(--muted)]">{pattern.detail}</span>
           </div>
         ))}
       </Block>
 
       <Block title="Stack adherence">
-        <p className="text-xs text-[#9b978f] leading-relaxed">{payload.stackAdherence.summary}</p>
+        <p className="text-xs text-[var(--muted)] leading-relaxed">{payload.stackAdherence.summary}</p>
       </Block>
 
       {payload.ouraLinkage.length > 0 && (
         <Block title="Sleep & recovery">
           <ul className="flex flex-col gap-1">
             {payload.ouraLinkage.map((linkage) => (
-              <li key={linkage} className="text-xs text-[#9b978f] leading-relaxed">• {linkage}</li>
+              <li key={linkage} className="text-xs text-[var(--muted)] leading-relaxed">• {linkage}</li>
             ))}
           </ul>
         </Block>
@@ -101,8 +101,8 @@ export function WeeklyReviewSection() {
       <Block title="For next week">
         {payload.actions.map((action) => (
           <div key={action.title} className="mb-1.5">
-            <span className="text-xs font-semibold text-[#8fae74]">{action.title}: </span>
-            <span className="text-xs text-[#9b978f]">{action.detail}</span>
+            <span className="text-xs font-semibold text-[var(--green)]">{action.title}: </span>
+            <span className="text-xs text-[var(--muted)]">{action.detail}</span>
           </div>
         ))}
       </Block>
@@ -117,8 +117,8 @@ export function WeeklyReviewSection() {
               className={[
                 'rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors',
                 review.id === selected.id
-                  ? 'bg-[#a292c9] text-white'
-                  : 'bg-[#191d22] text-[#9b978f] hover:text-[#e8e6e1]',
+                  ? 'bg-[var(--purple)] text-white'
+                  : 'bg-[var(--surface2)] text-[var(--muted)] hover:text-[var(--text)]',
               ].join(' ')}
             >
               {formatWeek(review.weekStart)}
@@ -127,7 +127,7 @@ export function WeeklyReviewSection() {
         </div>
       )}
 
-      <p className="mt-3 text-[10px] text-[#9b978f] leading-relaxed">
+      <p className="mt-3 text-[10px] text-[var(--muted)] leading-relaxed">
         This is not medical advice. Do not change your medications or supplements without consulting your healthcare provider.
       </p>
     </div>

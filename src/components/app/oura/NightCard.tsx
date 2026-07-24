@@ -29,10 +29,10 @@ function dateLabel(localDate: string): string {
 }
 
 function toneClass(tone: string): string {
-  if (tone === 'positive') return 'text-[#8fae74]';
-  if (tone === 'negative') return 'text-[#c96a5a]';
-  if (tone === 'warning') return 'text-[#cf8148]';
-  return 'text-[#9b978f]';
+  if (tone === 'positive') return 'text-[var(--green)]';
+  if (tone === 'negative') return 'text-[var(--red)]';
+  if (tone === 'warning') return 'text-[var(--yellow)]';
+  return 'text-[var(--muted)]';
 }
 
 function DeltaChip({ day, index, metric, transform }: {
@@ -69,13 +69,13 @@ function DetailRow({ label, value, suffix, metric, day, index, hint, formatter =
   transform?: (value: number | null | undefined) => number | null;
 }) {
   return (
-    <div className="border-b border-[#23272d] py-2 last:border-b-0">
+    <div className="border-b border-[var(--border)] py-2 last:border-b-0">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-[12.5px] text-[#9b978f]">{label}</span>
-        <span className="ml-auto font-mono text-[12.5px] font-semibold tabular-nums text-[#e8e6e1]">{formatter(value, suffix)}</span>
+        <span className="font-mono text-[12.5px] text-[var(--muted)]">{label}</span>
+        <span className="ml-auto font-mono text-[12.5px] font-semibold tabular-nums text-[var(--text)]">{formatter(value, suffix)}</span>
         <DeltaChip day={day} index={index} metric={metric} transform={transform} />
       </div>
-      {hint && <p className="mt-0.5 text-[10.5px] leading-snug text-[#605d56]">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[10.5px] leading-snug text-[var(--faint)]">{hint}</p>}
     </div>
   );
 }
@@ -84,20 +84,20 @@ export function NightCard({ days }: { days: OuraStatsDay[] }) {
   const display = pickDisplayNight(days);
   if (!display.day) {
     return (
-      <section className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4">
-        <div className="text-sm font-bold text-[#e8e6e1]">No sleep data yet</div>
-        <p className="mt-1 text-sm text-[#9b978f]">Run a sync from Settings to fill in your latest night.</p>
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+        <div className="text-sm font-bold text-[var(--text)]">No sleep data yet</div>
+        <p className="mt-1 text-sm text-[var(--muted)]">Run a sync from Settings to fill in your latest night.</p>
       </section>
     );
   }
 
   const day = { ...display.day, __allDays: days };
   return (
-    <section className="rounded-2xl border border-[#23272d] bg-[#14171b] p-4">
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-xs text-[#9b978f]">Last night · Oura</div>
+        <div className="text-xs text-[var(--muted)]">Last night · Oura</div>
         {display.isFallback && (
-          <span className="font-mono text-[10px] tabular-nums text-[#605d56]">
+          <span className="font-mono text-[10px] tabular-nums text-[var(--faint)]">
             night of {dateLabel(day.localDate)}
           </span>
         )}

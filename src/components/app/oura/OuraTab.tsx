@@ -46,11 +46,11 @@ function hasAny(values: Array<number | null>): boolean {
 
 function StateCard({ title, body, action }: { title: string; body: string; action?: string }) {
   return (
-    <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-5">
-      <div className="text-base font-bold text-[#e8e6e1]">{title}</div>
-      <p className="mt-2 text-sm leading-relaxed text-[#9b978f]">{body}</p>
+    <div className="rounded-2xl border border-[rgba(var(--overlay-rgb),0.08)] bg-[var(--surface)] p-5">
+      <div className="text-base font-bold text-[var(--text)]">{title}</div>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{body}</p>
       {action && (
-        <a href="/app/settings" className="mt-4 inline-flex rounded-xl bg-[#d9a53f] px-4 py-2 text-sm font-bold text-[#14120b]">
+        <a href="/app/settings" className="mt-4 inline-flex rounded-xl bg-[var(--blue)] px-4 py-2 text-sm font-bold text-[var(--blue-on)]">
           {action}
         </a>
       )}
@@ -117,9 +117,9 @@ export function OuraTab() {
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-[rgba(217,138,124,0.22)] bg-[rgba(217,138,124,0.08)] p-5">
-        <div className="text-base font-bold text-[#e2a89d]">Oura stats unavailable</div>
-        <p className="mt-2 text-sm text-[#c4c0b8]">{error}</p>
+      <div className="rounded-2xl border border-[rgba(var(--red-border-soft-rgb),0.22)] bg-[rgba(var(--red-border-soft-rgb),0.08)] p-5">
+        <div className="text-base font-bold text-[var(--red-text-soft)]">Oura stats unavailable</div>
+        <p className="mt-2 text-sm text-[var(--chip-text)]">{error}</p>
         <Button className="mt-4" size="sm" onClick={load} loading={loading}>Retry</Button>
       </div>
     );
@@ -141,26 +141,26 @@ export function OuraTab() {
         className={[
           'rounded-full border px-3 py-2 text-xs font-bold',
           freshness.stale
-            ? 'border-[rgba(207,129,72,0.28)] bg-[rgba(207,129,72,0.1)] text-[#cf8148]'
-            : 'border-[rgba(143,174,116,0.22)] bg-[rgba(143,174,116,0.08)] text-[#8fae74]',
+            ? 'border-[rgba(var(--yellow-rgb),0.28)] bg-[rgba(var(--yellow-rgb),0.1)] text-[var(--yellow)]'
+            : 'border-[rgba(var(--green-rgb),0.22)] bg-[rgba(var(--green-rgb),0.08)] text-[var(--green)]',
         ].join(' ')}
       >
         {freshness.label}
         {summary.battery?.level != null && ` · Battery ${summary.battery.level}%${summary.battery.charging ? ' charging' : ''}`}
-        {freshness.stale && <span className="ml-2 font-semibold text-[#9b978f]">Data may be stale — sync runs every 6h.</span>}
+        {freshness.stale && <span className="ml-2 font-semibold text-[var(--muted)]">Data may be stale — sync runs every 6h.</span>}
       </div>
 
       <NightCard days={summary.days} />
       <DayCard days={summary.days} />
       <PulseDayCard />
 
-      <section className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#14171b] p-4">
+      <section className="rounded-2xl border border-[rgba(var(--overlay-rgb),0.08)] bg-[var(--surface)] p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-bold uppercase tracking-widest text-[#9b978f]">Trends</div>
-            <h2 className="mt-1 text-lg font-extrabold text-[#e8e6e1]">Daily bars</h2>
+            <div className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Trends</div>
+            <h2 className="mt-1 text-lg font-extrabold text-[var(--text)]">Daily bars</h2>
           </div>
-          <div className="flex rounded-xl bg-[#0e1013] p-1">
+          <div className="flex rounded-xl bg-[var(--bg)] p-1">
             {([7, 30, 90] as const).map(value => (
               <button
                 key={value}
@@ -168,7 +168,7 @@ export function OuraTab() {
                 onClick={() => setPeriod(value)}
                 className={[
                   'rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
-                  period === value ? 'bg-[#d9a53f] text-[#14120b]' : 'text-[#9b978f] hover:text-[#e8e6e1]',
+                  period === value ? 'bg-[var(--blue)] text-[var(--blue-on)]' : 'text-[var(--muted)] hover:text-[var(--text)]',
                 ].join(' ')}
               >
                 {value}
@@ -216,7 +216,7 @@ export function OuraTab() {
 
           {showLongGroup && (
           <div>
-            <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[#9b978f]">Long-horizon</div>
+            <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Long-horizon</div>
             <div className="grid gap-3 md:grid-cols-3">
               <LongMetricTile title="VO₂ max" metric="vo2Max" days={summary.days} period={period} />
               <LongMetricTile title="Cardio age" metric="cardiovascularAge" days={summary.days} period={period} />
@@ -233,7 +233,7 @@ export function OuraTab() {
 function TrendGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[#9b978f]">{title}</div>
+      <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[var(--muted)]">{title}</div>
       <div className="grid gap-3 lg:grid-cols-3">{children}</div>
     </div>
   );

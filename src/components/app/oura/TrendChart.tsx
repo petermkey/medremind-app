@@ -38,12 +38,12 @@ function rangeLabel(values: Array<number | null>, suffix: string): string | null
 
 const LEGENDS: Record<string, Array<{ color: string; label: string }>> = {
   diverging: [
-    { color: '#c96a3a', label: 'Warmer' },
-    { color: '#7fa6bf', label: 'Cooler' },
+    { color: 'var(--chart-warm)', label: 'Warmer' },
+    { color: 'var(--chart-cool)', label: 'Cooler' },
   ],
   paired: [
-    { color: '#c96a3a', label: 'Stress' },
-    { color: '#8fae74', label: 'Recovery' },
+    { color: 'var(--chart-warm)', label: 'Stress' },
+    { color: 'var(--green)', label: 'Recovery' },
   ],
 };
 
@@ -89,17 +89,17 @@ export function TrendChart({
   const range = rangeLabel(mode === 'paired' ? [...values, ...(secondaryValues ?? [])] : values, valueSuffix);
 
   return (
-    <div className="rounded-lg border border-[rgba(255,255,255,0.06)] bg-[#0e1013] p-3">
+    <div className="rounded-lg border border-[rgba(var(--overlay-rgb),0.06)] bg-[var(--bg)] p-3">
       <div className="mb-1 flex items-center justify-between gap-3">
-        <div className="text-xs font-bold text-[#e8e6e1]">{title}</div>
-        <div className="text-[10px] font-semibold text-[#9b978f]">
+        <div className="text-xs font-bold text-[var(--text)]">{title}</div>
+        <div className="text-[10px] font-semibold text-[var(--muted)]">
           {tooltip ? `${tooltip.label} · ${tooltip.value}` : range}
         </div>
       </div>
       {legend && (
         <div className="mb-2 flex items-center gap-3">
           {legend.map(item => (
-            <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[#9b978f]">
+            <span key={item.label} className="flex items-center gap-1 text-[10px] font-semibold text-[var(--muted)]">
               <span className="h-2 w-2 rounded-full" style={{ background: item.color }} />
               {item.label}
             </span>
@@ -122,7 +122,7 @@ export function TrendChart({
             x2={width - padX}
             y1={padY + lineY * plotHeight}
             y2={padY + lineY * plotHeight}
-            stroke="rgba(255,255,255,0.35)"
+            stroke="rgba(var(--overlay-rgb),0.35)"
             strokeDasharray="4 4"
           />
         )}
@@ -150,13 +150,13 @@ export function TrendChart({
           const isLatest = index === bars.length - 1;
           let y = padY + bar.y * plotHeight;
           let h = Math.max(1, bar.height * plotHeight);
-          let fill = isLatest ? '#e6b654' : '#d9a53f';
+          let fill = isLatest ? 'var(--blue-hover)' : 'var(--blue)';
 
           if (mode === 'diverging') {
             const magnitude = Math.min(1, Math.abs(bar.value) / 1);
             h = Math.max(1, magnitude * (plotHeight / 2));
             y = bar.value >= 0 ? zeroY - h : zeroY;
-            fill = bar.value >= 0 ? '#c96a3a' : '#7fa6bf';
+            fill = bar.value >= 0 ? 'var(--chart-warm)' : 'var(--chart-cool)';
           }
 
           if (mode === 'paired') {
@@ -170,7 +170,7 @@ export function TrendChart({
                   width={pairWidth}
                   height={h}
                   rx="1.5"
-                  fill="#c96a3a"
+                  fill="var(--chart-warm)"
                   opacity={bar.opacity}
                   onClick={() => setTooltip({ index, label: dates[index] ?? '', value: `${fmt(bar.value, valueSuffix)} stress` })}
                 />
@@ -181,7 +181,7 @@ export function TrendChart({
                     width={pairWidth}
                     height={Math.max(1, second.height * plotHeight)}
                     rx="1.5"
-                    fill="#8fae74"
+                    fill="var(--green)"
                     opacity={second.opacity}
                     onClick={() => setTooltip({ index, label: dates[index] ?? '', value: `${fmt(second.value, valueSuffix)} recovery` })}
                   />
@@ -206,12 +206,12 @@ export function TrendChart({
         })}
         {mode === 'diverging' && (
           <g>
-            <line x1={padX} x2={width - padX} y1={zeroY} y2={zeroY} stroke="rgba(255,255,255,0.6)" strokeWidth="1" pointerEvents="none" />
-            <text x={padX} y={zeroY - 3} fontSize="8" fill="rgba(255,255,255,0.6)" pointerEvents="none">0{valueSuffix}</text>
+            <line x1={padX} x2={width - padX} y1={zeroY} y2={zeroY} stroke="rgba(var(--overlay-rgb),0.6)" strokeWidth="1" pointerEvents="none" />
+            <text x={padX} y={zeroY - 3} fontSize="8" fill="rgba(var(--overlay-rgb),0.6)" pointerEvents="none">0{valueSuffix}</text>
           </g>
         )}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-[#9b978f]">
+      <div className="mt-1 flex justify-between text-[10px] text-[var(--muted)]">
         <span>{dates[0] ?? ''}</span>
         <span>{dates[dates.length - 1] ?? ''}</span>
       </div>
