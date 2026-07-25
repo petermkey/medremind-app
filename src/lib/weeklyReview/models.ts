@@ -3,7 +3,7 @@
 // Leaf module. The code-default model is always the terminal fallback so a
 // stale env-pinned model can never sink the whole chain.
 
-export const DEFAULT_WEEKLY_REVIEW_MODEL = 'openai/gpt-4o-mini';
+export const DEFAULT_WEEKLY_REVIEW_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
 
 const FALLBACKABLE_STATUSES = new Set([404, 408, 409, 429, 500, 502, 503, 504]);
 
