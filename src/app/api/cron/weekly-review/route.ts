@@ -271,7 +271,7 @@ async function runWeeklyReview(checkInId: string): Promise<void> {
 
         const sendResult = await sendPushToUser(supabase, userId, {
           title: 'MedRemind',
-          body: 'Ваш недельный разбор готов',
+          body: 'Your weekly review is ready',
           url: '/app/progress',
           tag: `weekly-review-${weekStart}`,
         });
