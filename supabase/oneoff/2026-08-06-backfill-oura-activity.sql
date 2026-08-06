@@ -41,12 +41,34 @@
 --      so the two tables join directly on (user_id, local_date).
 --
 --   4. Confirmed oura_raw_documents has MANY rows per (user_id, local_date)
---      for daily_activity (14-23 fetches/day in the affected week, since the
---      Oura score is recalculated as the day's data accumulates and gets
---      revised on later syncs, e.g. one 2026-07-24 row was fetched as late
---      as 2026-07-30). The backfill must use the LATEST fetched_at per
---      (user_id, local_date) to get the final/most complete score, not an
---      arbitrary row.
+--      for daily_activity (14-23 fetches/day in the affected week). Pulled
+--      every fetch for one affected day (2026-07-24) to see how the value
+--      moves over time:
+--        select fetched_at, payload->>'score' as score,
+--               payload->>'non_wear_time' as non_wear_time
+--        from oura_raw_documents
+--        where endpoint = 'daily_activity' and local_date = '2026-07-24'
+--          and user_id = 'f9b36ee9-823a-4ec1-9648-e5a3e793e207'
+--        order by fetched_at;
+--      -> Result: score fluctuates during the day itself (56,56,56,56,56,56,
+--         57,57,57,57,56,56,55,55,53 across same-day fetches from 00:01 to
+--         22:00), then a LAST fetch dated 2026-07-30 23:00 (six days later,
+--         not "the day after") jumps to score=58, non_wear_time=24600
+--         (vs 3060-5580 on the same-day fetches). So the value is NOT a
+--         same-day value that quietly stabilizes and then goes untouched —
+--         Oura keeps revising a day's activity score for days afterward as
+--         more device data syncs in, and the raw-document table has no
+--         is_final/sync_type flag to mark which fetch is authoritative.
+--         "Latest fetched_at" is therefore not a verified-stable
+--         "finalize sync" per se — it is the best available proxy for
+--         "most complete data Oura has produced for that day so far", and
+--         it matches how the live sync would behave anyway: persistence.ts
+--         upserts snapshot rows on `(user_id, source, local_date)` conflict
+--         (upsertExternalHealthDailySnapshots, onConflict:
+--         'user_id,source,local_date'), i.e. last-write-wins — so a
+--         correctly-running sync during this week would itself have kept
+--         overwriting the day's values with whatever the newest fetch said,
+--         landing on the same answer this backfill computes.
 --
 --   5. Confirmed scope: only one user (f9b36ee9-823a-4ec1-9648-e5a3e793e207)
 --      has snapshot rows in this date range, all 7 dates present, all with
@@ -87,7 +109,9 @@ ORDER BY s.user_id, s.local_date;
 -- ============================================================================
 -- STEP 2 — UPDATE. Only run after reviewing the preview above.
 -- Only touches rows where the target column is currently NULL and a matching
--- raw document exists; never overwrites a non-NULL value.
+-- raw document exists; never overwrites a non-NULL value. RETURNING lists
+-- exactly which rows changed and their new values, so there's no need to
+-- re-run the preview SELECT afterward to confirm the result.
 -- ============================================================================
 
 WITH latest_raw AS (
@@ -115,4 +139,5 @@ FROM latest_raw AS r
 WHERE s.user_id = r.user_id
   AND s.local_date = r.local_date
   AND s.local_date BETWEEN '2026-07-24' AND '2026-07-30'
-  AND (s.activity_score IS NULL OR s.non_wear_minutes IS NULL);
+  AND (s.activity_score IS NULL OR s.non_wear_minutes IS NULL)
+RETURNING s.user_id, s.local_date, s.activity_score, s.non_wear_minutes;
