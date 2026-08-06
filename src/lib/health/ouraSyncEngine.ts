@@ -433,6 +433,7 @@ export function mergeHeartHealth(
   vo2: OuraCollectionResponse,
   resilience: OuraCollectionResponse,
   cardioAge: OuraCollectionResponse,
+  readiness: OuraCollectionResponse,
 ): Map<string, Record<string, unknown>> {
   const merged = new Map<string, Record<string, unknown>>();
   const upsert = (date: string, patch: Record<string, unknown>) => {
@@ -441,6 +442,15 @@ export function mergeHeartHealth(
   for (const [date, doc] of groupDailyData(vo2)) upsert(date, { vo2_max: doc.vo2_max });
   for (const [date, doc] of groupDailyData(resilience)) upsert(date, { resilience_level: doc.level });
   for (const [date, doc] of groupDailyData(cardioAge)) upsert(date, { cardiovascular_age: doc.vascular_age });
+  // hrv_balance has no dedicated endpoint — Oura only exposes it as a
+  // numeric 0-100 contributor score on daily_readiness. Stringify it here
+  // so ouraDailyMapper's existing stringOrNull(heartHealth.hrv_balance)
+  // and the `text` DB column both keep working unchanged.
+  for (const [date, doc] of groupDailyData(readiness)) {
+    const contributors = doc.contributors as Record<string, unknown> | undefined;
+    const hrvBalance = contributors?.hrv_balance;
+    if (typeof hrvBalance === 'number') upsert(date, { hrv_balance: String(hrvBalance) });
+  }
   return merged;
 }
 
@@ -463,7 +473,7 @@ async function fetchOuraDailyCollections(
     fetchOptionalOuraCollection(apiBaseUrl, accessToken, '/v2/usercollection/enhanced_tag', range),
   ]);
 
-  const heartHealth = mergeHeartHealth(vo2MaxRes, resilienceRes, cardioAgeRes);
+  const heartHealth = mergeHeartHealth(vo2MaxRes, resilienceRes, cardioAgeRes, readiness);
 
   const optionalCollections = {
     vO2_max: vo2MaxRes,
