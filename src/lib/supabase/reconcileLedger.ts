@@ -148,17 +148,20 @@ export async function reconcileStuckLedgerOps(
         continue;
       }
 
-      let targetRow: LedgerTargetRow = null;
       const { data: targetData, error: targetError } = await supabase
         .from(targetTable)
         .select('*')
         .eq('id', op.entity_id)
         .maybeSingle();
       if (targetError) {
+        // Transient fetch failure (network blip, RLS hiccup) is NOT the same
+        // as "target row genuinely missing" — leave this op `inflight` so a
+        // later boot retries it instead of permanently misclassifying it as
+        // `failed`.
         console.warn('[reconcile-ledger] failed to fetch target row', op.id, targetError.message);
-      } else {
-        targetRow = (targetData as LedgerTargetRow) ?? null;
+        continue;
       }
+      const targetRow: LedgerTargetRow = (targetData as LedgerTargetRow) ?? null;
 
       const verdict = classifyLedgerReconciliation(op, targetRow, now, staleAfterMs);
       if (verdict === 'skip') continue;
@@ -174,7 +177,8 @@ export async function reconcileStuckLedgerOps(
         .from('sync_operations')
         .update(patch)
         .eq('id', op.id)
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .eq('status', 'inflight');
 
       if (updateError) {
         console.warn('[reconcile-ledger] failed to update ledger row', op.id, updateError.message);

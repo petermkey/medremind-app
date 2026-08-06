@@ -75,8 +75,12 @@ test('row updated more recently than the stale threshold is skipped', () => {
 type FakeRow = Record<string, unknown>;
 type FakeDb = { sync_operations: FakeRow[]; active_protocols: FakeRow[]; protocols: FakeRow[] };
 
-function createFakeSupabaseClient(db: FakeDb, updateErrorForIds: Set<string> = new Set()) {
-  function makeSelectBuilder(rows: FakeRow[]) {
+function createFakeSupabaseClient(
+  db: FakeDb,
+  updateErrorForIds: Set<string> = new Set(),
+  targetSelectErrorTables: Set<string> = new Set(),
+) {
+  function makeSelectBuilder(rows: FakeRow[], table: string) {
     let filtered = rows;
     const builder = {
       eq(col: string, val: unknown) {
@@ -88,6 +92,12 @@ function createFakeSupabaseClient(db: FakeDb, updateErrorForIds: Set<string> = n
         return Promise.resolve({ data: filtered, error: null as { message: string } | null });
       },
       maybeSingle() {
+        if (targetSelectErrorTables.has(table)) {
+          return Promise.resolve({
+            data: null,
+            error: { message: 'transient fetch error' } as { message: string } | null,
+          });
+        }
         return Promise.resolve({ data: filtered[0] ?? null, error: null as { message: string } | null });
       },
     };
@@ -121,7 +131,7 @@ function createFakeSupabaseClient(db: FakeDb, updateErrorForIds: Set<string> = n
       const rows = db[table as keyof FakeDb] ?? [];
       return {
         select(_cols: string) {
-          return makeSelectBuilder(rows);
+          return makeSelectBuilder(rows, table);
         },
         update(patch: FakeRow) {
           return makeUpdateBuilder(rows, patch);
@@ -287,6 +297,38 @@ test('reconcileStuckLedgerOps marks failed when the target row is missing, witho
 
   assert.deepEqual(result, { reconciled: 1, succeeded: 0, failed: 1 });
   assert.equal(db.sync_operations[0].status, 'failed');
+});
+
+// Regression test for a review finding (I1): a transient error fetching the
+// target row (network blip, RLS hiccup) must NOT be treated the same as
+// "target row genuinely missing". The op should stay `inflight` so a later
+// boot retries it, instead of being permanently misclassified as `failed`.
+test('reconcileStuckLedgerOps leaves a row inflight when the target fetch errors transiently', async () => {
+  const now = new Date('2026-08-06T00:00:00.000Z');
+  const staleUpdatedAt = new Date(now.getTime() - 11 * 60 * 1000).toISOString();
+  const db: FakeDb = {
+    sync_operations: [
+      {
+        id: 'op-1',
+        user_id: 'user-1',
+        operation_kind: 'pause_command',
+        entity_type: 'active_protocol',
+        entity_id: 'active-1',
+        payload: { status: 'paused' },
+        status: 'inflight',
+        updated_at: staleUpdatedAt,
+      },
+    ],
+    active_protocols: [{ id: 'active-1', status: 'paused' }],
+    protocols: [],
+  };
+  const client = createFakeSupabaseClient(db, new Set(), new Set(['active_protocols']));
+
+  const { result, warnings } = await withCapturedWarnings(() => reconcileStuckLedgerOps('user-1', { now, client }));
+
+  assert.deepEqual(result, { reconciled: 0, succeeded: 0, failed: 0 });
+  assert.equal(db.sync_operations[0].status, 'inflight');
+  assert.ok(warnings.length >= 1, 'expected a console.warn call for the fetch error');
 });
 
 test('reconcileStuckLedgerOps does not abort the sweep when one row errors on update', async () => {
