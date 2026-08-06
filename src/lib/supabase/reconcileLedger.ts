@@ -36,7 +36,14 @@ export type LedgerTargetRow = Record<string, unknown> | null;
 export type LedgerReconciliationVerdict = 'succeeded' | 'failed' | 'skip';
 
 // Default staleness window a reaper should use before touching an `inflight`
-// row — matches WS1 plan's `reconcileStuckLedgerOps` default.
+// row — matches WS1 plan's `reconcileStuckLedgerOps` default. Threaded
+// through as `classifyLedgerReconciliation`'s `staleAfterMs` param so the
+// I/O wrapper's SQL-level threshold (`reconcileStuckLedgerOps`'s
+// `opts.staleAfterMs`, used in its `.lt('updated_at', ...)` filter) and this
+// classifier's own skip check always agree on the same value — do not let
+// them diverge, or a caller-supplied `staleAfterMs` narrower than this
+// default becomes a silent no-op (rows get selected by SQL but then
+// re-skipped here).
 export const DEFAULT_STALE_AFTER_MS = 10 * 60 * 1000;
 
 // Does the live target row already reflect the ledger op's intended state?
@@ -58,14 +65,18 @@ function targetMatchesIntent(op: SyncOperationLedgerRow, target: Record<string, 
 
 // Decide the correct terminal status for a stuck `inflight` ledger row by
 // comparing its payload's intended state to the live target row. Pure: no
-// I/O, no clock reads — `now` is injected.
+// I/O, no clock reads — `now` is injected. `staleAfterMs` defaults to
+// DEFAULT_STALE_AFTER_MS but callers with their own staleness window (e.g.
+// `reconcileStuckLedgerOps`) must pass the same value they used to select
+// the row, so this skip check agrees with theirs.
 export function classifyLedgerReconciliation(
   op: SyncOperationLedgerRow,
   targetRow: LedgerTargetRow,
   now: Date,
+  staleAfterMs: number = DEFAULT_STALE_AFTER_MS,
 ): LedgerReconciliationVerdict {
   const updatedAtMs = new Date(op.updated_at).getTime();
-  if (now.getTime() - updatedAtMs < DEFAULT_STALE_AFTER_MS) {
+  if (now.getTime() - updatedAtMs < staleAfterMs) {
     return 'skip';
   }
 
@@ -149,7 +160,7 @@ export async function reconcileStuckLedgerOps(
         targetRow = (targetData as LedgerTargetRow) ?? null;
       }
 
-      const verdict = classifyLedgerReconciliation(op, targetRow, now);
+      const verdict = classifyLedgerReconciliation(op, targetRow, now, staleAfterMs);
       if (verdict === 'skip') continue;
 
       const patch = {

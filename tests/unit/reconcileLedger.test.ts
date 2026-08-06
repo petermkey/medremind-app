@@ -330,3 +330,66 @@ test('reconcileStuckLedgerOps does not abort the sweep when one row errors on up
   assert.equal(db.sync_operations.find(r => r.id === 'op-good')?.status, 'succeeded');
   assert.ok(warnings.length >= 1, 'expected a console.warn call for the erroring row');
 });
+
+// Regression test for a review finding: opts.staleAfterMs must actually
+// control the threshold end-to-end, not just the SQL select filter. A row
+// 5 minutes old is NOT stale under the default 10-minute window but IS
+// stale under a custom 2-minute window — if classifyLedgerReconciliation
+// ignored the caller's staleAfterMs and fell back to its own hardcoded
+// default, this row would be selected by SQL then silently re-skipped by
+// the classifier, leaving `reconciled: 0` with no error.
+test('reconcileStuckLedgerOps honors a custom staleAfterMs shorter than the default 10-minute threshold', async () => {
+  const now = new Date('2026-08-06T00:00:00.000Z');
+  const staleAfterMs = 2 * 60 * 1000;
+  const updatedAt = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+  const db: FakeDb = {
+    sync_operations: [
+      {
+        id: 'op-1',
+        user_id: 'user-1',
+        operation_kind: 'pause_command',
+        entity_type: 'active_protocol',
+        entity_id: 'active-1',
+        payload: { status: 'paused' },
+        status: 'inflight',
+        updated_at: updatedAt,
+      },
+    ],
+    active_protocols: [{ id: 'active-1', status: 'paused' }],
+    protocols: [],
+  };
+  const client = createFakeSupabaseClient(db);
+
+  const result = await reconcileStuckLedgerOps('user-1', { now, staleAfterMs, client });
+
+  assert.deepEqual(result, { reconciled: 1, succeeded: 1, failed: 0 });
+  assert.equal(db.sync_operations[0].status, 'succeeded');
+});
+
+test('reconcileStuckLedgerOps still skips rows newer than a custom staleAfterMs', async () => {
+  const now = new Date('2026-08-06T00:00:00.000Z');
+  const staleAfterMs = 2 * 60 * 1000;
+  const updatedAt = new Date(now.getTime() - 60 * 1000).toISOString();
+  const db: FakeDb = {
+    sync_operations: [
+      {
+        id: 'op-1',
+        user_id: 'user-1',
+        operation_kind: 'pause_command',
+        entity_type: 'active_protocol',
+        entity_id: 'active-1',
+        payload: { status: 'paused' },
+        status: 'inflight',
+        updated_at: updatedAt,
+      },
+    ],
+    active_protocols: [{ id: 'active-1', status: 'active' }],
+    protocols: [],
+  };
+  const client = createFakeSupabaseClient(db);
+
+  const result = await reconcileStuckLedgerOps('user-1', { now, staleAfterMs, client });
+
+  assert.deepEqual(result, { reconciled: 0, succeeded: 0, failed: 0 });
+  assert.equal(db.sync_operations[0].status, 'inflight');
+});
