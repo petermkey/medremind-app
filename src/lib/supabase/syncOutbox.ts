@@ -36,6 +36,7 @@ import {
   syncEndProtocolFromTodayCommand,
   syncRemoveDoseCommand,
 } from './realtimeSync';
+import { reconcileStuckLedgerOps } from './reconcileLedger';
 
 type SyncKind =
   | 'protocolUpsert'
@@ -182,6 +183,7 @@ const MAX_ATTEMPTS = 20;
 const listeners = new Set<(status: SyncStatus) => void>();
 
 let started = false;
+let reaperStarted = false;
 let pumping = false;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 const status: SyncStatus = {
@@ -594,6 +596,19 @@ export function startSyncOutbox() {
     if (document.visibilityState === 'visible') void pumpOutbox();
   });
   void pumpOutbox();
+}
+
+// Best-effort sweep of stuck `inflight` sync_operations for the signed-in
+// user, run once per session on boot alongside the outbox pump above. Unlike
+// startSyncOutbox(), this needs the signed-in user's id, which callers only
+// have after resolving auth — so it's a separate entry point, gated by its
+// own once-per-session flag, called once that id is known (see
+// src/app/app/layout.tsx). Non-blocking: callers must not await this in a
+// way that blocks boot.
+export function startLedgerReaper(userId: string) {
+  if (reaperStarted || !hasWindow()) return;
+  reaperStarted = true;
+  void reconcileStuckLedgerOps(userId);
 }
 
 export function clearSyncOutbox() {

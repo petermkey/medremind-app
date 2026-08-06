@@ -6,7 +6,7 @@ import { useFoodStore } from '@/lib/store/foodStore';
 import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { getCurrentUser } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
-import { startSyncOutbox, flushSyncOutbox, getSyncStatusSnapshot } from '@/lib/supabase/syncOutbox';
+import { startSyncOutbox, startLedgerReaper, flushSyncOutbox, getSyncStatusSnapshot } from '@/lib/supabase/syncOutbox';
 import { registerServiceWorker } from '@/lib/push/swRegister';
 import { BottomNav } from '@/components/app/BottomNav';
 import { SyncStatusPill } from '@/components/app/SyncStatusPill';
@@ -87,6 +87,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         useNutritionTargetsStore.getState().resetNutritionTargets();
       }
       setProfile(user);
+      // Best-effort, non-blocking: sweeps stuck `inflight` ledger rows once
+      // per session now that the signed-in user's id is known.
+      startLedgerReaper(user.id);
       if (!user.onboarded) {
         router.replace('/onboarding');
         setChecking(false);
