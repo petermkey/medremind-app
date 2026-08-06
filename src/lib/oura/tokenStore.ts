@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-import { fetchOuraJson, getOuraTokenExpiresAt, OuraPersonalInfo, OuraTokenSet } from './client';
+import { fetchOuraJson, getOuraTokenExpiresAt } from './client';
+import type { OuraPersonalInfo, OuraTokenSet } from './client';
 import { parseOuraScopes } from './oauth';
 import { decryptOuraToken, encryptOuraToken } from './tokenCrypto';
 

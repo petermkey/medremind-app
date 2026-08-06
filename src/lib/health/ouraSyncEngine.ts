@@ -429,7 +429,7 @@ async function syncOuraDeviceStatus(input: {
 
 // A day's heart-health picture is now assembled from three separate
 // collections instead of the non-existent /heart_health endpoint.
-function mergeHeartHealth(
+export function mergeHeartHealth(
   vo2: OuraCollectionResponse,
   resilience: OuraCollectionResponse,
   cardioAge: OuraCollectionResponse,
