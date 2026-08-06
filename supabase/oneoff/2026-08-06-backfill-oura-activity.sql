@@ -114,6 +114,8 @@ ORDER BY s.user_id, s.local_date;
 -- re-run the preview SELECT afterward to confirm the result.
 -- ============================================================================
 
+BEGIN;
+
 WITH latest_raw AS (
   SELECT DISTINCT ON (user_id, local_date)
     user_id,
@@ -141,3 +143,7 @@ WHERE s.user_id = r.user_id
   AND s.local_date BETWEEN '2026-07-24' AND '2026-07-30'
   AND (s.activity_score IS NULL OR s.non_wear_minutes IS NULL)
 RETURNING s.user_id, s.local_date, s.activity_score, s.non_wear_minutes;
+
+-- Review the RETURNING output above. If it looks correct, run `COMMIT;` to
+-- apply the update. If anything looks wrong, run `ROLLBACK;` to abort —
+-- this transaction is left open on purpose and will NOT auto-commit.

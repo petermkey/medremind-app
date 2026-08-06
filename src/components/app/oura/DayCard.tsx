@@ -83,7 +83,7 @@ export function DayCard({ days }: { days: OuraStatsDay[] }) {
         <div className="mt-3 rounded-xl bg-[var(--bg)] p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-[var(--chip-text)]">HRV balance</span>
-            <span className="text-sm font-bold capitalize text-[var(--text)]">{day.hrvBalance}</span>
+            <span className="text-sm font-bold text-[var(--text)]">{day.hrvBalance}/100</span>
           </div>
           <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">{OURA_METRIC_EXPLAINERS.hrvBalance}</p>
         </div>
