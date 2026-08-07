@@ -1,5 +1,5 @@
-import type { FoodAnalysisDraft } from '@/types/food';
-import { validateFoodAnalysisDraft } from '@/lib/food/analysisSchema';
+import type { FoodAnalysisDraft } from '../../../types/food';
+import { validateFoodAnalysisDraft } from '../analysisSchema';
 import {
   getOpenRouterFoodVisionModels,
   shouldFallbackOpenRouterFoodModel,
@@ -17,7 +17,7 @@ const FOOD_TEXT_PROMPT =
 
 const PROVIDER_TIMEOUT_MS = 30_000;
 
-const FOOD_ANALYSIS_SCHEMA = {
+export const FOOD_ANALYSIS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
@@ -95,8 +95,26 @@ const FOOD_ANALYSIS_SCHEMA = {
         extended: {
           type: 'object',
           additionalProperties: false,
-          properties: {},
-          required: [],
+          required: [
+            'vitaminCMg',
+            'vitaminDMcg',
+            'vitaminAMcg',
+            'calciumMg',
+            'ironMg',
+            'potassiumMg',
+            'magnesiumMg',
+            'zincMg',
+          ],
+          properties: {
+            vitaminCMg: { type: ['number', 'null'] },
+            vitaminDMcg: { type: ['number', 'null'] },
+            vitaminAMcg: { type: ['number', 'null'] },
+            calciumMg: { type: ['number', 'null'] },
+            ironMg: { type: ['number', 'null'] },
+            potassiumMg: { type: ['number', 'null'] },
+            magnesiumMg: { type: ['number', 'null'] },
+            zincMg: { type: ['number', 'null'] },
+          },
         },
       },
     },

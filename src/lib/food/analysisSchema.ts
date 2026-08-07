@@ -3,7 +3,7 @@ import type {
   FoodAnalysisDraft,
   FoodMealLabel,
   FoodNutrients,
-} from '@/types/food';
+} from '../../types/food';
 
 const ALLOWED_MEAL_LABELS = new Set<FoodMealLabel>([
   'breakfast',
