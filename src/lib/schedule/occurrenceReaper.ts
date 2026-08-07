@@ -6,23 +6,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // the strip-types test-runner; the sweep below is the only part of this file
 // that imports Supabase types.
 //
-// Status-domain finding (WS7 Task 2): the plan requires confirming the
-// `planned_occurrences.status` CHECK constraint before picking a terminal
-// status, via `npx supabase db query --linked "select ... pg_constraint ..."`.
-// That command could not complete in this worktree — `~/.supabase/profile`
-// does not exist here, so the CLI has no cached auth/access-token, and
-// `db query --linked` (which authenticates against the Management API) hangs
-// waiting on an interactive login flow that never resolves non-interactively
-// (`--debug` confirms: `NotFound: FileSystem.readFile
-// (~/.supabase/profile)`). Per project rules the fix for that is `supabase
-// login`/a documented `SUPABASE_ACCESS_TOKEN` env var, not scanning the
-// keychain for a token, so that path is not available here either.
-// Per the plan's own constraint ("No new enum value without confirming the
-// domain first"), the safe choice when confirmation is unavailable is to NOT
-// introduce `'expired'` and instead reuse `'cancelled'` — already a known
-// non-planned status in this table (Task 1's own predicate tests exercise it
-// as a valid status alongside `'completed'`/`'planned'`). See
-// REAP_TERMINAL_STATUS below.
+// Status-domain finding (WS7 Task 2, later remediated): the plan originally
+// reused `'cancelled'` here because the CLI couldn't confirm the allowed
+// `planned_occurrences.status` domain from this worktree at the time. Final
+// review caught that this collides with an existing meaning elsewhere:
+// `status = 'cancelled'` with no linked `execution_events` is treated as a
+// deliberate user removal (src/lib/supabase/cloudStore.ts derives
+// `removedSlotKeys` from that pattern, and src/lib/correlation/persistence.ts
+// / src/app/api/medication-knowledge/refresh/route.ts derive a `'skipped'`
+// adherence signal from it). Reaping a merely-forgotten occurrence into
+// `'cancelled'` would silently conflate it with real removals in history and
+// adherence metrics. `supabase/032_planned_occurrences_expired_status.sql`
+// adds a distinct `'expired'` status to the CHECK constraint for exactly
+// this case. See REAP_TERMINAL_STATUS below.
 
 /**
  * Add `days` (may be negative) to a `YYYY-MM-DD` local-date string and
@@ -62,9 +58,9 @@ export function isReapableOccurrence(
 // --- Bounded reaper (I/O wrapper) -------------------------------------------
 
 // Terminal status the reaper transitions reapable rows to. See the
-// status-domain finding at the top of this file for why this reuses
-// `'cancelled'` rather than introducing a new `'expired'` value.
-export const REAP_TERMINAL_STATUS = 'cancelled';
+// status-domain finding at the top of this file for why this is a distinct
+// `'expired'` value rather than reusing `'cancelled'`.
+export const REAP_TERMINAL_STATUS = 'expired';
 
 // Default grace period, mirrors isReapableOccurrence's own default so a
 // caller that doesn't override either stays consistent.

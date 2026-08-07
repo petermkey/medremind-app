@@ -152,12 +152,20 @@ export interface NotificationSettings {
 //   planned    — live, actionable occurrence
 //   superseded — rescheduled away (snooze origin); a successor exists
 //   cancelled  — explicitly removed from the plan
+//   expired    — reaper-terminal: stale/forgotten, not a deliberate removal
+//
+// cancelled and expired occurrences (without a linked execution_events row)
+// are filtered out of the client store upstream in cloudStore.ts, so
+// projectToOccurrence below never actually assigns those two values today —
+// they're documented here for completeness against the DB status domain
+// (supabase/002_lifecycle_schema_readiness.sql,
+// supabase/032_planned_occurrences_expired_status.sql).
 //
 // This is distinct from DoseStatus, which is a mixed legacy field.
 // PlannedOccurrence extends ScheduledDose so all existing UI components
 // (MedCard, etc.) can consume it without changes.
 
-export type OccurrenceStatus = 'planned' | 'superseded' | 'cancelled';
+export type OccurrenceStatus = 'planned' | 'superseded' | 'cancelled' | 'expired';
 
 export interface PlannedOccurrence extends ScheduledDose {
   // Structural occurrence state — derived at read time, never written to DB for new rows.
