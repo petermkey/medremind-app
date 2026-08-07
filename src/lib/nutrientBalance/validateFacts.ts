@@ -20,15 +20,24 @@ export type NutrientFactValidation = {
 };
 
 // Hard implausibility ceiling, expressed as a multiplier of the curated
-// tolerable upper limit (UL) from limits.ts. 10x is chosen because:
-// - Legitimate megadose supplement products rarely exceed ~2-5x the
-//   NIH ODS / EFSA UL for a nutrient (e.g. high-dose B-vitamin or
-//   omega-3 products), so 10x stays well clear of real-world dosing.
-// - The dominant LLM extraction failure modes are unit confusion
-//   (mg vs mcg, g vs mg -> 1000x or 1x/1000 errors) and decimal-shift
-//   misreads of a label (10x-100x errors); a 10x ceiling reliably catches
-//   both without needing per-nutrient tuning.
-const IMPLAUSIBILITY_MULTIPLIER = 10;
+// tolerable upper limit (UL) from limits.ts. The multiplier is scoped by
+// `NutrientDef.ulScope`:
+// - 'total' (IMPLAUSIBILITY_MULTIPLIER_TOTAL = 10): the curated UL already
+//   applies to total intake (food + supplements). Legitimate megadose
+//   supplement products rarely exceed ~2-5x the NIH ODS / EFSA UL for a
+//   nutrient, so 10x stays well clear of real-world dosing.
+// - 'supplemental' (IMPLAUSIBILITY_MULTIPLIER_SUPPLEMENTAL = 100): the
+//   curated UL applies only to the supplemental-intake portion (e.g.
+//   niacin, vitamin E, folate, magnesium, omega-3 EPA/DHA per NIH ODS), so
+//   it is deliberately set far below typical single-product content.
+//   Mainstream OTC doses of these nutrients can legitimately sit well
+//   above a 10x ceiling (e.g. niacin 500mg vs ul=35mg), so a flat 10x
+//   wrongly rejects real products. 100x still reliably catches the actual
+//   failure modes this validator targets: unit confusion (mg vs mcg, g vs
+//   mg -> ~1000x errors) and decimal-shift misreads of a label (10x-100x
+//   errors), since those errors typically overshoot even a 100x ceiling.
+const IMPLAUSIBILITY_MULTIPLIER_TOTAL = 10;
+const IMPLAUSIBILITY_MULTIPLIER_SUPPLEMENTAL = 100;
 
 function normalizeKey(rawKey: string): string {
   return rawKey.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -74,11 +83,15 @@ export function validateNutrientFact(
     const def = index.get(normalizeKey(key));
     if (!def || def.ul === null) continue; // no curated ceiling to check against
 
-    const ceiling = def.ul * IMPLAUSIBILITY_MULTIPLIER;
+    const multiplier =
+      def.ulScope === 'supplemental'
+        ? IMPLAUSIBILITY_MULTIPLIER_SUPPLEMENTAL
+        : IMPLAUSIBILITY_MULTIPLIER_TOTAL;
+    const ceiling = def.ul * multiplier;
     if (value > ceiling) {
       reasons.push(
         `${key}: ${value}${def.unit} exceeds implausibility ceiling of ${ceiling}${def.unit} ` +
-          `(${IMPLAUSIBILITY_MULTIPLIER}x curated UL ${def.ul}${def.unit})`,
+          `(${multiplier}x curated UL ${def.ul}${def.unit})`,
       );
     }
   }

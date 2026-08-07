@@ -55,6 +55,36 @@ test('validateNutrientFact rejects negative or NaN nutrient values', () => {
   assert.ok(infinite.reasons.length > 0);
 });
 
+test('validateNutrientFact verifies a mainstream OTC dose of a supplemental-scope nutrient', () => {
+  // niacinMg UL is 35mg but ulScope is 'supplemental' (see limits.ts): the UL
+  // applies only to the supplemental-intake portion, so common OTC niacin
+  // products (e.g. 500mg) legitimately sit far above it. At the old flat 10x
+  // multiplier this would have wrongly been rejected (10x ceiling = 350mg);
+  // with the 100x supplemental ceiling (3500mg) it must verify.
+  const result = validateNutrientFact({
+    normalizedName: 'niacin 500mg',
+    doseAmount: 500,
+    doseUnit: 'mg',
+    nutrients: { niacinMg: 500 },
+  });
+  assert.equal(result.status, 'verified');
+  assert.deepEqual(result.reasons, []);
+});
+
+test('validateNutrientFact rejects a supplemental-scope nutrient far past its 100x ceiling', () => {
+  // niacinMg UL is 35mg, ulScope 'supplemental' -> 100x ceiling = 3500mg.
+  // 10000mg is well past that, representative of a unit-confusion error.
+  const result = validateNutrientFact({
+    normalizedName: 'niacin mislabeled',
+    doseAmount: 10000,
+    doseUnit: 'mg',
+    nutrients: { niacinMg: 10000 },
+  });
+  assert.equal(result.status, 'rejected');
+  assert.ok(result.reasons.length > 0);
+  assert.match(result.reasons[0], /niacinMg/);
+});
+
 test('validateNutrientFact rejects an empty nutrients object', () => {
   const result = validateNutrientFact({
     normalizedName: 'mystery pill',
