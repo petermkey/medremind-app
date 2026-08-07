@@ -382,6 +382,18 @@ export async function replaceCorrelationInsightCards(
   return cards.length;
 }
 
+export async function listConsentedCorrelationUserIds(
+  supabase: SupabaseClient = createCorrelationServiceClient(),
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('correlation_consents')
+    .select('user_id')
+    .eq('enabled', true);
+
+  if (error) throw error;
+  return ((data as unknown as Row[] | null) ?? []).map((row) => String(row.user_id));
+}
+
 export async function generateAndPersistCorrelationInsights(userId: string): Promise<CorrelationInsightCard[]> {
   const supabase = createCorrelationServiceClient();
   const endDate = new Date().toISOString().slice(0, 10);
