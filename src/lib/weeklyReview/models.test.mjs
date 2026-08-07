@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getWeeklyReviewModels, shouldFallbackWeeklyReviewModel } from './models.ts';
+import {
+  DEFAULT_WEEKLY_REVIEW_MODEL,
+  getWeeklyReviewModels,
+  shouldFallbackWeeklyReviewModel,
+} from './models.ts';
 
 test('default chain is just the code default', () => {
-  assert.deepEqual(getWeeklyReviewModels({}), ['google/gemini-2.5-flash']);
+  assert.deepEqual(getWeeklyReviewModels({}), [DEFAULT_WEEKLY_REVIEW_MODEL]);
 });
 
 test('env primary + fallback, code default always terminal, deduplicated', () => {
@@ -13,11 +17,11 @@ test('env primary + fallback, code default always terminal, deduplicated', () =>
       OPENROUTER_WEEKLY_REVIEW_MODEL: 'anthropic/claude-sonnet-4.5',
       OPENROUTER_WEEKLY_REVIEW_FALLBACK_MODEL: 'openrouter/auto',
     }),
-    ['anthropic/claude-sonnet-4.5', 'openrouter/auto', 'google/gemini-2.5-flash'],
+    ['anthropic/claude-sonnet-4.5', 'openrouter/auto', DEFAULT_WEEKLY_REVIEW_MODEL],
   );
   assert.deepEqual(
-    getWeeklyReviewModels({ OPENROUTER_WEEKLY_REVIEW_MODEL: 'google/gemini-2.5-flash' }),
-    ['google/gemini-2.5-flash'],
+    getWeeklyReviewModels({ OPENROUTER_WEEKLY_REVIEW_MODEL: DEFAULT_WEEKLY_REVIEW_MODEL }),
+    [DEFAULT_WEEKLY_REVIEW_MODEL],
   );
 });
 
