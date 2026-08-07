@@ -570,6 +570,12 @@ export async function syncOuraSnapshots(
     rangeEnd: range.end_date,
   });
 
+  // Best-effort marker for which step of the multi-stage sync was running
+  // when a failure hit the catch below — this single try wraps fetch,
+  // mapping, persistence, and the tag/heartrate/device-status sub-syncs, so
+  // without this the failed run row and Sentry event both lose where the
+  // error actually happened.
+  let stage = 'fetch_daily_collections';
   try {
     const collections = await fetchOuraDailyCollections(
       auth.config.apiBaseUrl,
@@ -577,6 +583,7 @@ export async function syncOuraSnapshots(
       range,
     );
 
+    stage = 'persist_analytics_payloads';
     const analyticsPayloads = await persistOuraAnalyticsPayloads({
       userId,
       connectionId: auth.tokens.rowId,
@@ -585,6 +592,7 @@ export async function syncOuraSnapshots(
       collections,
     });
 
+    stage = 'map_daily_snapshots';
     const snapshots = getSnapshotDates(collections).map((localDate) =>
       mapOuraDailyPayloadToHealthSnapshot({
         userId,
@@ -601,8 +609,10 @@ export async function syncOuraSnapshots(
       }),
     );
 
+    stage = 'upsert_snapshots';
     const count = await upsertExternalHealthDailySnapshots(snapshots);
 
+    stage = 'sync_tags';
     const tagRows = (collections.enhancedTags.data ?? [])
       .map(asRecord)
       .filter((doc): doc is Record<string, unknown> => doc !== null)
@@ -616,6 +626,8 @@ export async function syncOuraSnapshots(
       }))
       .filter((row) => row.ouraId.length > 0);
     await upsertOuraTags(tagRows);
+
+    stage = 'sync_heartrate';
     const heartrateCount = await syncHeartrateSamples({
       userId,
       syncRunId: syncRun.id,
@@ -623,6 +635,8 @@ export async function syncOuraSnapshots(
       accessToken: auth.tokens.accessToken,
       range,
     });
+
+    stage = 'sync_device_status';
     await syncOuraDeviceStatus({
       userId,
       syncRunId: syncRun.id,
@@ -631,6 +645,7 @@ export async function syncOuraSnapshots(
       range,
     });
 
+    stage = 'finish_run';
     await markOuraSyncSuccess(userId);
     await markHealthConnectionSyncSuccess(userId, 'oura');
     await finishOuraSyncRun({
@@ -648,12 +663,12 @@ export async function syncOuraSnapshots(
 
     return count;
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'Oura health sync failed.';
+    Sentry.captureException(err, { tags: { route: 'cron/oura-sync', stage } });
     await finishOuraSyncRun({
       syncRunId: syncRun.id,
       status: 'failed',
-      errors: [{
-        message: err instanceof Error ? err.message : 'Oura health sync failed.',
-      }],
+      errors: [{ message, stage }],
     }).catch((finishErr) => {
       console.error('[health/sync] failed to finish Oura sync run', finishErr);
     });
