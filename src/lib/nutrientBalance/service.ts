@@ -172,10 +172,38 @@ export async function getNutrientBalance(
       ) {
         continue;
       }
-      factsByKey.set(factKey(row.normalized_name, amount, row.dose_unit), {
-        nutrients: (row.nutrients as Record<string, number> | null) ?? {},
-        validationStatus: typeof row.validation_status === 'string' ? row.validation_status : 'pending',
-      });
+      const normalizedName = row.normalized_name;
+      const doseUnit = row.dose_unit;
+      const nutrients = (row.nutrients as Record<string, number> | null) ?? {};
+      const validationStatus = typeof row.validation_status === 'string' ? row.validation_status : 'pending';
+      const key = factKey(normalizedName, amount, doseUnit);
+      factsByKey.set(key, { nutrients, validationStatus });
+
+      // Backfill-validate pending facts written before validation existed
+      // (WS3 Task 3): revalidate on next use so they promote to
+      // verified/rejected without a manual migration.
+      if (validationStatus === 'pending') {
+        const revalidation = validateNutrientFact({
+          nutrients,
+          normalizedName,
+          doseAmount: amount,
+          doseUnit,
+        });
+        factsByKey.set(key, { nutrients, validationStatus: revalidation.status });
+        void (async () => {
+          try {
+            const { error } = await supabase
+              .from('supplement_nutrient_facts')
+              .update({ validation_status: revalidation.status })
+              .eq('normalized_name', normalizedName)
+              .eq('dose_amount', amount)
+              .eq('dose_unit', doseUnit);
+            if (error) Sentry.captureException(error);
+          } catch (error) {
+            Sentry.captureException(error);
+          }
+        })();
+      }
     }
   }
 
