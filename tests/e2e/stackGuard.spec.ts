@@ -91,7 +91,7 @@ test.describe('stack guard (requires E2E_EMAIL and E2E_PASSWORD)', () => {
 
     await waitForSyncFlushed(page);
 
-    await page.goto('/app/meds');
+    await page.goto('/app/protocols');
     const card = page.getByTestId('stack-guard-card');
     await expect(card).toBeVisible({ timeout: 20_000 });
     await expect(card.getByText('Iron and calcium in the same slot')).toBeVisible();

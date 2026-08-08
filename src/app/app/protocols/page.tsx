@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { useStore } from '@/lib/store/store';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
+import { StackGuardCard } from '@/components/app/StackGuardCard';
 import type { Protocol } from '@/types';
 import { SEED_PROTOCOLS } from '@/lib/data/seed';
 
@@ -177,6 +178,7 @@ export default function ProtocolsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
+        <StackGuardCard />
         {filtered.length === 0 && (
           <div className="text-center py-16">
             <div className="text-sm font-bold text-[var(--text)] mb-1">No protocols found</div>
