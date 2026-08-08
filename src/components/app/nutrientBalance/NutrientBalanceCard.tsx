@@ -80,7 +80,7 @@ export function NutrientBalanceCard() {
         <div>
           <div className="text-xs font-bold text-[var(--muted)] uppercase tracking-widest">Nutrient Balance</div>
           <div className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
-            Food diary 14-day average crossed with the active supplement stack.
+            Food diary 14-day average crossed with your supplement stack.
           </div>
         </div>
         <button
@@ -106,8 +106,7 @@ export function NutrientBalanceCard() {
           )}
           {totalFindings === 0 && !data.insufficientFoodData && (
             <p className="text-sm leading-relaxed text-[var(--muted)]">
-              No findings yet. Log meals and refresh medication context above so the stack is
-              known, then refresh.
+              No findings yet. Log a few more days of meals, then refresh.
             </p>
           )}
 

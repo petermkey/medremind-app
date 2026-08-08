@@ -1,5 +1,13 @@
-import type { JsonSchema } from './aiSchemas';
 import type { MedicationKnowledgeModelConfig } from './openRouterModels';
+
+export type JsonSchema = {
+  type: string;
+  properties?: Record<string, unknown>;
+  required?: string[];
+  additionalProperties: false;
+  items?: unknown;
+  enum?: readonly string[];
+};
 
 type OpenRouterMessage = {
   role: 'system' | 'user' | 'assistant';

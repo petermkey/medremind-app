@@ -13,10 +13,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // `status = 'cancelled'` with no linked `execution_events` is treated as a
 // deliberate user removal (src/lib/supabase/cloudStore.ts derives
 // `removedSlotKeys` from that pattern, and src/lib/correlation/persistence.ts
-// / src/app/api/medication-knowledge/refresh/route.ts derive a `'skipped'`
-// adherence signal from it). Reaping a merely-forgotten occurrence into
-// `'cancelled'` would silently conflate it with real removals in history and
-// adherence metrics. `supabase/032_planned_occurrences_expired_status.sql`
+// derives a `'skipped'` adherence signal from it). Reaping a merely-forgotten
+// occurrence into `'cancelled'` would silently conflate it with real
+// removals in history and adherence metrics. `supabase/032_planned_occurrences_expired_status.sql`
 // adds a distinct `'expired'` status to the CHECK constraint for exactly
 // this case. See REAP_TERMINAL_STATUS below.
 
