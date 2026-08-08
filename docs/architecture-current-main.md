@@ -42,7 +42,6 @@ Guarded app:
 - `/app/protocols`
 - `/app/protocols/new`
 - `/app/protocols/[id]`
-- `/app/meds`
 - `/app/progress`
 - `/app/insights` (compatibility redirect to `/app/progress`)
 - `/app/insights/medications` (compatibility redirect to `/app/progress`)
