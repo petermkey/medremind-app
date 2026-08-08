@@ -145,7 +145,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           sm:shadow-[0_40px_80px_rgba(0,0,0,0.6),0_0_0_1px_rgba(var(--overlay-rgb),0.04)]
           overflow-hidden relative
         ">
-          <div className="absolute left-4 bottom-24 z-20 pointer-events-none">
+          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
             <SyncStatusPill />
           </div>
           <div className="flex-1 overflow-hidden">

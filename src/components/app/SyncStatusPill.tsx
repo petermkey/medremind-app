@@ -11,7 +11,7 @@ const ERROR_DISPLAY_DELAY_MS = 4000;
 
 // How long the idle "Synced" pill stays visible before fading out — it floats over
 // page content, so it shouldn't linger indefinitely once there's nothing to report.
-const IDLE_HIDE_DELAY_MS = 3000;
+const IDLE_HIDE_DELAY_MS = 1500;
 
 function tone(status: SyncStatus) {
   if (status.lastError) return 'border-[rgba(var(--red-rgb),0.35)] bg-[rgba(var(--red-rgb),0.12)] text-[var(--red-text-soft)]';

@@ -177,6 +177,7 @@ export default function ProgressPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [refreshingCorrelations, setRefreshingCorrelations] = useState(false);
   const [analyticsMessage, setAnalyticsMessage] = useState('');
+  const [manageConsent, setManageConsent] = useState(false);
   const activeTab = searchParams.get('tab') === 'oura' ? 'oura' : 'correlations';
 
   const today = new Date();
@@ -429,9 +430,9 @@ export default function ProgressPage() {
     <div className="flex flex-col h-full">
       <div className="px-5 pt-4 pb-2 flex-shrink-0">
         <div className="text-[10px] font-mono uppercase tracking-[0.08em] text-[var(--faint)] mb-1">
-          Data · {calendarRange} d window
+          {calendarRange}-day window
         </div>
-        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[var(--text)]">Signals</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-[var(--text)]">Data</h1>
         <div className="mt-3 grid grid-cols-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1">
           {([
             ['correlations', 'Correlations'],
@@ -533,115 +534,21 @@ export default function ProgressPage() {
         )}
 
         {/* ── 3. SUMMARY METRICS (time-scoped labels) ── */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-5">
           {[
-            { label: 'Adherence', value: `${stats.pct}%`,    color: 'var(--blue-text)', sub: `last ${calendarRange}d` },
+            { label: 'Adherence', value: `${stats.pct}%`,    color: 'var(--blue-text)', sub: `${stats.taken}/${stats.total} · ${calendarRange}d` },
             { label: 'Streak',    value: `${streak}`,         color: 'var(--green)', sub: 'days in a row' },
             { label: 'Active',    value: `${activeCount}`,    color: 'var(--purple)', sub: 'protocols' },
-            { label: 'Taken',     value: `${stats.taken}`,    color: 'var(--green)', sub: `of ${stats.total} (${calendarRange}d)` },
           ].map(({ label, value, color, sub }) => (
-            <div key={label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="text-2xl font-extrabold font-mono tabular-nums" style={{ color }}>{value}</div>
+            <div key={label} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3">
+              <div className="text-xl font-extrabold font-mono tabular-nums" style={{ color }}>{value}</div>
               <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mt-1">{label}</div>
-              <div className="text-[11px] font-mono tabular-nums text-[var(--muted)]">{sub}</div>
+              <div className="text-[10px] font-mono tabular-nums text-[var(--muted)]">{sub}</div>
             </div>
           ))}
         </div>
 
-        {/* ── 4. HEALTH AND MEDICATION PATTERNS ── */}
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 mb-4">
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">Health & Medication Patterns</div>
-              <div className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
-                Oura connection and health sync are managed in Settings.
-              </div>
-            </div>
-            <a
-              href="/app/settings"
-              className="text-xs font-semibold text-[var(--blue-text)] hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
-            >
-              Settings
-            </a>
-          </div>
-
-          {analyticsLoading ? (
-            <p className="text-sm text-[var(--muted)]">Loading analytics...</p>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3">
-                <ConsentToggle
-                  label="Medication pattern analysis"
-                  checked={correlations.consent.enabled && correlations.consent.includesMedicationPatterns}
-                  onChange={(checked) => saveConsent({
-                    ...correlations.consent,
-                    enabled: checked || correlations.consent.includesHealthData,
-                    includesMedicationPatterns: checked,
-                  })}
-                />
-                <ConsentToggle
-                  label="Health-data analysis"
-                  checked={correlations.consent.enabled && correlations.consent.includesHealthData}
-                  onChange={(checked) => saveConsent({
-                    ...correlations.consent,
-                    enabled: checked || correlations.consent.includesMedicationPatterns,
-                    includesHealthData: checked,
-                  })}
-                />
-                <ConsentToggle
-                  label="I understand these patterns support clinician review and do not change medication instructions."
-                  checked={correlations.consent.acknowledgedNoMedChanges}
-                  onChange={(checked) => saveConsent({
-                    ...correlations.consent,
-                    enabled: checked || correlations.consent.enabled,
-                    acknowledgedNoMedChanges: checked,
-                  })}
-                />
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={refreshCorrelations} loading={refreshingCorrelations} disabled={!consentReady}>
-                    Refresh patterns
-                  </Button>
-                  {correlationsStale && (
-                    <span className="text-xs text-[var(--muted)]">Refresh to update</span>
-                  )}
-                </div>
-              </div>
-
-              {analyticsMessage && <p className="text-xs text-[var(--muted)]">{analyticsMessage}</p>}
-              {correlations.error && <p className="text-xs text-[var(--red-text-soft)]">{correlations.error}</p>}
-
-              {latestCorrelationGeneratedAt && correlations.cards.length > 0 && (
-                <p className="text-xs text-[var(--muted)]">
-                  Insights last updated: {formatDistanceToNow(latestCorrelationGeneratedAt, { addSuffix: true })}
-                </p>
-              )}
-
-              {correlations.cards.length === 0 ? (
-                <p className="text-sm leading-relaxed text-[var(--muted)]">
-                  No pattern cards yet. Enable consent and refresh after food, hydration, and health summaries are available.
-                </p>
-              ) : correlations.cards.map((card) => (
-                <article
-                  key={`${card.title}-${card.generatedAt}`}
-                  className="rounded-xl border border-[var(--border)] border-l-2 border-l-[var(--blue)] bg-[var(--bg)] p-4"
-                >
-                  <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-[0.08em] tabular-nums text-[var(--blue-text)]">
-                    Pattern · {card.strength} · R {card.r.toFixed(2)} · N {card.n}
-                  </div>
-                  <h2 className="text-[13.5px] font-bold text-[var(--text)]">{card.title}</h2>
-                  <p className="mt-1 text-[13.5px] leading-relaxed text-[var(--chip-text)]">{card.body}</p>
-                  <p className="mt-3 text-[10.5px] font-mono tabular-nums text-[var(--faint)]">
-                    Direction: {card.direction} · r {card.r.toFixed(2)} · paired days {card.n}
-                  </p>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <NutrientBalanceCard />
-
-        {/* ── 5. LAST 7 DAYS (weekly rings — unchanged) ── */}
+        {/* ── 4. LAST 7 DAYS (weekly rings — unchanged) ── */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 mb-4">
           <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-4">Last 7 Days</div>
           <div className="grid grid-cols-7 gap-2">
@@ -665,7 +572,7 @@ export default function ProgressPage() {
           )}
         </div>
 
-        {/* ── 6. MONTHLY PATTERN (heatmap cells) ── */}
+        {/* ── 5. MONTHLY PATTERN (heatmap cells) ── */}
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">Monthly Pattern</div>
@@ -739,7 +646,7 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        {/* ── 7. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
+        {/* ── 6. PER-PROTOCOL BREAKDOWN (sorted: weakest first) ── */}
         {sortedActiveProtocols.length > 0 && (
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
             <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-4">By Protocol</div>
@@ -762,6 +669,123 @@ export default function ProgressPage() {
             })}
           </div>
         )}
+
+        {/* ── 7. HEALTH AND MEDICATION PATTERNS ── */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 mt-4 mb-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">Health & Medication Patterns</div>
+              <div className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+                Oura connection and health sync are managed in Settings.
+              </div>
+            </div>
+            <a
+              href="/app/settings"
+              className="text-xs font-semibold text-[var(--blue-text)] hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
+            >
+              Settings
+            </a>
+          </div>
+
+          {analyticsLoading ? (
+            <p className="text-sm text-[var(--muted)]">Loading analytics...</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {consentReady && !manageConsent ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3">
+                  <span className="text-xs text-[var(--green-text)]">✓ Analysis consent granted</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setManageConsent(true)}
+                      className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--text)] rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
+                    >
+                      Manage
+                    </button>
+                    <Button size="sm" onClick={refreshCorrelations} loading={refreshingCorrelations}>
+                      {correlationsStale ? 'Refresh (stale)' : 'Refresh patterns'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+              <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3">
+                <ConsentToggle
+                  label="Medication pattern analysis"
+                  checked={correlations.consent.enabled && correlations.consent.includesMedicationPatterns}
+                  onChange={(checked) => saveConsent({
+                    ...correlations.consent,
+                    enabled: checked || correlations.consent.includesHealthData,
+                    includesMedicationPatterns: checked,
+                  })}
+                />
+                <ConsentToggle
+                  label="Health-data analysis"
+                  checked={correlations.consent.enabled && correlations.consent.includesHealthData}
+                  onChange={(checked) => saveConsent({
+                    ...correlations.consent,
+                    enabled: checked || correlations.consent.includesMedicationPatterns,
+                    includesHealthData: checked,
+                  })}
+                />
+                <ConsentToggle
+                  label="I understand these patterns support clinician review and do not change medication instructions."
+                  checked={correlations.consent.acknowledgedNoMedChanges}
+                  onChange={(checked) => saveConsent({
+                    ...correlations.consent,
+                    enabled: checked || correlations.consent.enabled,
+                    acknowledgedNoMedChanges: checked,
+                  })}
+                />
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={refreshCorrelations} loading={refreshingCorrelations} disabled={!consentReady}>
+                    Refresh patterns
+                  </Button>
+                  {consentReady && (
+                    <button
+                      type="button"
+                      onClick={() => setManageConsent(false)}
+                      className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--text)] rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
+                    >
+                      Hide
+                    </button>
+                  )}
+                  {correlationsStale && (
+                    <span className="text-xs text-[var(--muted)]">Refresh to update</span>
+                  )}
+                </div>
+              </div>
+              )}
+
+              {analyticsMessage && <p className="text-xs text-[var(--muted)]">{analyticsMessage}</p>}
+              {correlations.error && <p className="text-xs text-[var(--red-text-soft)]">{correlations.error}</p>}
+
+              {latestCorrelationGeneratedAt && correlations.cards.length > 0 && (
+                <p className="text-xs text-[var(--muted)]">
+                  Insights last updated: {formatDistanceToNow(latestCorrelationGeneratedAt, { addSuffix: true })}
+                </p>
+              )}
+
+              {correlations.cards.length === 0 ? (
+                <p className="text-sm leading-relaxed text-[var(--muted)]">
+                  No pattern cards yet. Enable consent and refresh after food, hydration, and health summaries are available.
+                </p>
+              ) : correlations.cards.map((card) => (
+                <article
+                  key={`${card.title}-${card.generatedAt}`}
+                  className="rounded-xl border border-[var(--border)] border-l-2 border-l-[var(--blue)] bg-[var(--bg)] p-4"
+                >
+                  <div className="mb-2 text-[10px] font-mono font-semibold uppercase tracking-[0.08em] tabular-nums text-[var(--blue-text)]">
+                    Pattern · {card.strength} · R {card.r.toFixed(2)} · N {card.n}
+                  </div>
+                  <h2 className="text-[13.5px] font-bold text-[var(--text)]">{card.title}</h2>
+                  <p className="mt-1 text-[13.5px] leading-relaxed text-[var(--chip-text)]">{card.body}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <NutrientBalanceCard />
 
         {stats.total === 0 && (
           <div className="text-center py-10">
