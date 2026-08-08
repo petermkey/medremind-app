@@ -166,7 +166,7 @@ OpenRouter configuration is used only behind server routes. The medication knowl
 - `npm run test:med-knowledge`
 - `npm run test:correlation`
 
-Authenticated E2E specs, including `tests/e2e/food.spec.ts`, require `E2E_EMAIL`, `E2E_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+Authenticated E2E specs, including `tests/e2e/food.spec.ts`, require `E2E_EMAIL`, `E2E_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. **`E2E_EMAIL`/`E2E_PASSWORD` must point to a dedicated test account, never a real user's (including the owner's) personal account** — E2E specs create and mutate real rows (`profiles`, `active_protocols`, food entries) against whichever account these credentials belong to.
 
 ## CI/CD and Runtime Pipelines
 
