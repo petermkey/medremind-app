@@ -461,6 +461,14 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
   // from the schedule, and their slots must not be recreated by the
   // rolling-horizon regeneration below.
   const removedSlotKeys = new Set<string>();
+  // Expired occurrences without events are the reaper's terminal state for a
+  // stale/forgotten slot (src/lib/schedule/occurrenceReaper.ts) — unlike
+  // cancelled, this was never a deliberate user removal, so it must NOT feed
+  // removedSlotKeys (that would block future rolling-horizon regeneration at
+  // the same slot key, which cancelled deliberately does). It still must be
+  // excluded from scheduledDoses below: falling through to the default
+  // `derivedStatus = 'pending'` would surface a months-old forgotten dose as
+  // a live actionable "pending" item forever.
   const scheduledDoses: ScheduledDose[] = occurrencesRes.data
     .map(row => {
       const sourceActiveId = String(row.active_protocol_id);
@@ -482,8 +490,12 @@ export async function pullStoreFromSupabase(): Promise<PullSummary> {
         removedSlotKeys.add(doseSlotKey(itemId, String(row.occurrence_date), String(row.occurrence_time)));
         return null;
       }
-      // cancelled-without-event already returned null above, so a missing
-      // latestEvent here always means a live planned slot.
+      if (occStatus === 'expired' && !latestEvent) {
+        return null;
+      }
+      // cancelled-without-event and expired-without-event already returned
+      // null above, so a missing latestEvent here always means a live
+      // planned slot.
       const derivedStatus: ScheduledDose['status'] = latestEvent
         ? (String(latestEvent.event_type) as ScheduledDose['status'])
         : 'pending';

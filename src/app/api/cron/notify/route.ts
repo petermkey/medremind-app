@@ -31,6 +31,7 @@ import {
 } from '@/lib/push/foodTiming';
 import { isVapidConfigured, sendPushToUser } from '@/lib/push/sendToUser';
 import { computeWindowSegments, segmentsToOrFilter } from '@/lib/push/scheduleWindow';
+import { reapStaleOccurrences } from '@/lib/schedule/occurrenceReaper';
 
 // Notification fire window: ±1 minute around the current UTC time.
 // Cron runs every minute via cron-job.org (job #7402449).
@@ -120,6 +121,21 @@ export async function GET(request: NextRequest) {
 
   const now = new Date();
   const results: Array<{ userId: string; doseId: string; status: string; pass: string }> = [];
+
+  // Floor applied to every planned_occurrences candidate query below, so
+  // their cost stays flat regardless of how large the historical `planned`
+  // backlog grows (WS7) — occurrences never fire more than a couple of days
+  // late, so nothing this route cares about falls outside this window.
+  const scanFloorDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  // Bounded reap of stale `planned` occurrences (WS7): transitions rows past
+  // the reaper's own (independent, slightly wider) grace period to a
+  // terminal status, capped at DEFAULT_REAP_BATCH_SIZE per tick. Runs once
+  // per invocation of this every-minute cron rather than needing a separate
+  // schedule; reapStaleOccurrences never throws (Supabase errors are caught
+  // and logged internally), so this never blocks the notification passes
+  // below.
+  await reapStaleOccurrences(supabase, { today: now.toISOString().slice(0, 10) });
 
   // ── 1. Find users who have push enabled ────────────────────────────────────
   const { data: notifRows, error: notifErr } = await supabase
@@ -246,6 +262,7 @@ export async function GET(request: NextRequest) {
           `)
           .eq('user_id', userId)
           .eq('status', 'planned')
+          .gte('occurrence_date', scanFloorDate)
           .or(segmentsToOrFilter(segments, 'occurrence_date', 'occurrence_time'))
           .eq('active_protocols.status', 'active');
 
@@ -396,6 +413,7 @@ export async function GET(request: NextRequest) {
             `)
             .eq('user_id', userId)
             .eq('status', 'planned')
+            .gte('occurrence_date', scanFloorDate)
             .in('id', candidateDoseIds)
             .eq('active_protocols.status', 'active');
 
