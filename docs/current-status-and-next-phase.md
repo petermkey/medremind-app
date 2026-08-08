@@ -47,7 +47,7 @@ continuation per `docs/superpowers/plans/2026-06-12-food-pipeline-revival.md`. S
 ## 3. Testing & Verification
 
 **E2E test suite (Playwright):**
-- Food E2E suite requires `E2E_EMAIL` and `E2E_PASSWORD` (dedicated reusable test account; use env var names only, never commit values).
+- Food E2E suite requires `E2E_EMAIL` and `E2E_PASSWORD` — **must be a dedicated test account provisioned solely for E2E runs, never a real user's personal account** (use env var names only, never commit values). As of 2026-08-08 this needs to be provisioned and swapped in; see WS9-L5 in `docs/superpowers/plans/2026-08-06-audit-remediation-master.md`.
 - Requires `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Playwright process env.
 - Dev server must run with `FOOD_AI_PROVIDER=mock` to avoid external API calls.
 - Without credentials, food tests silently skip — selector rot has gone unnoticed this way; ensure test runner is configured.
