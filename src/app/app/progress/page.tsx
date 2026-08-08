@@ -618,7 +618,7 @@ export default function ProgressPage() {
 
               {correlations.cards.length === 0 ? (
                 <p className="text-sm leading-relaxed text-[var(--muted)]">
-                  No pattern cards yet. Enable consent and refresh after medication context, food, hydration, and health summaries are available.
+                  No pattern cards yet. Enable consent and refresh after food, hydration, and health summaries are available.
                 </p>
               ) : correlations.cards.map((card) => (
                 <article

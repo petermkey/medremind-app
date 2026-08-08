@@ -23,7 +23,7 @@ Runtime boundaries:
 - Retry/outbox: `src/lib/supabase/syncOutbox.ts`
 - Oura integration routes: `src/app/api/integrations/oura/*`
 - External health boundary: `src/lib/health/*`, `/api/integrations/health/sync`
-- Medication knowledge boundary: `src/lib/medKnowledge/*`
+- Shared OpenRouter client: `src/lib/medKnowledge/openRouter.ts`, `openRouterModels.ts` (medication-knowledge feature retired WS8; these two files remain as shared infra for the nutrient-balance supplement-facts extractor)
 - Correlation insight boundary: `src/lib/correlation/*`, `/api/insights/correlations`
 
 ## 2. Routing model
@@ -173,10 +173,10 @@ External health snapshot boundary:
 - `src/lib/health/*` and `/api/integrations/health/sync` form the source-compatible ingestion boundary for Oura now and Apple Health later.
 - Sync responses return counts only, not raw health payloads.
 
-Medication Knowledge Layer:
+Medication Knowledge Layer (retired 2026-08, WS8):
 
-- `supabase/009_medication_knowledge.sql` and `src/lib/medKnowledge` hold medication knowledge types, safety, rules, map reader, features, OpenRouter client/config/schemas/normalizer, and evidence handling.
-- The safety layer blocks direct medication-change language. The app must not instruct users to start, stop, increase, decrease, or reschedule medications.
+- The medication-knowledge feature (types, safety, rules, map reader, features, normalizer, evidence handling) was removed. Its `supabase/009_medication_knowledge.sql` tables are dropped by `supabase/033_retire_medication_knowledge.sql` (owner-applied post-merge).
+- `src/lib/medKnowledge/openRouter.ts` and `openRouterModels.ts` remain: shared OpenRouter client infra now used only by the nutrient-balance supplement-facts extractor (`src/lib/nutrientBalance/*`), not by any medication-knowledge logic.
 - OpenRouter model routing is server-side only. Do not log prompts, evidence excerpts, or user identifiers.
 - Structured model outputs require `provider.require_parameters`.
 
@@ -199,7 +199,7 @@ Correlation insight engine:
 - `src/lib/supabase/importStore.ts` — import idempotency via deterministic ID mapping
 - `src/lib/supabase/cloudStore.ts` — cloud pull and snapshot
 - `src/lib/supabase/syncOutbox.ts` — retry/outbox
-- `src/lib/medKnowledge/*` — medication knowledge safety, model routing, evidence, and structured output handling
+- `src/lib/medKnowledge/openRouter.ts`, `openRouterModels.ts` — shared OpenRouter client and model routing, now consumed by the nutrient-balance supplement-facts extractor (medication-knowledge feature that originally owned this directory was retired WS8)
 - `src/lib/correlation/*` — consent-gated aggregate insight generation
 
 Changes in these files require focused validation and docs updates in the same slice.
