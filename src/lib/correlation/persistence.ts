@@ -382,6 +382,24 @@ export async function replaceCorrelationInsightCards(
   return cards.length;
 }
 
+export async function listConsentedCorrelationUserIds(
+  supabase: SupabaseClient = createCorrelationServiceClient(),
+): Promise<string[]> {
+  // Mirrors hasActiveCorrelationConsent's full gate — `enabled` alone is not
+  // a reliable proxy: the UI can set enabled=true when only the
+  // acknowledgement checkbox is ticked (src/app/app/progress/page.tsx).
+  const { data, error } = await supabase
+    .from('correlation_consents')
+    .select('user_id')
+    .eq('enabled', true)
+    .eq('includes_medication_patterns', true)
+    .eq('includes_health_data', true)
+    .eq('acknowledged_no_med_changes', true);
+
+  if (error) throw error;
+  return ((data as unknown as Row[] | null) ?? []).map((row) => String(row.user_id));
+}
+
 export async function generateAndPersistCorrelationInsights(userId: string): Promise<CorrelationInsightCard[]> {
   const supabase = createCorrelationServiceClient();
   const endDate = new Date().toISOString().slice(0, 10);

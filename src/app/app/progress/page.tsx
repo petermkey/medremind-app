@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, eachDayOfInterval, format, subDays } from 'date-fns';
+import { addDays, eachDayOfInterval, format, formatDistanceToNow, subDays } from 'date-fns';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OuraTab } from '@/components/app/oura/OuraTab';
 import { NutrientBalanceCard } from '@/components/app/nutrientBalance/NutrientBalanceCard';
@@ -250,6 +250,20 @@ export default function ProgressPage() {
     && correlations.consent.includesHealthData
     && correlations.consent.acknowledgedNoMedChanges
   ), [correlations.consent]);
+
+  const latestCorrelationGeneratedAt = useMemo(() => {
+    if (correlations.cards.length === 0) return null;
+    return correlations.cards.reduce<Date | null>((latest, card) => {
+      const parsed = new Date(card.generatedAt);
+      if (Number.isNaN(parsed.getTime())) return latest;
+      return !latest || parsed > latest ? parsed : latest;
+    }, null);
+  }, [correlations.cards]);
+
+  const correlationsStale = useMemo(() => (
+    latestCorrelationGeneratedAt !== null
+    && Date.now() - latestCorrelationGeneratedAt.getTime() > 2 * 24 * 60 * 60 * 1000
+  ), [latestCorrelationGeneratedAt]);
 
   async function saveConsent(nextConsent: Consent) {
     setAnalyticsMessage('');
@@ -642,14 +656,25 @@ export default function ProgressPage() {
                     acknowledgedNoMedChanges: checked,
                   })}
                 />
-                <Button size="sm" onClick={refreshCorrelations} loading={refreshingCorrelations} disabled={!consentReady}>
-                  Refresh patterns
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={refreshCorrelations} loading={refreshingCorrelations} disabled={!consentReady}>
+                    Refresh patterns
+                  </Button>
+                  {correlationsStale && (
+                    <span className="text-xs text-[var(--muted)]">Refresh to update</span>
+                  )}
+                </div>
               </div>
 
               {analyticsMessage && <p className="text-xs text-[var(--muted)]">{analyticsMessage}</p>}
               {medicationStatus?.error && <p className="text-xs text-[var(--red-text-soft)]">{medicationStatus.error}</p>}
               {correlations.error && <p className="text-xs text-[var(--red-text-soft)]">{correlations.error}</p>}
+
+              {latestCorrelationGeneratedAt && correlations.cards.length > 0 && (
+                <p className="text-xs text-[var(--muted)]">
+                  Insights last updated: {formatDistanceToNow(latestCorrelationGeneratedAt, { addSuffix: true })}
+                </p>
+              )}
 
               {correlations.cards.length === 0 ? (
                 <p className="text-sm leading-relaxed text-[var(--muted)]">

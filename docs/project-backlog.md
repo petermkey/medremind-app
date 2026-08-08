@@ -81,6 +81,7 @@ Smaller items surfaced during audits that were deliberately left alone (not urge
 | **Oura webhooks (phase 2)**: subscription lifecycle (create/renew/delete, verification challenge, client-secret headers) instead of 6-hourly polling | `docs/oura-integration-stack.md` §4.1 | User count makes 6-hourly polling wasteful — explicitly deferred, not urgent at current scale |
 | **Retire deprecated Oura `tag` scope** on next OAuth consent refresh | `docs/oura-integration-stack.md` G3 (corrected in the sync-overhaul plan: the endpoint is unused, but the scope itself must stay until consent is re-requested, since it authorizes `enhanced_tag`) | Next time users are prompted to re-consent OAuth scopes |
 | **Playwright E2E not in CI** — `quality` job runs unit/correlation/med-knowledge/build only; E2E is creds-gated and silently skips outside local runs | `docs/health-check-2026-06-14.md` | Decide: nightly scheduled E2E CI job, or accept manual-run-only as the standing policy |
+| **`/api/cron/correlation-refresh` has no external scheduler wired up** — route is deployed and `CRON_SECRET`-gated (same situation P-5's healthcheck route and `/api/cron/oura-sync` were in) but insights won't actually regenerate daily until an owner creates the cron-job.org job | WS2 remediation, 2026-08-06 | Owner creates a cron-job.org job — `GET /api/cron/correlation-refresh`, `Authorization: Bearer <CRON_SECRET>`, daily `0 5 * * *` UTC — see README "CI/CD and Runtime Pipelines" |
 
 ---
 
