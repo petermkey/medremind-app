@@ -113,7 +113,11 @@ export async function getNutrientBalance(
       .eq('status', 'active'),
   ]);
   if (foodResult.error) throw foodResult.error;
-  if (stackResult.error) throw stackResult.error;
+  // medication_map_items is retired (WS8) — the table is dropped once the
+  // owner applies migration 033. It has been a frozen, unwritten cache since
+  // the medication-knowledge refresh route was removed (Task 2), so treating
+  // a read error as "no active stack tracked" changes nothing about today's
+  // real data — it only stops that staleness from becoming a hard failure.
 
   const foodRows = (foodResult.data as Row[] | null) ?? [];
   const loggedDayset = new Set<string>();
@@ -125,7 +129,7 @@ export async function getNutrientBalance(
   }
   const loggedDays = loggedDayset.size;
 
-  const mapRows = (stackResult.data as Row[] | null) ?? [];
+  const mapRows = stackResult.error ? [] : ((stackResult.data as Row[] | null) ?? []);
   const pendingItems: string[] = [];
   type PreparedItem = {
     displayName: string;
