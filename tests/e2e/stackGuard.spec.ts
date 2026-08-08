@@ -56,7 +56,7 @@ test.describe('stack guard (requires E2E_EMAIL and E2E_PASSWORD)', () => {
     await cleanupTestProtocols(page);
   });
 
-  test('seeded iron+calcium stack renders caution findings on the Meds page', async ({ page }) => {
+  test('seeded iron+calcium stack renders caution findings on the Stacks page', async ({ page }) => {
     await login(page);
 
     await page.evaluate(() => {
