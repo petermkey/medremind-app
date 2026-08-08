@@ -300,7 +300,8 @@ export async function buildAndPersistDailyLifestyleSnapshots(
     fetchSourceRows(supabase, 'water_entries', userId, 'consumed_at', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`),
     fetchOccurrenceRowsAsV1Compatible(supabase, userId, startDate, endDate),
     fetchSourceRows(supabase, 'external_health_daily_snapshots', userId, 'local_date', startDate, endDate),
-    fetchSourceRows(supabase, 'daily_medication_exposures', userId, 'local_date', startDate, endDate),
+    // daily_medication_exposures is retired (WS8) — the medication-knowledge write path that populated it is gone; featureBuilder's exposure-derived fields already default cleanly on an empty array.
+    Promise.resolve([] as Row[]),
     fetchSourceRows(supabase, 'oura_tags', userId, 'local_date', startDate, endDate),
     fetchSourceRows(supabase, 'oura_heartrate_samples', userId, 'ts', `${widenedStartDate}T00:00:00.000Z`, `${widenedEndDate}T23:59:59.999Z`, 'ts, bpm, source'),
     (async () => {
