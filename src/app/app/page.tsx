@@ -132,7 +132,8 @@ export default function SchedulePage() {
     const seen: Record<string, number> = {};
     for (const dose of actionableDoses) {
       const [h] = dose.scheduledTime.split(':').map(Number);
-      const label = h < 12 ? `Morning · ${fmtTime(dose.scheduledTime)}` :
+      const label = h < 5  ? `Night · ${fmtTime(dose.scheduledTime)}` :
+                    h < 12 ? `Morning · ${fmtTime(dose.scheduledTime)}` :
                     h < 17 ? `Afternoon · ${fmtTime(dose.scheduledTime)}` :
                               `Evening · ${fmtTime(dose.scheduledTime)}`;
       if (!(label in seen)) { seen[label] = blocks.length; blocks.push({ label, doses: [] }); }
@@ -246,12 +247,22 @@ export default function SchedulePage() {
             <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)]">{greeting()}</div>
             <div className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text)]">{profile?.name}</div>
           </div>
-          <Link
-            href="/app/settings"
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--blue)] to-[var(--purple)] flex items-center justify-center text-sm font-bold text-[var(--blue-on)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
-          >
-            {profile?.name?.charAt(0).toUpperCase()}
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              aria-label="Add dose"
+              onClick={() => setSheetOpen(true)}
+              className="w-9 h-9 rounded-full border border-[var(--border-strong)] flex items-center justify-center text-xl leading-none text-[var(--blue-text)] hover:border-[var(--blue)] hover:bg-[rgba(var(--blue-rgb),0.1)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
+            >
+              +
+            </button>
+            <Link
+              href="/app/settings"
+              className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--blue)] to-[var(--purple)] flex items-center justify-center text-sm font-bold text-[var(--blue-on)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
+            >
+              {profile?.name?.charAt(0).toUpperCase()}
+            </Link>
+          </div>
         </div>
 
         {/* Status strip — 3 stats with hairline dividers */}
@@ -282,7 +293,7 @@ export default function SchedulePage() {
       </div>
 
       {/* Scroll area */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
+      <div className="flex-1 overflow-y-auto px-5 pb-8">
         {isFutureDate && (
           <div className="mb-4 rounded-2xl border border-[rgba(var(--yellow-rgb),0.35)] bg-[rgba(var(--yellow-rgb),0.1)] px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-[var(--yellow)]">Future Date</div>
@@ -396,19 +407,17 @@ export default function SchedulePage() {
                 ))}
               </div>
             ))}
+            <button
+              type="button"
+              aria-label="Add dose manually"
+              onClick={() => setSheetOpen(true)}
+              className="mb-2 w-full rounded-xl border border-dashed border-[var(--border-strong)] py-3 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-text)] hover:border-[var(--blue)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
+            >
+              + Add dose
+            </button>
           </div>
         )}
       </div>
-
-      {/* FAB */}
-      <button
-        type="button"
-        aria-label="Open add dose sheet"
-        onClick={() => setSheetOpen(true)}
-        className="absolute bottom-24 right-5 w-12 h-12 bg-[var(--blue)] hover:bg-[var(--blue-dk)] rounded-[16px] shadow-[0_4px_20px_rgba(var(--blue-rgb),0.5)] flex items-center justify-center text-2xl text-[var(--blue-on)] transition-all duration-200 z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--blue)] focus-visible:outline-offset-2"
-      >
-        +
-      </button>
 
       <AddDoseSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
       {deleteTargetDose && (
