@@ -2,7 +2,7 @@
 // Relative imports only (test:unit harness). The schema whitelists exactly
 // the curated nutrient keys - the model cannot invent nutrients, and it
 // cannot supply ULs (those live in limits.ts by design).
-import type { JsonSchema } from '../medKnowledge/aiSchemas';
+import type { JsonSchema } from '../medKnowledge/openRouter';
 import { findNutrientDef, NUTRIENT_DEFS } from './limits';
 
 export function normalizeSupplementName(displayName: string): string {

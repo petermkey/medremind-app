@@ -1,8 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { MEDICATION_CLASSIFICATION_SCHEMA } from './aiSchemas.ts';
 import { callOpenRouterStructuredJson } from './openRouter.ts';
+
+const MEDICATION_CLASSIFICATION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['label', 'confidence', 'rationale'],
+  properties: {
+    label: { type: 'string' },
+    rxnormRxcui: { type: ['string', 'null'] },
+    normalizedName: { type: ['string', 'null'] },
+    ingredients: { type: 'array', items: { type: 'string' } },
+    classLabels: { type: 'array', items: { type: 'string' } },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    rationale: { type: 'string' },
+    ambiguityNotes: { type: ['string', 'null'] },
+  },
+};
 
 test('sends strict schema requests with provider parameter requirements', async () => {
   let capturedUrl;
