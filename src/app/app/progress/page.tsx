@@ -8,21 +8,6 @@ import { WeeklyReviewSection } from '@/components/app/WeeklyReviewSection';
 import { Button } from '@/components/ui/Button';
 import { useStore } from '@/lib/store/store';
 
-type MedicationStatus = {
-  counts?: {
-    mapItems: number;
-    rules: number;
-    clinicianReviewFlags: number;
-    dailyExposures: number;
-  };
-  lastRun?: {
-    status?: string;
-    updatedAt?: string | null;
-    lastError?: string | null;
-  } | null;
-  error?: string;
-};
-
 type Consent = {
   enabled: boolean;
   includesMedicationPatterns: boolean;
@@ -188,10 +173,8 @@ export default function ProgressPage() {
   } = useStore();
   const [calendarRange, setCalendarRange] = useState<30 | 60 | 90>(30);
   const [isMobile, setIsMobile] = useState(false);
-  const [medicationStatus, setMedicationStatus] = useState<MedicationStatus | null>(null);
   const [correlations, setCorrelations] = useState<CorrelationResponse>({ consent: DEFAULT_CONSENT, cards: [] });
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [refreshingMedication, setRefreshingMedication] = useState(false);
   const [refreshingCorrelations, setRefreshingCorrelations] = useState(false);
   const [analyticsMessage, setAnalyticsMessage] = useState('');
   const activeTab = searchParams.get('tab') === 'oura' ? 'oura' : 'correlations';
@@ -220,24 +203,19 @@ export default function ProgressPage() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      fetch('/api/medication-knowledge/status')
-        .then((response) => response.json())
-        .catch(() => ({ error: 'Medication knowledge unavailable.' })),
-      fetch('/api/insights/correlations')
-        .then((response) => response.json())
-        .catch(() => ({ consent: DEFAULT_CONSENT, cards: [], error: 'Progress analytics unavailable.' })),
-    ]).then(([medicationData, correlationData]) => {
-      if (cancelled) return;
-      setMedicationStatus(medicationData);
-      setCorrelations({
-        consent: correlationData.consent ?? DEFAULT_CONSENT,
-        cards: correlationData.cards ?? [],
-        error: correlationData.error,
+    fetch('/api/insights/correlations')
+      .then((response) => response.json())
+      .catch(() => ({ consent: DEFAULT_CONSENT, cards: [], error: 'Progress analytics unavailable.' }))
+      .then((correlationData) => {
+        if (cancelled) return;
+        setCorrelations({
+          consent: correlationData.consent ?? DEFAULT_CONSENT,
+          cards: correlationData.cards ?? [],
+          error: correlationData.error,
+        });
+      }).finally(() => {
+        if (!cancelled) setAnalyticsLoading(false);
       });
-    }).finally(() => {
-      if (!cancelled) setAnalyticsLoading(false);
-    });
 
     return () => {
       cancelled = true;
@@ -279,29 +257,6 @@ export default function ProgressPage() {
       error: response.ok ? undefined : data.error,
     });
     if (!response.ok) setAnalyticsMessage(data.error ?? 'Consent update failed.');
-  }
-
-  async function refreshMedicationKnowledge() {
-    setRefreshingMedication(true);
-    setAnalyticsMessage('');
-    try {
-      const response = await fetch('/api/medication-knowledge/refresh', { method: 'POST' });
-      const data = await response.json();
-      setMedicationStatus((current) => ({
-        ...current,
-        counts: {
-          mapItems: data.counts?.mapItems ?? current?.counts?.mapItems ?? 0,
-          rules: data.counts?.rules ?? current?.counts?.rules ?? 0,
-          clinicianReviewFlags: current?.counts?.clinicianReviewFlags ?? 0,
-          dailyExposures: data.counts?.dailyExposures ?? current?.counts?.dailyExposures ?? 0,
-        },
-        lastRun: data.lastRun ?? current?.lastRun ?? null,
-        error: response.ok ? undefined : data.error,
-      }));
-      setAnalyticsMessage(response.ok ? 'Medication context refreshed.' : data.error ?? 'Medication context refresh failed.');
-    } finally {
-      setRefreshingMedication(false);
-    }
   }
 
   async function refreshCorrelations() {
@@ -614,20 +569,6 @@ export default function ProgressPage() {
             <p className="text-sm text-[var(--muted)]">Loading analytics...</p>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[var(--text)]">
-                    <span className="font-mono tabular-nums">{medicationStatus?.counts?.mapItems ?? 0}</span> medication map item(s)
-                  </div>
-                  <div className="mt-1 text-xs font-mono tabular-nums text-[var(--muted)]">
-                    {medicationStatus?.counts?.rules ?? 0} rule card(s), {medicationStatus?.counts?.clinicianReviewFlags ?? 0} clinician-review flag(s)
-                  </div>
-                </div>
-                <Button size="sm" variant="secondary" onClick={refreshMedicationKnowledge} loading={refreshingMedication}>
-                  Refresh
-                </Button>
-              </div>
-
               <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3">
                 <ConsentToggle
                   label="Medication pattern analysis"
@@ -667,7 +608,6 @@ export default function ProgressPage() {
               </div>
 
               {analyticsMessage && <p className="text-xs text-[var(--muted)]">{analyticsMessage}</p>}
-              {medicationStatus?.error && <p className="text-xs text-[var(--red-text-soft)]">{medicationStatus.error}</p>}
               {correlations.error && <p className="text-xs text-[var(--red-text-soft)]">{correlations.error}</p>}
 
               {latestCorrelationGeneratedAt && correlations.cards.length > 0 && (
