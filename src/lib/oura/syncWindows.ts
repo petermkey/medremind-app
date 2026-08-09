@@ -72,3 +72,40 @@ export function heartrateDatetimeRange(
     end_datetime: `${range.end_date}T23:59:59Z`,
   };
 }
+
+// How far back before the newest stored sample the incremental fetch restarts.
+// Covers samples the ring uploads out of order around the boundary; anything
+// older than this is healed by a manual refresh (14-day window) or backfill.
+export const HEARTRATE_WATERMARK_OVERLAP_MINUTES = 360;
+
+// Incremental variant of heartrateDatetimeRange for the recurring cron sync.
+//
+// The cron range is sized for the DAILY AGGREGATES, which keep mutating for
+// days (daily_activity/stress update through the day, readiness finalizes next
+// morning) — hence the 7-day floor in computeOuraCronSyncRange. Heartrate
+// samples are the opposite: immutable point telemetry, keyed (user_id, ts),
+// that never changes once written. Re-upserting the whole aggregate window
+// every hour rewrote ~7.2k unchanged rows per run (~173k row-updates/day for
+// ~500 genuinely new samples) and made oura_heartrate_samples the single
+// largest WAL producer in the database — the root cause of the Supabase Disk
+// IO Budget warning on 2026-08-09.
+//
+// Given a watermark (newest stored sample), fetch only from there minus a
+// small overlap. Falls back to the full window whenever the watermark is
+// missing or unusable, so a first sync/backfill still pulls everything, and
+// never widens beyond the range the caller asked for.
+export function incrementalHeartrateDatetimeRange(
+  range: { start_date: string; end_date: string },
+  watermark: string | null,
+): { start_datetime: string; end_datetime: string } {
+  const full = heartrateDatetimeRange(range);
+  if (!watermark) return full;
+
+  const parsed = new Date(watermark);
+  if (Number.isNaN(parsed.getTime())) return full;
+
+  const from = new Date(parsed.getTime() - HEARTRATE_WATERMARK_OVERLAP_MINUTES * 60 * 1000);
+  if (from <= new Date(full.start_datetime)) return full;
+
+  return { start_datetime: from.toISOString(), end_datetime: full.end_datetime };
+}

@@ -100,6 +100,26 @@ export async function upsertOuraTags(rows: OuraTagRow[]): Promise<number> {
   return rows.length;
 }
 
+// Newest stored sample timestamp for a user, or null when none exist yet.
+// Never throws: a failed watermark read must degrade to the full sync window
+// (the previous behaviour) rather than skip the heartrate sync entirely.
+export async function getOuraHeartrateWatermark(userId: string): Promise<string | null> {
+  try {
+    const supabase = createHealthServiceClient();
+    const { data, error } = await supabase
+      .from('oura_heartrate_samples')
+      .select('ts')
+      .eq('user_id', userId)
+      .order('ts', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return null;
+    return typeof data?.ts === 'string' ? data.ts : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function upsertOuraHeartrateSamples(
   userId: string,
   rows: OuraHeartrateSampleRow[],
