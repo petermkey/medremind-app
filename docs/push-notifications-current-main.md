@@ -15,7 +15,7 @@ Status: Implemented, deployed to production, **verified end-to-end 2026-03-23**
 | Install detection | `src/lib/push/useInstallState.ts` — detects `standalone` vs `browser` mode |
 | Push delivery | `POST /api/push/send` — CRON_SECRET auth, calls `web-push`, auto-deletes stale endpoints |
 | Scheduler | `GET /api/cron/notify` — queries `notification_settings`, finds due doses, deduplicates via `notification_log` |
-| Cron trigger | [cron-job.org](https://cron-job.org) job #7402449 — calls `/api/cron/notify` every minute with Bearer token |
+| Cron trigger | [cron-job.org](https://cron-job.org) job #7402449 — calls `/api/cron/notify` every 2 minutes with Bearer token |
 | DB tables | `push_subscriptions`, `notification_log` (see `supabase/003_web_push.sql`) |
 
 ---
@@ -41,10 +41,10 @@ Status: Implemented, deployed to production, **verified end-to-end 2026-03-23**
 ### Notification delivery (cron) — two-pass firing with reliability
 
 **Pass A: Initial scheduled notifications**
-1. cron-job.org hits `GET /api/cron/notify` every minute with `Authorization: Bearer $CRON_SECRET`
-2. Before processing each user: **stale-claim recovery** deletes `notification_log` rows with `notification_count=1` older than 2× WINDOW_MINUTES (2 min). This unblocks doses whose Pass A lock was written by a crashed worker that never delivered the push.
+1. cron-job.org hits `GET /api/cron/notify` every 2 minutes with `Authorization: Bearer $CRON_SECRET`
+2. Before processing each user: **stale-claim recovery** deletes `notification_log` rows with `notification_count=1` older than 2× WINDOW_MINUTES (4 min). This unblocks doses whose Pass A lock was written by a crashed worker that never delivered the push.
 3. Queries `notification_settings` where `push_enabled = true`
-4. For each user: computes target time with `lead_time_min` offset, queries `scheduled_doses` in ±1 min window
+4. For each user: computes target time with `lead_time_min` offset, queries `scheduled_doses` in ±2 min window
 5. Lifecycle filters: `active` protocols only, `pending`/`overdue` doses, within `end_date`
 6. Atomic Pass A lock: upsert `notification_log` with `notification_count=1` using `onConflict: ignoreDuplicates` to ensure only one cron worker claims the initial send per dose.
 7. Calls `POST /api/push/send` per dose → `webpush.sendNotification()` → Apple APNs
@@ -118,7 +118,7 @@ curl https://medremind-app-two.vercel.app/api/cron/notify \
 ## 8. cron-job.org setup
 
 - URL: `https://medremind-app-two.vercel.app/api/cron/notify`
-- Schedule: every 1 minute
+- Schedule: every 2 minutes (changed 2026-08-09 from every 1 minute — the 1-minute-forever cadence was the dominant driver of the project's Supabase Disk IO Budget warning; see `WINDOW_MINUTES` comment in `src/app/api/cron/notify/route.ts`)
 - Header: `Authorization: Bearer <CRON_SECRET>`
 - Vercel Hobby plan does NOT support sub-daily cron jobs — cron-job.org is the trigger
 - `vercel.json` has `"crons": []` (empty — Vercel cron disabled)
@@ -151,7 +151,7 @@ The service worker applies context-aware re-alert behaviour based on the push pa
 
 **Problem:** If a cron worker crashes after writing the Pass A lock (`notification_count=1`) but before calling `/api/push/send`, the row remains indefinitely and blocks all future Pass A attempts for that dose. The dose will never fire.
 
-**Solution:** Before processing each user, delete any `notification_count=1` rows whose `sent_at` is older than 2× WINDOW_MINUTES (i.e., 2 minutes). A worker writing the lock has 2 minutes to deliver; if the timestamp is older, the writer is clearly gone and the row is safe to reclaim.
+**Solution:** Before processing each user, delete any `notification_count=1` rows whose `sent_at` is older than 2× WINDOW_MINUTES (i.e., 4 minutes). A worker writing the lock has 4 minutes to deliver; if the timestamp is older, the writer is clearly gone and the row is safe to reclaim.
 
 **Implementation:** Lines 92–106 of `/api/cron/notify`.
 
