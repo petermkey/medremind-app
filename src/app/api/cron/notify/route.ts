@@ -1,7 +1,17 @@
 // GET /api/cron/notify
-// Triggered every minute by an external scheduler (cron-job.org job
+// Triggered every 2 minutes by an external scheduler (cron-job.org job
 // #7402449), not Vercel Cron — see docs/project_push_notifications memory.
 // Finds doses due for push notification and delivers them.
+//
+// Cadence note (2026-08-09): was every 1 minute until this change. A
+// 1-minute-forever cron doing several small write transactions per tick
+// (stale-claim delete, notification_log upsert/update, reaper writes)
+// was the dominant source of the project's Supabase Disk IO Budget
+// warning — confirmed via pg_stat_wal (wal_buffers_full in the millions)
+// against a 39 MB database. Moving to 2 minutes halves the tick count
+// with no functional loss beyond the fire window widening from ±1 to
+// ±2 minutes (see WINDOW_MINUTES below). Remember to update the
+// cron-job.org job #7402449 schedule to match.
 //
 // Lifecycle contract rules honored:
 //   - Only pending/overdue doses for active protocols fire.
@@ -11,7 +21,7 @@
 //   - lead_time_min is applied: notification fires leadTimeMin before scheduled_time.
 //   - Pass A (initial): fires once per dose when it first enters the window.
 //   - Pass B (reminders): re-fires every REMINDER_INTERVAL_MINUTES while dose is still pending/overdue.
-//   - Fire window: doses due in [now - 1 min, now + 1 min] (scheduler cadence tolerance).
+//   - Fire window: doses due in [now - 2 min, now + 2 min] (scheduler cadence tolerance).
 //
 import * as Sentry from '@sentry/nextjs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -33,9 +43,11 @@ import { isVapidConfigured, sendPushToUser } from '@/lib/push/sendToUser';
 import { computeWindowSegments, segmentsToOrFilter } from '@/lib/push/scheduleWindow';
 import { reapStaleOccurrences } from '@/lib/schedule/occurrenceReaper';
 
-// Notification fire window: ±1 minute around the current UTC time.
-// Cron runs every minute via cron-job.org (job #7402449).
-const WINDOW_MINUTES = 1;
+// Notification fire window: ±2 minutes around the current UTC time.
+// Cron runs every 2 minutes via cron-job.org (job #7402449) — the window
+// must be >= the tick interval so consecutive ticks overlap and no
+// occurrence falls in the gap between them.
+const WINDOW_MINUTES = 2;
 
 // How often to re-notify for unactioned (pending/overdue) doses.
 const REMINDER_INTERVAL_MINUTES = 10;
