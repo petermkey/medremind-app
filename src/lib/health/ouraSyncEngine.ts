@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { mapOuraDailyPayloadToHealthSnapshot } from '@/lib/health/ouraDailyMapper';
 import { hrvRecoveryDelta, parseSleepPhaseFeatures } from '@/lib/health/nightDetail';
 import {
+  getOuraHeartrateWatermark,
   upsertExternalHealthDailySnapshots,
   upsertOuraHeartrateSamples,
   upsertOuraTags,
@@ -25,7 +26,7 @@ import { fetchOuraJson, refreshOuraAccessToken } from '@/lib/oura/client';
 import { getOuraServerConfig } from '@/lib/oura/config';
 import { parseHeartrateRows } from '@/lib/oura/heartrateSamples';
 import { classifyOptionalOuraError, type OuraOptionalFetchAuthError } from '@/lib/oura/optionalFetchError';
-import { heartrateDatetimeRange } from '@/lib/oura/syncWindows';
+import { heartrateDatetimeRange, incrementalHeartrateDatetimeRange } from '@/lib/oura/syncWindows';
 import {
   getStoredOuraTokens,
   markOuraSyncSuccess,
@@ -276,14 +277,23 @@ async function fetchOptionalOuraCollection(
 
 // Heartrate is additive telemetry: a failure records coverage and moves on,
 // never failing the run. Uses datetime params because heartrate has no date params.
+//
+// On the recurring 'daily' cron the fetch starts from the newest stored sample
+// (minus a small overlap) instead of restating the whole aggregate window —
+// see incrementalHeartrateDatetimeRange. 'initial_backfill' and
+// 'manual_refresh' keep the full window: the first pulls history that isn't
+// there yet, the second is the user's explicit "re-pull and heal gaps" action.
 async function syncHeartrateSamples(input: {
   userId: string;
   syncRunId: string;
   apiBaseUrl: string;
   accessToken: string;
   range: { start_date: string; end_date: string };
+  syncType: 'initial_backfill' | 'daily' | 'manual_refresh';
 }): Promise<number> {
-  const dtRange = heartrateDatetimeRange(input.range);
+  const dtRange = input.syncType === 'daily'
+    ? incrementalHeartrateDatetimeRange(input.range, await getOuraHeartrateWatermark(input.userId))
+    : heartrateDatetimeRange(input.range);
   const data: unknown[] = [];
   let nextToken: string | null = null;
   try {
@@ -634,6 +644,7 @@ export async function syncOuraSnapshots(
       apiBaseUrl: auth.config.apiBaseUrl,
       accessToken: auth.tokens.accessToken,
       range,
+      syncType,
     });
 
     stage = 'sync_device_status';

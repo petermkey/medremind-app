@@ -44,14 +44,14 @@ Sources: [cloud.ouraring.com/v2/docs](https://cloud.ouraring.com/v2/docs), [Oura
 | **Recommended sleep window** | `sleep_time` | smart reminders (quiet hours), B4 check-in timing | align pushes with the user's optimal bedtime |
 | **Enhanced tags** (caffeine, alcohol, sauna…) | `enhanced_tag` | correlation features alongside our meds/food | user already tags lifestyle events in the Oura app — free feature inputs |
 | Sessions (meditation/breath) | `session` | correlations (optional) | recovery practices as features |
-| 5-min heart rate | `heartrate` | *(defer)* | high volume, low marginal value until intra-day analysis exists |
+| 5-min heart rate | `heartrate` | intra-day charts, correlations | high volume — synced **incrementally** from the newest stored sample (see §4.1a); a full-window re-pull is a manual-refresh/backfill action only |
 | Ring configuration / battery | `ring_configuration` | *(defer)* | support/diagnostics only |
 
 ## 4. Target architecture
 
 ### 4.1 Freshness: scheduled server pull now, webhooks later
 ```
-cron-job.org (every 6h) ──▶ /api/cron/oura-sync   (Bearer CRON_SECRET)
+cron-job.org (hourly since 2026-07-18) ──▶ /api/cron/oura-sync   (Bearer CRON_SECRET)
   for each external_health_connections row with status='connected':
     decrypt refresh token (tokenStore/tokenCrypto — already built)
     → refresh access token if needed (client.ts — already built)
@@ -64,6 +64,29 @@ cron-job.org (every 6h) ──▶ /api/cron/oura-sync   (Bearer CRON_SECRET)
 - **Reuses the entire existing fetch/map/upsert path** — the only new code is the cron route walking connections server-side (Settings button stays as manual "sync now").
 - Same operational discipline as `/api/cron/notify`: CRON_SECRET, per-user try/catch, Sentry, results summary.
 - **Webhooks = phase 2**, only when user count makes 6-hourly polling wasteful: subscription lifecycle (create/renew/delete) needs client-secret headers, a verification challenge endpoint, and renewal bookkeeping — real complexity that a single-digit user base doesn't justify. Architecture note: webhook handler would enqueue `(user, data_type, date)` and reuse the same fetch-window code path, so nothing built for polling is thrown away.
+
+### 4.1a Heartrate is incremental, not restated (added 2026-08-09)
+The trailing 7-day window above exists for the **daily aggregates**, which keep
+mutating (activity/stress update through the day, readiness finalizes next
+morning). Heartrate samples are the opposite: immutable point telemetry keyed
+`(user_id, ts)` that never changes once written.
+
+Applying the aggregate window to heartrate made the hourly cron re-upsert the
+entire 7-day window every run — **7,202 unchanged rows per run, ~173k
+row-updates/day, for ~500 genuinely new samples.** Each no-op UPDATE still
+costs an MVCC row version, a WAL record, a dead tuple and later autovacuum
+work, which made `oura_heartrate_samples` the single largest WAL producer in
+the database (433 MB, 37% of all WAL) and triggered Supabase's Disk IO Budget
+warning on 2026-08-09.
+
+`incrementalHeartrateDatetimeRange` (`src/lib/oura/syncWindows.ts`) now starts
+the fetch at the newest stored sample minus a 6h overlap:
+- `syncType: 'daily'` (hourly cron) → incremental — measured 7,202 → 177 rows/run
+- `'initial_backfill'` / `'manual_refresh'` → **full window**, unchanged: the
+  first pulls history that isn't there yet, the second is the user-facing
+  "re-pull and heal gaps" action
+- watermark missing/unparseable → falls back to the full window, so a failed
+  read degrades to the old behaviour rather than skipping the sync
 
 ### 4.2 New data: fill the NULLs, then widen (migration 020-series)
 Phase A (no schema change): fetch `daily_resilience`, `vO2_max`, `daily_cardiovascular_age` in the daily route; extend `ouraDailyMapper` inputs (columns already exist; add `cardiovascular_age numeric` — one new column).
