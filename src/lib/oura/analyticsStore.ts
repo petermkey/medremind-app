@@ -273,14 +273,26 @@ export async function upsertOuraRawDocument(
   const existing = await findRawDocument(input, payloadHash);
 
   if (existing) {
+    // findRawDocument matches on payload_hash, so reaching this branch proves
+    // the stored payload is already byte-identical. Rewriting it still costs a
+    // new row version, a WAL record (payloads average ~1 KB and the large ones
+    // are TOASTed), a dead tuple and later autovacuum work — all for no change
+    // in content. The hourly cron re-visits the same documents every run, which
+    // made this the #2 WAL producer in the database at 140 MB / 32k updates
+    // across only 875 rows (~37 rewrites each).
+    //
+    // fetched_at and sync_run_id are write-only here — nothing in the codebase
+    // reads them back. The single exception is pruneOuraRawDocuments, which
+    // falls back to fetched_at for documents carrying neither local_date nor
+    // start_datetime; keep touching those so the retention safety net behaves
+    // exactly as before (currently 0 rows qualify, but the branch must stay
+    // correct if an endpoint ever produces such documents).
+    const retentionUsesFetchedAt = !input.localDate && !input.startDatetime;
+    if (!retentionUsesFetchedAt) return { id: existing.id, payloadHash };
+
     const { error } = await supabase
       .from('oura_raw_documents')
-      .update({
-        payload: input.payload,
-        fetched_at: input.fetchedAt ?? new Date().toISOString(),
-        sync_run_id: input.syncRunId ?? null,
-        schema_version: input.schemaVersion ?? 1,
-      })
+      .update({ fetched_at: input.fetchedAt ?? new Date().toISOString() })
       .eq('id', existing.id);
 
     if (error) throw error;
