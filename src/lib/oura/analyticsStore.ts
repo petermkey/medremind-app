@@ -357,6 +357,34 @@ export async function pruneOuraRawDocuments(input: {
   return count;
 }
 
+// Coverage rows are per-run diagnostics (14 per hourly sync, ~336/day) with no
+// reader in the codebase and no retention until 2026-08-10 — the table grew
+// unbounded (~123k rows/year). Same 90-day retention as oura_raw_documents;
+// the delete is keyed on (user_id, fetched_at), matching
+// idx_oura_sync_endpoint_coverage_user_fetched.
+export async function pruneOuraSyncEndpointCoverage(input: {
+  cutoffDate?: string;
+  now?: Date;
+  retentionDays?: number;
+  userId?: string;
+} = {}): Promise<number | null> {
+  const supabase = getServiceClient();
+  const cutoffDate = input.cutoffDate
+    ?? getOuraRawRetentionCutoffDate(input.now, input.retentionDays);
+  let query = supabase
+    .from('oura_sync_endpoint_coverage')
+    .delete({ count: 'exact' })
+    .lt('fetched_at', `${cutoffDate}T00:00:00.000Z`);
+
+  if (input.userId) {
+    query = query.eq('user_id', input.userId);
+  }
+
+  const { count, error } = await query;
+  if (error) throw error;
+  return count;
+}
+
 export function getOuraRawRetentionCutoffDate(now = new Date(), retentionDays = 90): string {
   const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   cutoff.setUTCDate(cutoff.getUTCDate() - retentionDays + 1);
