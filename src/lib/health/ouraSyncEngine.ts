@@ -13,6 +13,7 @@ import {
   finishOuraSyncRun,
   type JsonObject,
   pruneOuraRawDocuments,
+  pruneOuraSyncEndpointCoverage,
   recordOuraEndpointCoverage,
   startOuraSyncRun,
   upsertDailyHealthFeature,
@@ -671,6 +672,7 @@ export async function syncOuraSnapshots(
       },
     });
     await pruneOuraRawDocuments({ userId });
+    await pruneOuraSyncEndpointCoverage({ userId });
 
     return count;
   } catch (err) {
