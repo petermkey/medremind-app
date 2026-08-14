@@ -7,8 +7,14 @@ import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { useStore } from '@/lib/store/store';
 import { isEmailConfirmationRequiredError, resendSignupConfirmationEmail, signInWithOAuth, supabaseSignIn } from '@/lib/supabase/auth';
 import { pullStoreFromSupabase } from '@/lib/supabase/cloudStore';
+import { TimeoutError, withTimeout } from '@/lib/supabase/withTimeout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+
+// Caps how long the UI waits on Supabase before showing a clear error
+// instead of spinning forever (e.g. during an upstream outage).
+const AUTH_TIMEOUT_MS = 15000;
+const SERVICE_UNAVAILABLE_MESSAGE = 'Service is temporarily unavailable. Please try again in a few minutes.';
 
 function LoginForm() {
   const RESEND_COOLDOWN_SECONDS = 30;
@@ -36,12 +42,18 @@ function LoginForm() {
 
   async function handleOAuth(provider: 'google') {
     setOauthLoading(provider);
-    const err = await signInWithOAuth(provider);
-    if (err) {
-      setError(err);
+    setError('');
+    try {
+      const err = await withTimeout(signInWithOAuth(provider), AUTH_TIMEOUT_MS);
+      if (err) {
+        setError(err);
+        setOauthLoading(null);
+      }
+      // On success the browser navigates away; no need to reset state.
+    } catch (err) {
       setOauthLoading(null);
+      setError(err instanceof TimeoutError ? SERVICE_UNAVAILABLE_MESSAGE : 'Sign-in failed. Please try again.');
     }
-    // On success the browser navigates away; no need to reset state.
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,7 +64,14 @@ function LoginForm() {
     setResendError(false);
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setLoading(true);
-    const { profile, error: authError } = await supabaseSignIn(email, password);
+    let profile, authError: string | null;
+    try {
+      ({ profile, error: authError } = await withTimeout(supabaseSignIn(email, password), AUTH_TIMEOUT_MS));
+    } catch (err) {
+      setLoading(false);
+      setError(err instanceof TimeoutError ? SERVICE_UNAVAILABLE_MESSAGE : 'Sign-in failed. Please try again.');
+      return;
+    }
     setLoading(false);
     if (authError || !profile) {
       const message = authError ?? 'Sign-in failed. Check your credentials.';

@@ -6,8 +6,14 @@ import { useFoodStore } from '@/lib/store/foodStore';
 import { useNutritionTargetsStore } from '@/lib/store/nutritionTargetsStore';
 import { useStore } from '@/lib/store/store';
 import { resendSignupConfirmationEmail, signInWithOAuth, supabaseSignUp } from '@/lib/supabase/auth';
+import { TimeoutError, withTimeout } from '@/lib/supabase/withTimeout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+
+// Caps how long the UI waits on Supabase before showing a clear error
+// instead of spinning forever (e.g. during an upstream outage).
+const AUTH_TIMEOUT_MS = 15000;
+const SERVICE_UNAVAILABLE_MESSAGE = 'Service is temporarily unavailable. Please try again in a few minutes.';
 
 function validate(name: string, email: string, password: string, confirm: string) {
   if (!name.trim()) return 'Name is required.';
@@ -49,10 +55,15 @@ export default function RegisterPage() {
   async function handleOAuth(provider: 'google') {
     setOauthLoading(provider);
     setOauthError('');
-    const err = await signInWithOAuth(provider);
-    if (err) {
-      setOauthError(err);
+    try {
+      const err = await withTimeout(signInWithOAuth(provider), AUTH_TIMEOUT_MS);
+      if (err) {
+        setOauthError(err);
+        setOauthLoading(null);
+      }
+    } catch (err) {
       setOauthLoading(null);
+      setOauthError(err instanceof TimeoutError ? SERVICE_UNAVAILABLE_MESSAGE : 'Sign-in failed. Please try again.');
     }
   }
 
@@ -69,7 +80,17 @@ export default function RegisterPage() {
 
     setLoading(true);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const { profile, error: authError, hasSession } = await supabaseSignUp(email, password, name.trim(), timezone);
+    let profile, authError: string | null, hasSession: boolean;
+    try {
+      ({ profile, error: authError, hasSession } = await withTimeout(
+        supabaseSignUp(email, password, name.trim(), timezone),
+        AUTH_TIMEOUT_MS,
+      ));
+    } catch (err) {
+      setLoading(false);
+      setError(err instanceof TimeoutError ? SERVICE_UNAVAILABLE_MESSAGE : 'Registration failed. Please try again.');
+      return;
+    }
     setLoading(false);
 
     if (authError || !profile) {
